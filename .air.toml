@@ -2,10 +2,10 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-  cmd = "templ generate && go build -o ./tmp/builder ./cmd/hgmx/builder"
-  bin = "./tmp/builder"
+  cmd = "templ generate && go build -o /tmp/builder ./cmd/builder"
+  bin = "/tmp/builder"
   include_ext = ["go", "templ", "css", "js"]
-  exclude_dir = ["tmp", "vendor", "node_modules", "cmd/hgmx/main"]
+  exclude_dir = ["tmp", "vendor", "node_modules", "cmd/hgmx/"]
   exclude_file = []
   exclude_regex = ["_test.go", "_templ.go"]
   exclude_unchanged = false

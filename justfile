@@ -21,6 +21,10 @@ run *ARGS:
     @echo
     @go run {{MAIN_PACKAGE_PATH}} {{ARGS}}
 
+builder:
+    open http://localhost:3008
+    @air -c .air.toml
+
 describe:
     @echo "{{GIT_VERSION}}"
 
