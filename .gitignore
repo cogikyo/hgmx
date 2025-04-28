@@ -23,4 +23,6 @@ go.work.sum
 
 # env file
 .env
+node_modules/
+package-lock.json
 tmp/

@@ -3,6 +3,8 @@ BINARY_NAME         := "hgmx"
 MAIN_PACKAGE_PATH   := "cmd/hgmx/hgmx.go"
 VERSION_VAR_PATH    := "main.Version"
 GIT_VERSION         := `git describe --tags --always || echo dev`
+CSS_INPUT           := "static/css/main.css"
+CSS_OUTPUT          := "static/css/output.css"
 
 default:
     @just --list
@@ -20,6 +22,9 @@ clean:
 run *ARGS:
     @echo
     @go run {{MAIN_PACKAGE_PATH}} {{ARGS}}
+
+tw:
+    @tailwindcss -i {{CSS_INPUT}} -o {{CSS_OUTPUT}} --watch
 
 builder:
     open http://localhost:3008
