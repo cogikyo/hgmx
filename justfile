@@ -1,13 +1,16 @@
 # Variables
 BINARY_NAME         := "hgmx"
-MAIN_PACKAGE_PATH   := "cmd/cli/cli.go"
+MAIN_PACKAGE_PATH   := "cmd/hgmx/hgmx.go"
 VERSION_VAR_PATH    := "main.Version"
 GIT_VERSION         := `git describe --tags --always || echo dev`
 
 default:
     @just --list
 
-build:
+gen:
+    @templ generate
+
+build: gen
     @go build -ldflags="-X {{VERSION_VAR_PATH}}={{GIT_VERSION}}" -o {{BINARY_NAME}} {{MAIN_PACKAGE_PATH}}
 
 clean:
