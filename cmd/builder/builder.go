@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 
-	// NOTE: Adjust import path if your module name is different
 	"github.com/nosvagor/hgmx/internal/server"
 )
 

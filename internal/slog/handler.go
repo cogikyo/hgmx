@@ -2,6 +2,7 @@ package sloghandler
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -75,6 +76,14 @@ func NewLogger(logLevel string, verbose bool, stderr io.Writer) *slog.Logger {
 
 	handler := NewHandler(stderr, &slog.HandlerOptions{Level: level})
 	return slog.New(handler)
+}
+
+func Pretty(v any) string {
+	b, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return fmt.Sprintf("%v", v)
+	}
+	return string(b)
 }
 
 func (h *Handler) Enabled(ctx context.Context, level slog.Level) bool {

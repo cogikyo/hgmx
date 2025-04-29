@@ -36,6 +36,8 @@ func run(stdin io.Reader, stdout, stderr io.Writer, args []string) (code int) {
 		return infoCmd(stdout, stderr, args[2:])
 	case "init":
 		return initCmd(stdout, stderr, args[2:])
+	case "palette":
+		return paletteCmd(stdout, stderr, args[2:])
 	// TODO: Add 'add' command
 	case "version", "--version", "-v":
 		fmt.Fprintln(stdout, hgmx.Version())

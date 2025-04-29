@@ -11,6 +11,7 @@ import (
 	"runtime"
 
 	"github.com/nosvagor/hgmx"
+	"github.com/nosvagor/hgmx/internal/palette"
 	l "github.com/nosvagor/hgmx/internal/slog"
 )
 
@@ -22,7 +23,7 @@ Displays information about the hgmx environment.
 
 Args:
   -v           Set log verbosity level to "debug". (default "info")
-  -log-level   Set log verbosity level. (default "info", options: "debug", "success", "info", "warn", "error")
+  -log-level   Set log verbosity level. (default "info", options: "debug", "info", "warn", "error")
 `
 
 func infoCmd(stdout, stderr io.Writer, args []string) (code int) {
@@ -57,7 +58,7 @@ Initializes a new hgmx project.
 
 Args:
   -v           Set log verbosity level to "debug". (default "info")
-  -log-level   Set log verbosity level. (default "info", options: "debug", "success", "info", "warn", "error")
+  -log-level   Set log verbosity level. (default "info", options: "debug", "info", "warn", "error")
 `
 
 func initCmd(stdout, stderr io.Writer, args []string) (code int) {
@@ -105,6 +106,72 @@ func initCmd(stdout, stderr io.Writer, args []string) (code int) {
 	l.Info("Copied index.templ to views directory")
 
 	l.Info("hgmx project initialized successfully")
+	return 0
+}
+
+// --- palette command ---
+
+const paletteUsageText = `usage: hgmx palette <hex_color>
+
+Generates a color palette based on the input hex color using OKLCH.
+
+Args:
+  color    The base background color in hex format (e.g., "#RRGGBB").
+  -v           Set log verbosity level to "debug". (default "info")
+  -log-level   Set log verbosity level. (default "info", options: "debug", "info", "warn", "error")
+`
+
+func paletteCmd(stdout, stderr io.Writer, args []string) (code int) {
+	cmd := flag.NewFlagSet("palette", flag.ExitOnError)
+	verboseFlag := cmd.Bool("v", false, "")
+	logLevelFlag := cmd.String("log-level", "info", "")
+
+	cmd.Usage = func() {
+		fmt.Fprint(stderr, paletteUsageText)
+	}
+
+	err := cmd.Parse(args)
+	if err != nil {
+		return 64
+	}
+
+	lg := l.NewLogger(*logLevelFlag, *verboseFlag, stderr)
+
+	remainingArgs := cmd.Args()
+	if len(remainingArgs) != 1 {
+		lg.Error("Missing or too many arguments: expected exactly one (hex) color argument.")
+		fmt.Fprint(stderr, paletteUsageText)
+		return 64
+	}
+
+	hexColor := remainingArgs[0]
+
+	// TODO: more than hex
+	if len(hexColor) != 7 || hexColor[0] != '#' {
+		lg.Error("Invalid hex color format. Expected #RRGGBB.", slog.String("color", hexColor))
+		return 1
+	}
+
+	lg.Info("Generating palette for color:", slog.String("hex", hexColor))
+
+	oklchColor, err := palette.HexToOklch(hexColor)
+	if err != nil {
+		lg.Error("Failed to convert hex to OKLCH", slog.String("error", err.Error()))
+		return 1
+	}
+
+	generatedPalette := palette.Generate(oklchColor)
+
+	outputFile := "../../static/css/colors.css"
+	f, err := os.Create(outputFile)
+	if err != nil {
+		lg.Error("Failed to open output file for writing", slog.String("file", outputFile), slog.String("error", err.Error()))
+		return 1
+	}
+	defer f.Close()
+	generatedPalette.ToCSS(f)
+
+	lg.Info("Palette successfully generated and written", slog.String("file", outputFile))
 	return 0
 }
 

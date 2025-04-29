@@ -19,6 +19,7 @@
     --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
     --default-font-family: var(--font-sans);
     --default-mono-font-family: var(--font-mono);
+    --font-display: "Chillax", sans-serif;
   }
 }
 @layer base {
@@ -176,6 +177,9 @@
   .fixed {
     position: fixed;
   }
+  .relative {
+    position: relative;
+  }
   .static {
     position: static;
   }
@@ -214,6 +218,11 @@
   }
   .gap-2 {
     gap: calc(var(--spacing) * 2);
+  }
+  .truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .px-8 {
     padding-inline: calc(var(--spacing) * 8);

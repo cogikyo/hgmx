@@ -1,6 +1,6 @@
 # Variables
 BINARY_NAME         := "hgmx"
-MAIN_PACKAGE_PATH   := "cmd/hgmx/hgmx.go"
+MAIN_PACKAGE_PATH   := "./cmd/hgmx/hgmx.go"
 VERSION_VAR_PATH    := "main.Version"
 GIT_VERSION         := `git describe --tags --always || echo dev`
 CSS_INPUT           := "static/css/main.css"
