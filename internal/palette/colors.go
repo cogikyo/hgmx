@@ -1,6 +1,10 @@
 package palette
 
-import "github.com/alltom/oklab"
+import (
+	"math"
+
+	"github.com/alltom/oklab"
+)
 
 func hexMust(hex string) *oklab.Oklch {
 	c, err := HexToOklch(hex)
@@ -12,11 +16,30 @@ func hexMust(hex string) *oklab.Oklch {
 
 func Background(base oklab.Oklch) (c ColorScale) {
 	c = ColorScale{}.New("bgc")
-	c.shade[500] = hexMust("#222536") // drk-0
-	c.shade[600] = hexMust("#1e2133") // drk-1
-	c.shade[700] = hexMust("#181a2c") // drk-2
-	c.shade[800] = hexMust("#131626") // drk-3
-	c.shade[900] = hexMust("#0d0f1b") // drk-4
+	baseL := base.L
+	baseC := base.C
+	baseH := base.H
+
+	c.shade[500] = &base
+
+	darkStepL := (baseL - (baseL * 0.55)) / 5.0
+	for i, shadeKey := range []int{600, 700, 800, 900, 950} {
+		stepNum := float64(i + 1)
+		shadeL := math.Max(0, baseL-(stepNum*darkStepL))
+		shadeC := baseC
+		shade := oklab.Oklch{L: shadeL, C: shadeC, H: baseH}
+		c.shade[shadeKey] = &shade
+	}
+
+	lightStepL := 0.10 / 5.0
+	for i, shadeKey := range []int{400, 300, 200, 100, 50} {
+		stepNum := float64(i + 1)
+		shadeL := math.Min(1, baseL+(stepNum*lightStepL))
+		shadeC := baseC
+		shade := oklab.Oklch{L: shadeL, C: shadeC, H: baseH}
+		c.shade[shadeKey] = &shade
+	}
+
 	return
 }
 

@@ -4,7 +4,7 @@ MAIN_PACKAGE_PATH   := "./cmd/hgmx/hgmx.go"
 VERSION_VAR_PATH    := "main.Version"
 GIT_VERSION         := `git describe --tags --always || echo dev`
 CSS_INPUT           := "static/css/main.css"
-CSS_OUTPUT          := "static/css/output.css"
+CSS_OUTPUT          := "static/css/main.min.css"
 
 default:
     @just --list
@@ -24,7 +24,7 @@ run *ARGS:
     @go run {{MAIN_PACKAGE_PATH}} {{ARGS}}
 
 tw:
-    @tailwindcss -i {{CSS_INPUT}} -o {{CSS_OUTPUT}} --watch
+    @tailwindcss -i {{CSS_INPUT}} -o {{CSS_OUTPUT}} --minify --watch
 
 builder:
     open http://localhost:3008

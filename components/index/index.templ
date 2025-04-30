@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"sync"
 	"time"
 )
@@ -31,19 +30,19 @@ templ Head() {
 		<meta charset="UTF-8"/>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 		@Favicon()
-		@Style("/views/styles/main.min.css")
-		@Script(ScriptParams{Path: "/views/scripts/htmx.min.js"})
-		@Script(ScriptParams{Path: "/views/scripts/_hyperscript.min.js"})
-		@Script(ScriptParams{Path: "/views/scripts/motion.min.js"})
-		<script>
-			const { animate, scroll } = Motion
-		</script>
+		@Style("/static/css/main.min.css")
+		@Script(ScriptParams{Path: "/static/vendor/htmx.min.js"})
+		@Script(ScriptParams{Path: "/static/vendor/_hyperscript.min.js"})
+		// @Script(ScriptParams{Path: "/static/vendor/motion.min.js"})
+		// <script>
+		// 	const { animate, scroll } = Motion
+		// </script>
 	</head>
 }
 
 templ Body(content templ.Component) {
 	<body>
-		@Nav()
+		// @Nav()
 		@Main(content)
 	</body>
 }
@@ -56,8 +55,8 @@ templ Footer() {
 
 // =============================================================================
 templ Favicon() {
-	<link rel="icon" type="image/png" href="/views/assets/favicon/favicon-32x32.png" sizes="32x32"/>
-	<link rel="shortcut icon" href="/views/assets/favicon/favicon.ico"/>
+	<link rel="icon" type="image/png" href="/static/assets/favicon/favicon-32x32.png" sizes="32x32"/>
+	<link rel="shortcut icon" href="/static/assets/favicon/favicon.ico"/>
 }
 
 templ Title(title string) {
@@ -70,42 +69,42 @@ templ Main(content templ.Component) {
 	</main>
 }
 
-templ Nav() {
-	<div
-		class="fixed z-50 items-center justify-between hidden w-full px-8 py-2 text-lg transition-all duration-200 ease-out md:flex"
-		_="on load from window 
-			if window's scrollY is not 0 then add .nav-bg to me
-			else remove .nav-bg from me
-		end
-		on scroll from window
-			if window's scrollY is not 0 then add .nav-bg to me
-			else remove .nav-bg from me
-		end"
-	>
-		<a href="/" class="text-sm btn btn-subtle">Home</a>
-		<div class="hidden gap-2 text-md md:flex">
-			<a href="/services" class="btn btn-subtle">Services</a>
-			<a href="/works" class="btn btn-subtle">Works</a>
-			<a href="/careers" class="btn btn-subtle">Careers</a>
-			<a href="/about" class="btn btn-subtle">About</a>
-		</div>
-		<a
-			href="/contact"
-			class="hidden my-1 text-base btn btn-active"
-			style=" --btn-padding: 0.1rem 1rem; "
-			_="on load from window
-				if window's scrollY is 0 then add .hidden to me
-				else remove .hidden from me
-			end
-			on scroll from window
-				if window's scrollY is 0 then add .hidden to me
-				else remove .hidden from me
-			end"
-		>
-			Find a Solution
-		</a>
-	</div>
-}
+// templ Nav() {
+// 	<div
+// 		class="fixed z-50 items-center justify-between hidden w-full px-8 py-2 text-lg transition-all duration-200 ease-out md:flex"
+// 		_="on load from window 
+// 			if window's scrollY is not 0 then add .nav-bg to me
+// 			else remove .nav-bg from me
+// 		end
+// 		on scroll from window
+// 			if window's scrollY is not 0 then add .nav-bg to me
+// 			else remove .nav-bg from me
+// 		end"
+// 	>
+// 		<a href="/" class="text-sm btn btn-subtle">Home</a>
+// 		<div class="hidden gap-2 text-md md:flex">
+// 			<a href="/services" class="btn btn-subtle">Services</a>
+// 			<a href="/works" class="btn btn-subtle">Works</a>
+// 			<a href="/careers" class="btn btn-subtle">Careers</a>
+// 			<a href="/about" class="btn btn-subtle">About</a>
+// 		</div>
+// 		<a
+// 			href="/contact"
+// 			class="hidden my-1 text-base btn btn-active"
+// 			style=" --btn-padding: 0.1rem 1rem; "
+// 			_="on load from window
+// 				if window's scrollY is 0 then add .hidden to me
+// 				else remove .hidden from me
+// 			end
+// 			on scroll from window
+// 				if window's scrollY is 0 then add .hidden to me
+// 				else remove .hidden from me
+// 			end"
+// 		>
+// 			Find a Solution
+// 		</a>
+// 	</div>
+// }
 
 var (
 	fileHashes      = make(map[string]string)
@@ -118,8 +117,7 @@ func hash(filePath string) string {
 	fileHashesMutex.RUnlock()
 
 	if !exists {
-		fullPath := filepath.Join("static", filePath)
-		file, err := os.Open(fullPath)
+		file, err := os.Open(filePath)
 		if err != nil {
 			hash = fmt.Sprintf("?v=error-%d", time.Now().Unix())
 		} else {
@@ -147,12 +145,12 @@ type ScriptParams struct {
 
 templ Script(p ScriptParams) {
 	if p.Defer {
-		<script defer src={ p.Path + hash(p.Path) }></script>
+		<script defer src={ p.Path }></script>
 	} else {
-		<script src={ p.Path + hash(p.Path) }></script>
+		<script src={ p.Path }></script>
 	}
 }
 
 templ Style(path string) {
-	<link rel="stylesheet" href={ path + hash(path) }/>
+	<link rel="stylesheet" href={ path }/>
 }

@@ -1,23 +1,20 @@
 package server
 
 import (
-	"context"
-	"net/http"
 
-	"github.com/nosvagor/hgmx/components/button"
+	// "net/http"
+
+	"github.com/labstack/echo/v4"
 	"github.com/nosvagor/hgmx/components/index"
+	"github.com/nosvagor/hgmx/views/builder"
 )
 
-func Index(w http.ResponseWriter, r *http.Request) {
+// Index handler for the root path using Echo context.
+func Index(c echo.Context) error {
 	cmp := index.Index(index.Page{
-		Title: "HGMX Builder",
-		Content: button.Button(button.Props{
-			Attrs: map[string]any{
-				"onclick": "console.log('Button clicked')",
-			},
-			Text: "Click me",
-		}),
+		Title:   "HGMX Builder",
+		Content: builder.Palette(),
 	})
 
-	cmp.Render(context.Background(), w)
+	return cmp.Render(c.Request().Context(), c.Response().Writer)
 }

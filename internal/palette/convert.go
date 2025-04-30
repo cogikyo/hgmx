@@ -84,7 +84,7 @@ func ContrastRatio(c1, c2 oklab.Oklch) float64 {
 }
 
 func OklchCompare(c1, c2 oklab.Oklch) (rl float64, cr float64) {
-	rl = RelativeLuminance(c1)
+	rl = RelativeLuminance(c2)
 	cr = ContrastRatio(c1, c2)
 	return
 }

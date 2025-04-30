@@ -1,17 +1,25 @@
 package server
 
 import (
-	"net/http"
+	// "net/http"
+
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 )
 
-// NewRouter creates a new ServeMux and registers the application handlers.
-func NewRouter() *http.ServeMux {
-	mux := http.NewServeMux()
+// NewRouter creates and configures a new Echo instance.
+func NewRouter() *echo.Echo {
+	e := echo.New()
 
-	// Register handlers from handlers.go
-	mux.HandleFunc("/", Index)
+	// --- Middleware ---
+	e.Use(middleware.Logger())
+	e.Use(middleware.Recover())
 
-	// TODO: Add routes for serving static assets (CSS, JS) later
+	// --- Static Files ---
+	e.Static("/static", "static")
 
-	return mux
+	// --- Application Routes ---
+	e.GET("/", Index)
+
+	return e
 }
