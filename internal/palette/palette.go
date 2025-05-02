@@ -131,15 +131,13 @@ func (p *Palette) ToCSS(w io.Writer) {
 
 func (s ColorScale) ToCSS(w io.Writer, seed oklab.Oklch) {
 	for _, shadeKey := range shades {
-		color, ok := s.shade[shadeKey]
-		if ok && color != nil {
-			css := OklchToString(color)
-			rl, cr := OklchCompare(seed, *color)
-			if shadeKey == 50 {
-				fmt.Fprintf(w, "  --%s-50:  %s; /* RL: %0.4f, CR: %05.2f */\n", strings.ToLower(s.name), css, rl, cr)
-			} else {
-				fmt.Fprintf(w, "  --%s-%d: %s; /* RL: %0.4f, CR: %05.2f */\n", strings.ToLower(s.name), shadeKey, css, rl, cr)
-			}
+		color := s.shade[shadeKey]
+		css := OklchToString(color)
+		rl, cr := OklchCompare(seed, *color)
+		if shadeKey == 50 {
+			fmt.Fprintf(w, "  --%s-50:  %s; /* RL: %0.4f, CR: %05.2f */\n", strings.ToLower(s.name), css, rl, cr)
+		} else {
+			fmt.Fprintf(w, "  --%s-%d: %s; /* RL: %0.4f, CR: %05.2f */\n", strings.ToLower(s.name), shadeKey, css, rl, cr)
 		}
 	}
 	fmt.Fprintln(w, " ")

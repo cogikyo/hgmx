@@ -5,8 +5,8 @@ import (
 	// "net/http"
 
 	"github.com/labstack/echo/v4"
-	"github.com/nosvagor/hgmx/components/index"
 	"github.com/nosvagor/hgmx/views/builder"
+	"github.com/nosvagor/hgmx/views/index"
 )
 
 // Index handler for the root path using Echo context.

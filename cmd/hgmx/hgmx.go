@@ -22,6 +22,8 @@ hgmx - A component management tool for Go Templ and HTMX projects.
 
 commands:
   info      	Displays information about the hgmx environment
+  init      	Initializes a new hgmx project
+  palette   	Generates a color palette based on the input hex color
   version 	-v  Prints the version
 `
 
