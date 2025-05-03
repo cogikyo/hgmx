@@ -6,17 +6,25 @@ import (
 	"strings"
 
 	"github.com/alltom/oklab"
+	"github.com/nosvagor/hgmx/views/builder"
 )
 
 type ColorScale struct {
 	name  string
 	shade map[int]*oklab.Oklch
+	rl    map[int]float64
+	cr    map[int]float64
 }
 
 var shades = []int{50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950}
 
 func (cs ColorScale) New(name string) ColorScale {
-	cs = ColorScale{name: name, shade: make(map[int]*oklab.Oklch)}
+	cs = ColorScale{
+		name:  name,
+		shade: make(map[int]*oklab.Oklch),
+		rl:    make(map[int]float64),
+		cr:    make(map[int]float64),
+	}
 	for _, shade := range shades {
 		cs.shade[shade] = &oklab.Oklch{}
 	}
@@ -141,4 +149,64 @@ func (s ColorScale) ToCSS(w io.Writer, seed oklab.Oklch) {
 		}
 	}
 	fmt.Fprintln(w, " ")
+}
+
+func (p *Palette) ToView() []builder.ColorScaleView {
+	var views []builder.ColorScaleView
+
+	// Helper function to convert a ColorScale to ColorScaleView
+	convertScale := func(name, code string, scale ColorScale) builder.ColorScaleView {
+		view := builder.ColorScaleView{
+			Name:   name,
+			Code:   code,
+			Shades: make([]builder.Shade, len(shades)),
+		}
+
+		for i, shade := range shades {
+			color := scale.shade[shade]
+			rl, cr := OklchCompare(p.seed, *color)
+			view.Shades[i] = builder.Shade{
+				Code:  code,
+				Value: fmt.Sprintf("%d", shade),
+				RL:    fmt.Sprintf("%0.4f", rl),
+				CR:    fmt.Sprintf("%05.2f", cr),
+			}
+		}
+		return view
+	}
+
+	// Base colors
+	views = append(views, convertScale("Bg", "bgc", p.Background))
+	views = append(views, convertScale("Text", "fgc", p.Foreground))
+
+	// Colors
+	views = append(views, convertScale("Ruby", "rby", p.Ruby))
+	views = append(views, convertScale("Orange", "orn", p.Orange))
+	views = append(views, convertScale("Sun", "sun", p.Sun))
+	views = append(views, convertScale("Green", "grn", p.Green))
+	views = append(views, convertScale("Emerald", "emr", p.Emerald))
+	views = append(views, convertScale("Cyan", "cyn", p.Cyan))
+	views = append(views, convertScale("Sky", "sky", p.Sky))
+	views = append(views, convertScale("Blue", "blu", p.Blue))
+	views = append(views, convertScale("Purple", "prp", p.Purple))
+	views = append(views, convertScale("Pink", "pnk", p.Pink))
+
+	// Muted colors
+	views = append(views, convertScale("Adenine", "ade", p.Adenine))
+	views = append(views, convertScale("Rust", "rst", p.Rust))
+	views = append(views, convertScale("Cytosine", "cyt", p.Cytosine))
+	views = append(views, convertScale("Olive", "olv", p.Olive))
+	views = append(views, convertScale("Forest", "frt", p.Forest))
+	views = append(views, convertScale("Slate", "slt", p.Slate))
+	views = append(views, convertScale("Thymine", "thy", p.Thymine))
+	views = append(views, convertScale("Glacial", "glc", p.Glacial))
+	views = append(views, convertScale("Guanine", "gau", p.Guanine))
+	views = append(views, convertScale("Plum", "plm", p.Plum))
+
+	// Grays
+	views = append(views, convertScale("Black", "blk", p.Black))
+	views = append(views, convertScale("Gray", "gry", p.Gray))
+	views = append(views, convertScale("White", "wht", p.White))
+
+	return views
 }
