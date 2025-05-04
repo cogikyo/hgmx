@@ -56,7 +56,6 @@ type Palette struct {
 	Forest   ColorScale
 	Slate    ColorScale
 	Thymine  ColorScale
-	Glacial  ColorScale
 	Guanine  ColorScale
 	Plum     ColorScale
 	// Grays
@@ -89,7 +88,6 @@ func Generate(base oklab.Oklch) (p Palette) {
 	p.Forest = Forest(base)
 	p.Slate = Slate(base)
 	p.Thymine = Thymine(base)
-	p.Glacial = Glacial(base)
 	p.Guanine = Guanine(base)
 	p.Plum = Plum(base)
 	// Grays
@@ -102,11 +100,9 @@ func Generate(base oklab.Oklch) (p Palette) {
 func (p *Palette) ToCSS(w io.Writer) {
 	fmt.Fprintln(w, ":root {")
 	// Base
-	fmt.Fprintln(w, "/* Base */")
 	p.Background.ToCSS(w, p.seed)
 	p.Foreground.ToCSS(w, p.seed)
 	// Colors
-	fmt.Fprintln(w, "/* Colors */")
 	p.Ruby.ToCSS(w, p.seed)
 	p.Orange.ToCSS(w, p.seed)
 	p.Sun.ToCSS(w, p.seed)
@@ -118,7 +114,6 @@ func (p *Palette) ToCSS(w io.Writer) {
 	p.Purple.ToCSS(w, p.seed)
 	p.Pink.ToCSS(w, p.seed)
 	// Muted
-	fmt.Fprintln(w, "/* Muted */")
 	p.Adenine.ToCSS(w, p.seed)
 	p.Rust.ToCSS(w, p.seed)
 	p.Cytosine.ToCSS(w, p.seed)
@@ -126,11 +121,9 @@ func (p *Palette) ToCSS(w io.Writer) {
 	p.Forest.ToCSS(w, p.seed)
 	p.Slate.ToCSS(w, p.seed)
 	p.Thymine.ToCSS(w, p.seed)
-	p.Glacial.ToCSS(w, p.seed)
 	p.Guanine.ToCSS(w, p.seed)
 	p.Plum.ToCSS(w, p.seed)
 	// Grays
-	fmt.Fprintln(w, "/* Grays */")
 	p.Black.ToCSS(w, p.seed)
 	p.Gray.ToCSS(w, p.seed)
 	p.White.ToCSS(w, p.seed)
@@ -159,17 +152,22 @@ func (p *Palette) ToView() []builder.ColorScaleView {
 		view := builder.ColorScaleView{
 			Name:   name,
 			Code:   code,
+			Value:  *scale.shade[500], // Use the 500 shade as the base value
 			Shades: make([]builder.Shade, len(shades)),
 		}
 
 		for i, shade := range shades {
 			color := scale.shade[shade]
 			rl, cr := OklchCompare(p.seed, *color)
+			hue := to360(color.H)
 			view.Shades[i] = builder.Shade{
 				Code:  code,
 				Value: fmt.Sprintf("%d", shade),
-				RL:    fmt.Sprintf("%0.4f", rl),
-				CR:    fmt.Sprintf("%05.2f", cr),
+				RL:    rl,
+				CR:    cr,
+				L:     fmt.Sprintf("%0.1f%%", color.L*100),
+				C:     fmt.Sprintf("%0.2f", color.C),
+				H:     fmt.Sprintf("%0.1f", hue),
 			}
 		}
 		return view
@@ -178,35 +176,29 @@ func (p *Palette) ToView() []builder.ColorScaleView {
 	// Base colors
 	views = append(views, convertScale("Bg", "bgc", p.Background))
 	views = append(views, convertScale("Text", "fgc", p.Foreground))
+	views = append(views, convertScale("White", "wht", p.White))
 
 	// Colors
 	views = append(views, convertScale("Ruby", "rby", p.Ruby))
+	views = append(views, convertScale("Adenine", "ade", p.Adenine))
+	views = append(views, convertScale("Rust", "rst", p.Rust))
 	views = append(views, convertScale("Orange", "orn", p.Orange))
 	views = append(views, convertScale("Sun", "sun", p.Sun))
+	views = append(views, convertScale("Cytosine", "cyt", p.Cytosine))
 	views = append(views, convertScale("Green", "grn", p.Green))
 	views = append(views, convertScale("Emerald", "emr", p.Emerald))
+	views = append(views, convertScale("Forest", "frt", p.Forest))
+	views = append(views, convertScale("Olive", "olv", p.Olive))
 	views = append(views, convertScale("Cyan", "cyn", p.Cyan))
+	views = append(views, convertScale("Thymine", "thy", p.Thymine))
 	views = append(views, convertScale("Sky", "sky", p.Sky))
 	views = append(views, convertScale("Blue", "blu", p.Blue))
+	views = append(views, convertScale("Slate", "slt", p.Slate))
 	views = append(views, convertScale("Purple", "prp", p.Purple))
 	views = append(views, convertScale("Pink", "pnk", p.Pink))
 
 	// Muted colors
-	views = append(views, convertScale("Adenine", "ade", p.Adenine))
-	views = append(views, convertScale("Rust", "rst", p.Rust))
-	views = append(views, convertScale("Cytosine", "cyt", p.Cytosine))
-	views = append(views, convertScale("Olive", "olv", p.Olive))
-	views = append(views, convertScale("Forest", "frt", p.Forest))
-	views = append(views, convertScale("Slate", "slt", p.Slate))
-	views = append(views, convertScale("Thymine", "thy", p.Thymine))
-	views = append(views, convertScale("Glacial", "glc", p.Glacial))
 	views = append(views, convertScale("Guanine", "gau", p.Guanine))
 	views = append(views, convertScale("Plum", "plm", p.Plum))
-
-	// Grays
-	views = append(views, convertScale("Black", "blk", p.Black))
-	views = append(views, convertScale("Gray", "gry", p.Gray))
-	views = append(views, convertScale("White", "wht", p.White))
-
 	return views
 }

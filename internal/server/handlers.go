@@ -4,8 +4,6 @@ import (
 
 	// "net/http"
 
-	"log"
-
 	"github.com/a-h/templ"
 	"github.com/labstack/echo/v4"
 	"github.com/nosvagor/hgmx/internal/palette"
@@ -28,6 +26,5 @@ func Palette() templ.Component {
 	oklch, _ := palette.HexToOklch(hex)
 	p := palette.Generate(oklch)
 	viewModel := p.ToView()
-	log.Println(viewModel)
 	return builder.Palette(viewModel)
 }

@@ -35,12 +35,12 @@ templ Head() {
 		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 		@Favicon()
 		@Style("/static/css/main.min.css")
-		@Script(ScriptParams{Path: "/static/js/htmx.min.js"})
-		@Script(ScriptParams{Path: "/static/js/_hyperscript.min.js"})
-		@Script(ScriptParams{Path: "/static/js/motion.min.js"})
-		<script>
-			const { animate, scroll } = Motion
-		</script>
+		@Script(ScriptParams{Path: "/static/vendor/htmx.min.js"})
+		@Script(ScriptParams{Path: "/static/vendor/_hyperscript.min.js"})
+		// @Script(ScriptParams{Path: "/static/js/motion.min.js"})
+		// <script>
+		// 	const { animate, scroll } = Motion
+		// </script>
 	</head>
 }
 

@@ -1,8 +1,6 @@
 package palette
 
 import (
-	"math"
-
 	"github.com/alltom/oklab"
 )
 
@@ -16,30 +14,17 @@ func hexMust(hex string) *oklab.Oklch {
 
 func Background(base oklab.Oklch) (c ColorScale) {
 	c = ColorScale{}.New("bgc")
-	baseL := base.L
-	baseC := base.C
-	baseH := base.H
-
+	c.shade[50] = hexMust("#5a61aa")
+	c.shade[100] = hexMust("#4e5492")
+	c.shade[200] = hexMust("#3f4578")
+	c.shade[300] = hexMust("#30345a")
+	c.shade[400] = hexMust("#282b48")
 	c.shade[500] = &base
-
-	darkStepL := (baseL - (baseL * 0.55)) / 5.0
-	for i, shadeKey := range []int{600, 700, 800, 900, 950} {
-		stepNum := float64(i + 1)
-		shadeL := math.Max(0, baseL-(stepNum*darkStepL))
-		shadeC := baseC
-		shade := oklab.Oklch{L: shadeL, C: shadeC, H: baseH}
-		c.shade[shadeKey] = &shade
-	}
-
-	lightStepL := 0.10 / 5.0
-	for i, shadeKey := range []int{400, 300, 200, 100, 50} {
-		stepNum := float64(i + 1)
-		shadeL := math.Min(1, baseL+(stepNum*lightStepL))
-		shadeC := baseC
-		shade := oklab.Oklch{L: shadeL, C: shadeC, H: baseH}
-		c.shade[shadeKey] = &shade
-	}
-
+	c.shade[600] = hexMust("#252841")
+	c.shade[700] = hexMust("#1e2133")
+	c.shade[800] = hexMust("#181a2c")
+	c.shade[900] = hexMust("#131626")
+	c.shade[950] = hexMust("#0d0f1b")
 	return
 }
 
@@ -193,12 +178,12 @@ func Adenine(base oklab.Oklch) (c ColorScale) {
 
 func Rust(base oklab.Oklch) (c ColorScale) {
 	c = ColorScale{}.New("rst")
-	c.shade[500] = hexMust("#694b44") // rst-2 (Approx midpoint)
-	c.shade[600] = hexMust("#805a52") // rst-3
-	c.shade[700] = hexMust("#92675d") // rst-4
-	c.shade[800] = hexMust("#a3786d") // rst-5
-	c.shade[400] = hexMust("#563e39") // rst-1
-	c.shade[300] = hexMust("#493531") // rst-0
+	c.shade[800] = hexMust("#493531") // rst-0
+	c.shade[700] = hexMust("#563e39") // rst-1
+	c.shade[600] = hexMust("#694b44") // rst-2 (Approx midpoint)
+	c.shade[500] = hexMust("#805a52") // rst-3
+	c.shade[400] = hexMust("#92675d") // rst-4
+	c.shade[300] = hexMust("#a3786d") // rst-5
 	return
 }
 
@@ -248,17 +233,6 @@ func Thymine(base oklab.Oklch) (c ColorScale) {
 	c.shade[400] = hexMust("#5b77a4") // thy-1
 	c.shade[300] = hexMust("#7690b9") // thy-2
 	c.shade[200] = hexMust("#90a4c7") // thy-3
-	return
-}
-
-func Glacial(base oklab.Oklch) (c ColorScale) {
-	c = ColorScale{}.New("glc")
-	c.shade[500] = hexMust("#30345a") // glc-2 (Approx midpoint)
-	c.shade[600] = hexMust("#3f4578") // glc-3
-	c.shade[700] = hexMust("#4e5492") // glc-4
-	c.shade[800] = hexMust("#5a61aa") // glc-5
-	c.shade[400] = hexMust("#282b48") // glc-1
-	c.shade[300] = hexMust("#252841") // glc-0
 	return
 }
 

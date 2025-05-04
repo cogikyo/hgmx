@@ -31,12 +31,16 @@ func HexToOklch(hexColor string) (oklchColor oklab.Oklch, err error) {
 
 // OklchToString converts an OKLCH color to a css string.
 func OklchToString(oklchColor *oklab.Oklch) string {
-	hueDegrees := oklchColor.H * 180 / math.Pi
+	// Format hue with leading zeros (3 digits before, 2 after decimal)
+	return fmt.Sprintf("oklch(%.2f %.3f %06.2f)", oklchColor.L, oklchColor.C, to360(oklchColor.H))
+}
+
+func to360(hue float64) float64 {
+	hueDegrees := hue * 180 / math.Pi
 	if hueDegrees < 0 {
 		hueDegrees += 360
 	}
-	// Format hue with leading zeros (3 digits before, 2 after decimal)
-	return fmt.Sprintf("oklch(%.2f %.3f %06.2f)", oklchColor.L, oklchColor.C, hueDegrees)
+	return hueDegrees
 }
 
 // sRGBToLinear converts an sRGB color component (0.0-1.0) to its linear representation.
