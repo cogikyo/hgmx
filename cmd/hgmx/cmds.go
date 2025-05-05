@@ -162,7 +162,7 @@ func paletteCmd(stdout, stderr io.Writer, args []string) (code int) {
 
 	generatedPalette := palette.Generate(oklchColor)
 
-	outputFile := "../../static/css/colors.css"
+	outputFile := "static/css/colors.css"
 	f, err := os.Create(outputFile)
 	if err != nil {
 		lg.Error("Failed to open output file for writing", slog.String("file", outputFile), slog.String("error", err.Error()))

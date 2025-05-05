@@ -5,7 +5,6 @@ import (
 	"github.com/alltom/oklab"
 )
 
-
 type ColorScaleView struct {
 	Name   string
 	Code   string
@@ -14,26 +13,26 @@ type ColorScaleView struct {
 }
 
 templ Palette(colors []ColorScaleView) {
-	<div class="p-4 font-sans bg-bgc-500 text-fgc-500 max-w-6xl mx-auto">
+	<div class="max-w-6xl p-4 mx-auto font-sans bg-bgc-500 text-fgc-500">
 		<div class="flex flex-col space-y-3">
 			<div class="flex items-center">
 				<div class="w-16 shrink-0"></div>
-				<div class="grid flex-1 grid-cols-11 gap-x-2">
+				<div class="grid flex-1 grid-cols-11 mb-2 gap-x-2">
 					for _, shade := range colors[0].Shades {
 						<div class="text-sm font-medium text-center">{ shade.Value }</div>
 					}
 				</div>
 			</div>
-
 			for _, color := range colors {
-				<div 
-					class="flex items-center group show-oklch"
-					_="on click toggle .show-rlcr on me then toggle .show-oklch on me">
-					<div class="w-16 shrink-0 pr-4 text-sm font-semibold text-right capitalize">
+				<div
+					class="flex items-center group show-rlcr"
+					_="on click toggle .show-rlcr on me then toggle .show-oklch on me"
+				>
+					<div class="w-16 pr-4 text-sm font-semibold text-right capitalize shrink-0">
 						<span>{ color.Name }</span>
 						<span class="text-xs lowercase">({ color.Code })</span>
 					</div>
-					<div class="grid flex-1 grid-cols-11 gap-x-4">
+					<div class="grid flex-1 grid-cols-11 my-2 gap-x-4">
 						for _, shade := range color.Shades {
 							@ColorSwatch(shade)
 						}
@@ -42,11 +41,84 @@ templ Palette(colors []ColorScaleView) {
 			}
 		</div>
 	</div>
+	@HexPalette(colors)
+}
+
+templ HexPalette(colors []ColorScaleView) {
+	<div class="flex items-center justify-center p-4 bg-bgc-500">
+		<svg viewBox="0 10 100 82" width="1000" height="800">
+			<defs>
+				<linearGradient id="gradientTop" x1="100%" y1="50%" x2="0%" y2="50%">
+					<stop offset="0%" stop-color="#f00a80"></stop>
+					<stop offset="14%" stop-color="#f81500"></stop>
+					<stop offset="20%" stop-color="#ff6c06"></stop>
+					<stop offset="60%" stop-color="#ffdb3b"></stop>
+					<stop offset="85%" stop-color="#00ff00"></stop>
+					<stop offset="100%" stop-color="#36ffe2"></stop>
+				</linearGradient>
+				<linearGradient id="gradientBottom" x1="0%" y1="50%" x2="100%" y2="50%">
+					<stop offset="0%" stop-color="#36ffe2"></stop>
+					<stop offset="45.8%" stop-color="#0000ff"></stop>
+					<stop offset="70%" stop-color="#9201fd"></stop>
+					<stop offset="100%" stop-color="#f00a80"></stop>
+				</linearGradient>
+				<radialGradient id="centerMaskFade">
+					<stop offset="0%" stop-color="#222536" stop-opacity="1"></stop>
+					<stop offset="100%" stop-color="#222536" stop-opacity="0"></stop>
+				</radialGradient>
+			</defs>
+			<polygon
+				points="95,50 72.5,88.971 27.5,88.971 5,50 27.5,11.029 72.5,11.029"
+				fill="#222536"
+			></polygon>
+			<line x1="50" y1="50" x2="95" y2="50" stroke="#f00a80" stroke-width="0.25" stroke-dasharray="0.5,1"></line>
+			<line x1="50" y1="50" x2="83.5" y2="30.75" stroke="#f81500" stroke-width="0.25" stroke-dasharray="0.5,1"></line>
+			<line x1="50" y1="50" x2="78.5" y2="21.5" stroke="#ff6c06" stroke-width="0.25" stroke-dasharray="0.5,1"></line>
+			<line x1="50" y1="50" x2="39.5" y2="11.03" stroke="#ffff00" stroke-width="0.25" stroke-dasharray="0.5,1"></line>
+			<line x1="50" y1="50" x2="22" y2="19" stroke="#00ff00" stroke-width="0.25" stroke-dasharray="0.5,1"></line>
+			<line x1="50" y1="50" x2="5" y2="50" stroke="#36ffe2" stroke-width="0.25" stroke-dasharray="0.5,1"></line>
+			<line x1="50" y1="50" x2="45.8" y2="90" stroke="#0000ff" stroke-width="0.25" stroke-dasharray="0.5,1"></line>
+			<line x1="50" y1="50" x2="72.5" y2="88.97" stroke="#9201fd" stroke-width="0.25" stroke-dasharray="0.5,1"></line>
+			<path
+				d="M 95,50 L 72.5,11.029 L 27.5,11.029 L 5,50"
+				fill="none"
+				stroke="url(#gradientTop)"
+				stroke-width="0.5"
+			></path>
+			<path
+				d="M 5,50 L 27.5,88.971 L 72.5,88.971 L 95,50"
+				fill="none"
+				stroke="url(#gradientBottom)"
+				stroke-width="0.5"
+				stroke-linecap="round"
+			></path>
+			<polygon
+				points="72.5,50 61.25,69.48 38.75,69.48 27.5,50 38.75,30.52 61.25,30.52"
+				fill="url(#centerMaskFade)"
+			></polygon>
+			@templ.Raw(renderCircles(colors))
+		</svg>
+	</div>
+}
+
+func renderCircles(colors []ColorScaleView) string {
+	svg := ""
+	for _, color := range colors {
+		for _, shade := range color.Shades {
+			if shade.Hex == "#000000" {
+				continue
+			}
+			svg += fmt.Sprintf(`<circle cx="%.6f" cy="%.6f" r="1" fill="%s" />`, shade.Cx, shade.Cy, shade.Hex)
+		}
+	}
+	return svg
 }
 
 type Shade struct {
 	Code, Value, L, C, H string
-	RL, CR float64
+	RL, CR               float64
+	Hex                  string
+	Cx, Cy               float64
 }
 
 func tern(cond bool, a, b string) string {
@@ -58,17 +130,16 @@ func tern(cond bool, a, b string) string {
 
 templ ColorSwatch(s Shade) {
 	<div class={ fmt.Sprintf("h-12 w-full text-[10px] font-mono %s rounded bg-%s-%s relative", tern(s.CR <= 2.00, "text-fgc-500", "text-bgc-500"), s.Code, s.Value) }>
+		<div class={ fmt.Sprintf("absolute -top-5 left-0 right-0 text-center text-[10px] font-semibold text-%s-%s", s.Code, s.Value) }>
+			{ s.C }
+		</div>
 		<div class="absolute inset-0 flex flex-col justify-between p-1 opacity-0 group-[.show-rlcr]:group-hover:opacity-100 transition-opacity duration-200">
-			<div class="">RL: { fmt.Sprintf("%0.3f", s.RL) }</div>
-			<div class="text-right font-extrabold">CR: { fmt.Sprintf("%0.2f", s.CR) }</div>
+			<div class="">{ fmt.Sprintf("%0.3f", s.RL) }</div>
+			<div class="font-extrabold text-right">{ fmt.Sprintf("%05.2f", s.CR) }</div>
 		</div>
 		<div class="absolute inset-0 flex flex-col justify-between p-1 opacity-0 group-[.show-oklch]:group-hover:opacity-100 transition-opacity duration-200">
-			<div class="flex justify-between">
-				<div class="">{ s.L }</div>
-				<div class="">{ s.C }</div>
-			</div>
-			<div class="text-center text-xs font-extrabold">{ s.H }</div>
+			<div class="text-center">{ s.L }</div>
+			<div class="text-xs font-extrabold text-center">{ s.H }</div>
 		</div>
 	</div>
 }
-

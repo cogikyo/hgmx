@@ -1,25 +1,32 @@
 package server
 
 import (
-	// "net/http"
+	"os"
+	"time"
 
 	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 // NewRouter creates and configures a new Echo instance.
 func NewRouter() *echo.Echo {
+
 	e := echo.New()
 
 	// --- Middleware ---
-	e.Use(middleware.Logger())
-	e.Use(middleware.Recover())
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	e.Use(zerologRequestLogger)
+	e.Use(zerologRecoverer)
 
 	// --- Static Files ---
 	e.Static("/static", "static")
 
 	// --- Application Routes ---
 	e.GET("/", Index)
+	e.GET("/palette", Palette)
+	e.GET("/testing", Testing)
 
 	return e
 }

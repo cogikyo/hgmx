@@ -1,6 +1,6 @@
 # Variables
 BINARY_NAME         := "hgmx"
-MAIN_PACKAGE_PATH   := "./cmd/hgmx/hgmx.go"
+MAIN_PACKAGE_PATH   := "./cmd/hgmx"
 VERSION_VAR_PATH    := "main.Version"
 GIT_VERSION         := `git describe --tags --always || echo dev`
 CSS_INPUT           := "static/css/main.css"
@@ -20,14 +20,12 @@ clean:
 
 # e.g., run info -v
 run *ARGS:
-    @echo
     @go run {{MAIN_PACKAGE_PATH}} {{ARGS}}
 
 tw:
     @tailwindcss -i {{CSS_INPUT}} -o {{CSS_OUTPUT}} --minify --watch
 
 builder:
-    open http://localhost:3008
     @air -c .air.toml
 
 describe:

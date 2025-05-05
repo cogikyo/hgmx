@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/alltom/oklab"
+	// Assuming zerolog is initialized elsewhere
 )
 
 // HexToOklch converts a hex color string (e.g., "#RRGGBB") to its OKLCH representation.
@@ -31,11 +32,23 @@ func HexToOklch(hexColor string) (oklchColor oklab.Oklch, err error) {
 
 // OklchToString converts an OKLCH color to a css string.
 func OklchToString(oklchColor *oklab.Oklch) string {
-	// Format hue with leading zeros (3 digits before, 2 after decimal)
-	return fmt.Sprintf("oklch(%.2f %.3f %06.2f)", oklchColor.L, oklchColor.C, to360(oklchColor.H))
+	return fmt.Sprintf("oklch(%.2f %.3f %06.2f)", oklchColor.L, oklchColor.C, toDegree(oklchColor.H))
 }
 
-func to360(hue float64) float64 {
+func OklchToHex(oklchColor *oklab.Oklch) string {
+	if oklchColor == nil {
+		return "#000000"
+	}
+	r32, g32, b32, _ := oklchColor.RGBA()
+
+	r8 := uint8(r32 >> 8)
+	g8 := uint8(g32 >> 8)
+	b8 := uint8(b32 >> 8)
+
+	return fmt.Sprintf("#%02x%02x%02x", r8, g8, b8)
+}
+
+func toDegree(hue float64) float64 {
 	hueDegrees := hue * 180 / math.Pi
 	if hueDegrees < 0 {
 		hueDegrees += 360
@@ -53,23 +66,17 @@ func sRGBToLinear(c float64) float64 {
 }
 
 // RelativeLuminance calculates the relative luminance of a color according to WCAG standards.
-// Input color is OKLCH.
 func RelativeLuminance(c oklab.Oklch) float64 {
-	// Convert OKLCH -> OKLAB -> RGBA (returns values in 0-65535 range)
 	rInt, gInt, bInt, _ := c.Oklab().RGBA()
 
-	// Convert 0-65535 range to 0.0-1.0
 	r := float64(rInt) / 65535.0
 	g := float64(gInt) / 65535.0
 	b := float64(bInt) / 65535.0
 
-	// Convert sRGB to Linear RGB
 	rLin := sRGBToLinear(r)
 	gLin := sRGBToLinear(g)
 	bLin := sRGBToLinear(b)
 
-	// Calculate relative luminance
-	// Coefficients from WCAG
 	return 0.2126*rLin + 0.7152*gLin + 0.0722*bLin
 }
 
@@ -78,12 +85,10 @@ func ContrastRatio(c1, c2 oklab.Oklch) float64 {
 	l1 := RelativeLuminance(c1)
 	l2 := RelativeLuminance(c2)
 
-	// Ensure l1 is the lighter color
 	if l2 > l1 {
 		l1, l2 = l2, l1
 	}
 
-	// Formula from WCAG
 	return (l1 + 0.05) / (l2 + 0.05)
 }
 

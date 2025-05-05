@@ -1,11 +1,11 @@
 root = "."
-tmp_dir = "/tmp"
+tmp_dir = "/tmp/air"
 
 [build]
-  cmd = "templ generate && go build -o /tmp/builder ./cmd/builder"
-  bin = "/tmp/builder"
+  cmd = "templ generate && go build -o /tmp/air/builder ./cmd/builder"
+  bin = "/tmp/air/builder"
   include_ext = ["go", "templ", "css", "js"]
-  exclude_dir = ["tmp", "vendor", "node_modules", "cmd/hgmx/"]
+  exclude_dir = ["tmp", "vendor", "node_modules", "cmd/hgmx/", "static/css/"]
   exclude_file = []
   exclude_regex = ["_test.go", "_templ.go"]
   exclude_unchanged = false
@@ -17,8 +17,7 @@ tmp_dir = "/tmp"
   log = "build-errors.log"
   poll = false
   poll_interval = 0
-  post_cmd = []
-  pre_cmd = []
+  pre_cmd = ["just run 'palette \"#222536\"'"]
   rerun = false
   rerun_delay = 500
   send_interrupt = false
@@ -38,7 +37,7 @@ tmp_dir = "/tmp"
   time = true
 
 [misc]
-  clean_on_exit = true
+  clean_on_exit = false
 
 [proxy]
   app_port = 0
@@ -50,4 +49,4 @@ tmp_dir = "/tmp"
   keep_scroll = true
 
 [run]
-  cmd = "./tmp/builder"
+  cmd = "/tmp/air/builder"
