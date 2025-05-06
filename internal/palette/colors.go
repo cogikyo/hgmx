@@ -19,30 +19,20 @@ var shadesMap = map[int]int{
 	300: 3,
 	400: 4,
 	500: 5,
-	600: 6,
-	700: 7,
-	800: 8,
-	900: 9,
-	950: 10,
 }
 
-var numIntervals = 10.0
+var numIntervals = 6.0
 
-// generateShades dynamically creates shades 50-900 based on 950
-// interpolating L and C linearly between the target 50 values and the 950 values.
+// generateShades dynamically creates shades 50-500 based on 500
+// interpolating L and C linearly between the target 50 values and the 500 values.
 func generateShades(c ColorScale, l50, c50 float64) {
-	c950 := c.shade[950]
-	hue := c950.H // Keep hue constant for now
+	c600 := c.shade[600]
+	hue := c600.H
 
 	for shadeValue, index := range shadesMap {
-		if shadeValue == 950 {
-			continue
-		}
 		t := float64(index) / numIntervals
-
-		l := l50 + (c950.L-l50)*t
-		chroma := c50 + (c950.C-c50)*t
-
+		l := l50 + (c600.L-l50)*t
+		chroma := c50 + (c600.C-c50)*t
 		c.shade[shadeValue] = &oklab.Oklch{L: l, C: chroma, H: hue}
 	}
 }
@@ -73,251 +63,212 @@ func Foreground(base oklab.Oklch) (c ColorScale) {
 	return
 }
 
+func Berry(seed oklab.Oklch) (c ColorScale) {
+	c = ColorScale{}.New("bry")
+	c.shade[600] = hexMust("#fd016f")
+	generateShades(c, 0.95, 0.02)
+	return
+}
+
+func Cherry(seed oklab.Oklch) (c ColorScale) {
+	c = ColorScale{}.New("chr")
+	c.shade[600] = hexMust("#ff0457")
+	generateShades(c, 0.95, 0.02)
+	return
+}
+
 func Ruby(seed oklab.Oklch) (c ColorScale) {
 	c = ColorScale{}.New("rby")
-	c.shade[950] = hexMust("#ff0457")
+	c.shade[600] = hexMust("#f80237")
 	generateShades(c, 0.95, 0.02)
 	return
 }
 
 func Red(seed oklab.Oklch) (c ColorScale) {
 	c = ColorScale{}.New("red")
-	c.shade[950] = hexMust("#ff1701")
-
-	// c.shade[950] = hexMust("#ff1701") // red-0
-	// c.shade[500] = hexMust("#f34658") // red-0
-	// c.shade[400] = hexMust("#f36978") // red-1
-	// c.shade[300] = hexMust("#f07a88") // red-2
-	// c.shade[200] = hexMust("#f08898") // red-3
-	// c.shade[100] = hexMust("#f29ca9") // red-4
-
+	c.shade[600] = hexMust("#fd1818")
 	generateShades(c, 0.95, 0.02)
+	return
+}
 
+func Coral(seed oklab.Oklch) (c ColorScale) {
+	c = ColorScale{}.New("crl")
+	c.shade[600] = hexMust("#ff380e")
+	generateShades(c, 0.95, 0.02)
+	return
+}
+
+func Pumpkin(seed oklab.Oklch) (c ColorScale) {
+	c = ColorScale{}.New("pmk")
+	c.shade[600] = hexMust("#fa4e01")
+	generateShades(c, 0.95, 0.02)
 	return
 }
 
 func Orange(seed oklab.Oklch) (c ColorScale) {
 	c = ColorScale{}.New("orn")
-	c.shade[950] = hexMust("#fd6a00") // orn-0
-
-	// c.shade[500] = hexMust("#e56b2c") // orn-0
-	// c.shade[400] = hexMust("#ea834b") // orn-1
-	// c.shade[300] = hexMust("#eb905d") // orn-2
-	// c.shade[200] = hexMust("#f2a170") // orn-3
-	// c.shade[100] = hexMust("#f8b486") // orn-4
-
+	c.shade[600] = hexMust("#fd6a00")
 	generateShades(c, 0.95, 0.02)
-
 	return
 }
 
 func Sun(seed oklab.Oklch) (c ColorScale) {
 	c = ColorScale{}.New("sun")
-	c.shade[950] = hexMust("#ff9004") // sun-0
-
-	// c.shade[500] = hexMust("#f3a338") // sun-0
-	// c.shade[400] = hexMust("#f5b855") // sun-1
-	// c.shade[300] = hexMust("#f5c069") // sun-2
-	// c.shade[200] = hexMust("#f4ce88") // sun-3
-	// c.shade[100] = hexMust("#f5d599") // sun-4
-
+	c.shade[600] = hexMust("#ff9004")
 	generateShades(c, 0.95, 0.02)
-
 	return
 }
 
 func Gold(seed oklab.Oklch) (c ColorScale) {
 	c = ColorScale{}.New("gld")
-	c.shade[950] = hexMust("#fead05") // gld-0
-
+	c.shade[600] = hexMust("#fead05")
 	generateShades(c, 0.95, 0.02)
 	return
 }
 
 func Yellow(seed oklab.Oklch) (c ColorScale) {
 	c = ColorScale{}.New("yel")
-	c.shade[950] = hexMust("#ffcc00") // yel-0
-
+	c.shade[600] = hexMust("#ffcc00")
 	generateShades(c, 0.95, 0.02)
 	return
 }
 
 func Lemon(seed oklab.Oklch) (c ColorScale) {
 	c = ColorScale{}.New("lem")
-	c.shade[950] = hexMust("#fcee29")
-
+	c.shade[600] = hexMust("#fcee29")
 	generateShades(c, 0.95, 0.02)
 	return
 }
 
 func Lime(seed oklab.Oklch) (c ColorScale) {
 	c = ColorScale{}.New("lim")
-	c.shade[950] = hexMust("#d6fb12")
+	c.shade[600] = hexMust("#d9ff00")
+	generateShades(c, 0.95, 0.02)
+	return
+}
 
+func Kiwi(seed oklab.Oklch) (c ColorScale) {
+	c = ColorScale{}.New("kwi")
+	c.shade[600] = hexMust("#aff404")
 	generateShades(c, 0.95, 0.02)
 	return
 }
 
 func Green(seed oklab.Oklch) (c ColorScale) {
 	c = ColorScale{}.New("grn")
-	c.shade[950] = hexMust("#74dc01")
-
+	c.shade[600] = hexMust("#87fe02")
 	generateShades(c, 0.95, 0.02)
 	return
 }
 
 func Emerald(seed oklab.Oklch) (c ColorScale) {
 	c = ColorScale{}.New("emr")
-	c.shade[950] = hexMust("#02c059")
+	c.shade[600] = hexMust("#01ff01")
+	generateShades(c, 0.95, 0.02)
+	return
+}
 
-	// c.shade[500] = hexMust("#2d9a43") // emr-0
-	// c.shade[400] = hexMust("#48a95b") // emr-1
-	// c.shade[300] = hexMust("#5aba6d") // emr-2
-	// c.shade[200] = hexMust("#5fc976") // emr-3
-	// c.shade[100] = hexMust("#76d78b") // emr-4
-
+func Jade(seed oklab.Oklch) (c ColorScale) {
+	c = ColorScale{}.New("jde")
+	c.shade[600] = hexMust("#02e66c")
 	generateShades(c, 0.95, 0.02)
 	return
 }
 
 func Teal(seed oklab.Oklch) (c ColorScale) {
 	c = ColorScale{}.New("tea")
-	c.shade[950] = hexMust("#02fdb9")
-
+	c.shade[600] = hexMust("#02fdb9")
 	generateShades(c, 0.95, 0.02)
 	return
 }
 
 func Cyan(seed oklab.Oklch) (c ColorScale) {
 	c = ColorScale{}.New("cyn")
-	c.shade[950] = hexMust("#36ffe2") // cyn-0
-
-	// c.shade[500] = hexMust("#2bb198") // cyn-0
-	// c.shade[400] = hexMust("#30c9b0") // cyn-1
-	// c.shade[300] = hexMust("#38d2ba") // cyn-2
-	// c.shade[200] = hexMust("#50dec8") // cyn-3
-	// c.shade[100] = hexMust("#75e6d5") // cyn-4
-
+	c.shade[600] = hexMust("#36ffe2")
 	generateShades(c, 0.95, 0.02)
 	return
 }
 
 func Aqua(seed oklab.Oklch) (c ColorScale) {
 	c = ColorScale{}.New("aqu")
-	c.shade[950] = hexMust("#50ffff")
-
+	c.shade[600] = hexMust("#50ffff")
 	generateShades(c, 0.95, 0.02)
 	return
 }
 
 func Cerulean(seed oklab.Oklch) (c ColorScale) {
 	c = ColorScale{}.New("cer")
-	c.shade[950] = hexMust("#07e3fe")
-
+	c.shade[600] = hexMust("#07e3fe")
 	generateShades(c, 0.95, 0.02)
 	return
 }
 
 func Azure(seed oklab.Oklch) (c ColorScale) {
 	c = ColorScale{}.New("azr")
-	c.shade[950] = hexMust("#0acbff")
-
+	c.shade[600] = hexMust("#0acbff")
 	generateShades(c, 0.95, 0.02)
 	return
 }
 
 func Sky(seed oklab.Oklch) (c ColorScale) {
 	c = ColorScale{}.New("sky")
-	c.shade[950] = hexMust("#0aafff")
-
-	// 	c.shade[500] = hexMust("#369fd7") // sky-0
-	// 	c.shade[400] = hexMust("#54b0e2") // sky-1
-	// 	c.shade[300] = hexMust("#6bbdec") // sky-2
-	// 	c.shade[200] = hexMust("#7cc5ef") // sky-3
-	// 	c.shade[100] = hexMust("#90d1f5") // sky-4
-
+	c.shade[600] = hexMust("#0aafff")
 	generateShades(c, 0.95, 0.02)
 	return
 }
 
 func Blue(seed oklab.Oklch) (c ColorScale) {
 	c = ColorScale{}.New("blu")
-	c.shade[950] = hexMust("#0184fe")
-
+	c.shade[600] = hexMust("#0184fe")
 	generateShades(c, 0.95, 0.02)
 	return
 }
 
 func Sapphire(seed oklab.Oklch) (c ColorScale) {
 	c = ColorScale{}.New("sap")
-	c.shade[950] = hexMust("#4158fa") // sap-0
-
-	// c.shade[500] = hexMust("#4a6be3") // blu-0
-	// c.shade[400] = hexMust("#6380ec") // blu-1
-	// c.shade[300] = hexMust("#7492ef") // blu-2
-	// c.shade[200] = hexMust("#8aa4f3") // blu-3
-	// c.shade[100] = hexMust("#9db2f4") // blu-4
-
+	c.shade[600] = hexMust("#4158fa") // sap-0
 	generateShades(c, 0.95, 0.02)
 	return
 }
 
 func Lavender(seed oklab.Oklch) (c ColorScale) {
 	c = ColorScale{}.New("lav")
-	c.shade[950] = hexMust("#6e40ff")
-
-	// c.shade[500] = hexMust("#7f61cd")
-	// c.shade[400] = hexMust("#9376d8") // lav-1
-	// c.shade[300] = hexMust("#a188df") // lav-2
-	// c.shade[200] = hexMust("#b29ae8") // lav-3
-	// c.shade[100] = hexMust("#bdaaeb") // lav-4
-
+	c.shade[600] = hexMust("#6e40ff")
 	generateShades(c, 0.95, 0.02)
 	return
 }
 
 func Purple(seed oklab.Oklch) (c ColorScale) {
 	c = ColorScale{}.New("prp")
-	c.shade[950] = hexMust("#9201fd")
-
+	c.shade[600] = hexMust("#9201fd")
 	generateShades(c, 0.95, 0.02)
 	return
 }
 
 func Violet(seed oklab.Oklch) (c ColorScale) {
 	c = ColorScale{}.New("vio")
-	c.shade[950] = hexMust("#c602fe")
-
+	c.shade[600] = hexMust("#c602fe")
 	generateShades(c, 0.95, 0.02)
 	return
 }
 
 func Pink(seed oklab.Oklch) (c ColorScale) {
 	c = ColorScale{}.New("pnk")
-	c.shade[950] = hexMust("#ff13f7")
-
+	c.shade[600] = hexMust("#ff13f7")
 	generateShades(c, 0.95, 0.02)
 	return
 }
 
 func Magenta(seed oklab.Oklch) (c ColorScale) {
 	c = ColorScale{}.New("mag")
-	c.shade[950] = hexMust("#fd01b9")
-
+	c.shade[600] = hexMust("#fd01b9")
 	generateShades(c, 0.95, 0.02)
 	return
 }
 
 func Rose(seed oklab.Oklch) (c ColorScale) {
 	c = ColorScale{}.New("ros")
-	c.shade[950] = hexMust("#f00a80") // pnk-0
-
-	// c.shade[500] = hexMust("#d15da6") // pnk-0
-	// c.shade[400] = hexMust("#e36cb8") // pnk-1
-	// c.shade[300] = hexMust("#ea76c0") // pnk-2
-	// c.shade[200] = hexMust("#e887c3") // pnk-3
-	// c.shade[100] = hexMust("#ed9acd") // pnk-4
-
+	c.shade[600] = hexMust("#f00a80")
 	generateShades(c, 0.95, 0.02)
 	return
 }

@@ -36,6 +36,30 @@
   --color-rby-900: var(--rby-900);
   --color-rby-950: var(--rby-950);
 
+  --color-bry-50: var(--bry-50);
+  --color-bry-100: var(--bry-100);
+  --color-bry-200: var(--bry-200);
+  --color-bry-300: var(--bry-300);
+  --color-bry-400: var(--bry-400);
+  --color-bry-500: var(--bry-500);
+  --color-bry-600: var(--bry-600);
+  --color-bry-700: var(--bry-700);
+  --color-bry-800: var(--bry-800);
+  --color-bry-900: var(--bry-900);
+  --color-bry-950: var(--bry-950);
+
+  --color-chr-50: var(--chr-50);
+  --color-chr-100: var(--chr-100);
+  --color-chr-200: var(--chr-200);
+  --color-chr-300: var(--chr-300);
+  --color-chr-400: var(--chr-400);
+  --color-chr-500: var(--chr-500);
+  --color-chr-600: var(--chr-600);
+  --color-chr-700: var(--chr-700);
+  --color-chr-800: var(--chr-800);
+  --color-chr-900: var(--chr-900);
+  --color-chr-950: var(--chr-950);
+
   --color-red-50: var(--red-50);
   --color-red-100: var(--red-100);
   --color-red-200: var(--red-200);
@@ -48,6 +72,18 @@
   --color-red-900: var(--red-900);
   --color-red-950: var(--red-950);
 
+  --color-crl-50: var(--crl-50);
+  --color-crl-100: var(--crl-100);
+  --color-crl-200: var(--crl-200);
+  --color-crl-300: var(--crl-300);
+  --color-crl-400: var(--crl-400);
+  --color-crl-500: var(--crl-500);
+  --color-crl-600: var(--crl-600);
+  --color-crl-700: var(--crl-700);
+  --color-crl-800: var(--crl-800);
+  --color-crl-900: var(--crl-900);
+  --color-crl-950: var(--crl-950);
+
   --color-orn-50: var(--orn-50);
   --color-orn-100: var(--orn-100);
   --color-orn-200: var(--orn-200);
@@ -59,6 +95,18 @@
   --color-orn-800: var(--orn-800);
   --color-orn-900: var(--orn-900);
   --color-orn-950: var(--orn-950);
+
+  --color-pmk-50: var(--pmk-50);
+  --color-pmk-100: var(--pmk-100);
+  --color-pmk-200: var(--pmk-200);
+  --color-pmk-300: var(--pmk-300);
+  --color-pmk-400: var(--pmk-400);
+  --color-pmk-500: var(--pmk-500);
+  --color-pmk-600: var(--pmk-600);
+  --color-pmk-700: var(--pmk-700);
+  --color-pmk-800: var(--pmk-800);
+  --color-pmk-900: var(--pmk-900);
+  --color-pmk-950: var(--pmk-950);
 
   --color-sun-50: var(--sun-50);
   --color-sun-100: var(--sun-100);
@@ -120,6 +168,18 @@
   --color-lim-900: var(--lim-900);
   --color-lim-950: var(--lim-950);
 
+  --color-kwi-50: var(--kwi-50);
+  --color-kwi-100: var(--kwi-100);
+  --color-kwi-200: var(--kwi-200);
+  --color-kwi-300: var(--kwi-300);
+  --color-kwi-400: var(--kwi-400);
+  --color-kwi-500: var(--kwi-500);
+  --color-kwi-600: var(--kwi-600);
+  --color-kwi-700: var(--kwi-700);
+  --color-kwi-800: var(--kwi-800);
+  --color-kwi-900: var(--kwi-900);
+  --color-kwi-950: var(--kwi-950);
+
   --color-grn-50: var(--grn-50);
   --color-grn-100: var(--grn-100);
   --color-grn-200: var(--grn-200);
@@ -131,6 +191,18 @@
   --color-grn-800: var(--grn-800);
   --color-grn-900: var(--grn-900);
   --color-grn-950: var(--grn-950);
+
+  --color-jde-50: var(--jde-50);
+  --color-jde-100: var(--jde-100);
+  --color-jde-200: var(--jde-200);
+  --color-jde-300: var(--jde-300);
+  --color-jde-400: var(--jde-400);
+  --color-jde-500: var(--jde-500);
+  --color-jde-600: var(--jde-600);
+  --color-jde-700: var(--jde-700);
+  --color-jde-800: var(--jde-800);
+  --color-jde-900: var(--jde-900);
+  --color-jde-950: var(--jde-950);
 
   --color-emr-50: var(--emr-50);
   --color-emr-100: var(--emr-100);

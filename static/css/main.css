@@ -7,7 +7,7 @@
 @import "./theme.css";
 
 @source inline("{hover:,}{bg-,text-}{bgc,fgc}-{50,{100..900..100},950}");
-@source inline("{hover:,}{bg-,text-}{rby,red,orn,sun,gld,grn,emr,cyn,sky,sap,blu,prp,pnk,yel,lem,lim,tea,aqu,azr,cer,lav,mag,ros,vio}-{50,{100..900..100},950}");
+@source inline("{hover:,}{bg-,text-}{rby,red,orn,sun,gld,grn,emr,cyn,sky,sap,blu,prp,pnk,yel,lem,lim,tea,aqu,azr,cer,lav,mag,ros,vio,chr,pmk,crl,bry,jde,kwi}-{50,{100..900..100},950}");
 @source inline("{hover:,}{bg-,text-}{ade,rst,cyt,olv,frt,slt,thy,glc,gau,plm}-{50,{100..900..100},950}");
 @source inline("{hover:,}{bg-,text-}{blk,gry,wht}-{50,{100..900..100},950}");
 

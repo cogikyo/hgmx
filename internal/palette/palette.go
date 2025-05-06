@@ -40,15 +40,21 @@ type Palette struct {
 	Foreground ColorScale
 	// Colors
 	Red      ColorScale
+	Berry    ColorScale
+	Cherry   ColorScale
 	Ruby     ColorScale
+	Coral    ColorScale
 	Orange   ColorScale
+	Pumpkin  ColorScale
 	Sun      ColorScale
 	Gold     ColorScale
 	Yellow   ColorScale
 	Lemon    ColorScale
 	Lime     ColorScale
+	Kiwi     ColorScale
 	Teal     ColorScale
 	Green    ColorScale
+	Jade     ColorScale
 	Emerald  ColorScale
 	Cyan     ColorScale
 	Cerulean ColorScale
@@ -86,14 +92,20 @@ func Generate(base oklab.Oklch) (p Palette) {
 	p.Foreground = Foreground(base)
 	// Colors
 	p.Red = Red(base)
+	p.Berry = Berry(base)
+	p.Cherry = Cherry(base)
 	p.Ruby = Ruby(base)
+	p.Coral = Coral(base)
 	p.Orange = Orange(base)
+	p.Pumpkin = Pumpkin(base)
 	p.Sun = Sun(base)
 	p.Gold = Gold(base)
 	p.Yellow = Yellow(base)
 	p.Lemon = Lemon(base)
 	p.Lime = Lime(base)
+	p.Kiwi = Kiwi(base)
 	p.Green = Green(base)
+	p.Jade = Jade(base)
 	p.Emerald = Emerald(base)
 	p.Teal = Teal(base)
 	p.Aqua = Aqua(base)
@@ -133,17 +145,23 @@ func (p *Palette) ToCSS(w io.Writer) {
 	p.Foreground.ToCSS(w, p.seed)
 	// Colors
 	p.Red.ToCSS(w, p.seed)
+	p.Berry.ToCSS(w, p.seed)
+	p.Cherry.ToCSS(w, p.seed)
 	p.Ruby.ToCSS(w, p.seed)
+	p.Coral.ToCSS(w, p.seed)
+	p.Pumpkin.ToCSS(w, p.seed)
 	p.Orange.ToCSS(w, p.seed)
 	p.Sun.ToCSS(w, p.seed)
 	p.Gold.ToCSS(w, p.seed)
 	p.Yellow.ToCSS(w, p.seed)
 	p.Lemon.ToCSS(w, p.seed)
 	p.Lime.ToCSS(w, p.seed)
+	p.Kiwi.ToCSS(w, p.seed)
 	p.Aqua.ToCSS(w, p.seed)
 	p.Azure.ToCSS(w, p.seed)
 	p.Cerulean.ToCSS(w, p.seed)
 	p.Green.ToCSS(w, p.seed)
+	p.Jade.ToCSS(w, p.seed)
 	p.Emerald.ToCSS(w, p.seed)
 	p.Teal.ToCSS(w, p.seed)
 	p.Cyan.ToCSS(w, p.seed)
@@ -205,7 +223,7 @@ func (p *Palette) ToView() []builder.ColorScaleView {
 
 			// Calculate radius using tanh for non-linear scaling
 			maxVisualRadius := 40.0
-			spreadFactor := 10.0
+			spreadFactor := 4.0
 			scaledRadius := maxVisualRadius * math.Tanh(spreadFactor*color.C)
 			totalDistance := scaledRadius
 
@@ -231,16 +249,23 @@ func (p *Palette) ToView() []builder.ColorScaleView {
 	// views = append(views, convertScale("Text", "fgc", p.Foreground))
 
 	// Colors
+	views = append(views, convertScale("Rose", "ros", p.Rose))
+	views = append(views, convertScale("Berry", "bry", p.Berry))
+	views = append(views, convertScale("Cherry", "chr", p.Cherry))
 	views = append(views, convertScale("Ruby", "rby", p.Ruby))
 	views = append(views, convertScale("Red", "red", p.Red))
+	views = append(views, convertScale("Coral", "crl", p.Coral))
+	views = append(views, convertScale("Pumpkin", "pmk", p.Pumpkin))
 	views = append(views, convertScale("Orange", "orn", p.Orange))
 	views = append(views, convertScale("Sun", "sun", p.Sun))
 	views = append(views, convertScale("Gold", "gld", p.Gold))
 	views = append(views, convertScale("Yellow", "yel", p.Yellow))
 	views = append(views, convertScale("Lemon", "lem", p.Lemon))
 	views = append(views, convertScale("Lime", "lim", p.Lime))
+	views = append(views, convertScale("Kiwi", "kwi", p.Kiwi))
 	views = append(views, convertScale("Green", "grn", p.Green))
 	views = append(views, convertScale("Emerald", "emr", p.Emerald))
+	views = append(views, convertScale("Jade", "jde", p.Jade))
 	views = append(views, convertScale("Teal", "tea", p.Teal))
 	views = append(views, convertScale("Cyan", "cyn", p.Cyan))
 	views = append(views, convertScale("Aqua", "aqu", p.Aqua))
@@ -254,7 +279,6 @@ func (p *Palette) ToView() []builder.ColorScaleView {
 	views = append(views, convertScale("Violet", "vio", p.Violet))
 	views = append(views, convertScale("Pink", "pnk", p.Pink))
 	views = append(views, convertScale("Magenta", "mag", p.Magenta))
-	views = append(views, convertScale("Rose", "ros", p.Rose))
 
 	// Muted colors
 	// views = append(views, convertScale("Forest", "frt", p.Forest))
