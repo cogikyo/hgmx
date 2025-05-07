@@ -42,6 +42,7 @@ templ Palette(colors []ColorScaleView) {
 		</div>
 	</div>
 	@HexPalette(colors)
+	@HexPaletteLightness(colors)
 }
 
 templ HexPalette(colors []ColorScaleView) {
@@ -49,34 +50,34 @@ templ HexPalette(colors []ColorScaleView) {
 		<svg viewBox="0 10 100 82" width="1000" height="800">
 			<defs>
 				<linearGradient id="gradientTop" x1="100%" y1="50%" x2="0%" y2="50%">
-					<stop offset="0%" stop-color="#f00a80"/>     <!-- Rose -->
-					<stop offset="8.33%" stop-color="#ff0457"/>    <!-- Ruby -->
-					<stop offset="16.67%" stop-color="#ff1701"/>   <!-- Red -->
-					<stop offset="25%" stop-color="#fd6a00"/>   <!-- Orange -->
-					<stop offset="33.33%" stop-color="#ff9004"/>   <!-- Sun -->
-					<stop offset="41.67%" stop-color="#fead05"/>   <!-- Gold -->
-					<stop offset="50%" stop-color="#ffcc00"/>   <!-- Yellow -->
-					<stop offset="58.33%" stop-color="#fcee29"/>   <!-- Lemon -->
-					<stop offset="66.67%" stop-color="#d9ff00"/>   <!-- Lime -->
-					<stop offset="75%" stop-color="#74dc01"/>   <!-- Green -->
-					<stop offset="83.33%" stop-color="#02c059"/>   <!-- Emerald -->
-					<stop offset="91.67%" stop-color="#02fdb9"/>   <!-- Teal -->
-					<stop offset="100%" stop-color="#36ffe2"/>    <!-- Cyan -->
+					<stop offset="0%" stop-color="#f00a80"></stop> <!-- Rose -->
+					<stop offset="8.33%" stop-color="#ff0457"></stop> <!-- Ruby -->
+					<stop offset="16.67%" stop-color="#ff1701"></stop> <!-- Red -->
+					<stop offset="25%" stop-color="#fd6a00"></stop> <!-- Orange -->
+					<stop offset="33.33%" stop-color="#ff9004"></stop> <!-- Sun -->
+					<stop offset="41.67%" stop-color="#fead05"></stop> <!-- Gold -->
+					<stop offset="50%" stop-color="#ffcc00"></stop> <!-- Yellow -->
+					<stop offset="58.33%" stop-color="#fcee29"></stop> <!-- Lemon -->
+					<stop offset="66.67%" stop-color="#d9ff00"></stop> <!-- Lime -->
+					<stop offset="75%" stop-color="#74dc01"></stop> <!-- Green -->
+					<stop offset="83.33%" stop-color="#02c059"></stop> <!-- Emerald -->
+					<stop offset="91.67%" stop-color="#02fdb9"></stop> <!-- Teal -->
+					<stop offset="100%" stop-color="#36ffe2"></stop> <!-- Cyan -->
 				</linearGradient>
 				<linearGradient id="gradientBottom" x1="0%" y1="50%" x2="100%" y2="50%">
-					<stop offset="0%" stop-color="#36ffe2"/>     <!-- Cyan -->
-					<stop offset="8.33%" stop-color="#50ffff"/>    <!-- Aqua -->
-					<stop offset="16.67%" stop-color="#07e3fe"/>   <!-- Cerulean -->
-					<stop offset="25.00%" stop-color="#0acbff"/>   <!-- Azure -->
-					<stop offset="33.33%" stop-color="#0aafff"/>   <!-- Sky -->
-					<stop offset="41.67%" stop-color="#0184fe"/>   <!-- Blue -->
-					<stop offset="50.00%" stop-color="#4158fa"/>   <!-- Sapphire -->
-					<stop offset="58.33%" stop-color="#6e40ff"/>   <!-- Lavender -->
-					<stop offset="66.67%" stop-color="#9201fd"/>   <!-- Purple -->
-					<stop offset="75.00%" stop-color="#c602fe"/>   <!-- Violet -->
-					<stop offset="83.33%" stop-color="#ff13f7"/>   <!-- Pink -->
-					<stop offset="91.67%" stop-color="#fd01b9"/>   <!-- Magenta -->
-					<stop offset="100%" stop-color="#f00a80"/>    <!-- Rose -->
+					<stop offset="0%" stop-color="#36ffe2"></stop> <!-- Cyan -->
+					<stop offset="8.33%" stop-color="#50ffff"></stop> <!-- Aqua -->
+					<stop offset="16.67%" stop-color="#07e3fe"></stop> <!-- Robin -->
+					<stop offset="25.00%" stop-color="#0acbff"></stop> <!-- Azure -->
+					<stop offset="33.33%" stop-color="#0aafff"></stop> <!-- Sky -->
+					<stop offset="41.67%" stop-color="#0184fe"></stop> <!-- Blue -->
+					<stop offset="50.00%" stop-color="#4158fa"></stop> <!-- Sapphire -->
+					<stop offset="58.33%" stop-color="#6e40ff"></stop> <!-- Lavender -->
+					<stop offset="66.67%" stop-color="#9201fd"></stop> <!-- Purple -->
+					<stop offset="75.00%" stop-color="#c602fe"></stop> <!-- Violet -->
+					<stop offset="83.33%" stop-color="#ff13f7"></stop> <!-- Pink -->
+					<stop offset="91.67%" stop-color="#fd01b9"></stop> <!-- Magenta -->
+					<stop offset="100%" stop-color="#f00a80"></stop> <!-- Rose -->
 				</linearGradient>
 				<radialGradient id="centerMaskFade">
 					<stop offset="0%" stop-color="#222536" stop-opacity="1"></stop>
@@ -112,19 +113,96 @@ templ HexPalette(colors []ColorScaleView) {
 				points="72.5,50 61.25,69.48 38.75,69.48 27.5,50 38.75,30.52 61.25,30.52"
 				fill="url(#centerMaskFade)"
 			></polygon>
-			@templ.Raw(renderCircles(colors))
+			@templ.Raw(renderCircles(colors, false))
 		</svg>
 	</div>
 }
 
-func renderCircles(colors []ColorScaleView) string {
+templ HexPaletteLightness(colors []ColorScaleView) {
+	<div class="flex items-center justify-center p-4 bg-bgc-500">
+		<svg viewBox="0 10 100 82" width="1000" height="800">
+			<defs>
+				<linearGradient id="gradientTop" x1="100%" y1="50%" x2="0%" y2="50%">
+					<stop offset="0%" stop-color="#f00a80"></stop> <!-- Rose -->
+					<stop offset="8.33%" stop-color="#ff0457"></stop> <!-- Ruby -->
+					<stop offset="16.67%" stop-color="#ff1701"></stop> <!-- Red -->
+					<stop offset="25%" stop-color="#fd6a00"></stop> <!-- Orange -->
+					<stop offset="33.33%" stop-color="#ff9004"></stop> <!-- Sun -->
+					<stop offset="41.67%" stop-color="#fead05"></stop> <!-- Gold -->
+					<stop offset="50%" stop-color="#ffcc00"></stop> <!-- Yellow -->
+					<stop offset="58.33%" stop-color="#fcee29"></stop> <!-- Lemon -->
+					<stop offset="66.67%" stop-color="#d9ff00"></stop> <!-- Lime -->
+					<stop offset="75%" stop-color="#74dc01"></stop> <!-- Green -->
+					<stop offset="83.33%" stop-color="#02c059"></stop> <!-- Emerald -->
+					<stop offset="91.67%" stop-color="#02fdb9"></stop> <!-- Teal -->
+					<stop offset="100%" stop-color="#36ffe2"></stop> <!-- Cyan -->
+				</linearGradient>
+				<linearGradient id="gradientBottom" x1="0%" y1="50%" x2="100%" y2="50%">
+					<stop offset="0%" stop-color="#36ffe2"></stop> <!-- Cyan -->
+					<stop offset="8.33%" stop-color="#50ffff"></stop> <!-- Aqua -->
+					<stop offset="16.67%" stop-color="#07e3fe"></stop> <!-- Robin -->
+					<stop offset="25.00%" stop-color="#0acbff"></stop> <!-- Azure -->
+					<stop offset="33.33%" stop-color="#0aafff"></stop> <!-- Sky -->
+					<stop offset="41.67%" stop-color="#0184fe"></stop> <!-- Blue -->
+					<stop offset="50.00%" stop-color="#4158fa"></stop> <!-- Sapphire -->
+					<stop offset="58.33%" stop-color="#6e40ff"></stop> <!-- Lavender -->
+					<stop offset="66.67%" stop-color="#9201fd"></stop> <!-- Purple -->
+					<stop offset="75.00%" stop-color="#c602fe"></stop> <!-- Violet -->
+					<stop offset="83.33%" stop-color="#ff13f7"></stop> <!-- Pink -->
+					<stop offset="91.67%" stop-color="#fd01b9"></stop> <!-- Magenta -->
+					<stop offset="100%" stop-color="#f00a80"></stop> <!-- Rose -->
+				</linearGradient>
+				<radialGradient id="centerMaskFade">
+					<stop offset="0%" stop-color="#222536" stop-opacity="1"></stop>
+					<stop offset="100%" stop-color="#222536" stop-opacity="0"></stop>
+				</radialGradient>
+			</defs>
+			<polygon
+				points="95,50 72.5,88.971 27.5,88.971 5,50 27.5,11.029 72.5,11.029"
+				fill="#222536"
+			></polygon>
+			<line x1="50" y1="50" x2="95" y2="50" stroke="#f00a80" stroke-width="0.25" stroke-dasharray="0.5,1"></line>
+			<line x1="50" y1="50" x2="83.5" y2="30.75" stroke="#f81500" stroke-width="0.25" stroke-dasharray="0.5,1"></line>
+			<line x1="50" y1="50" x2="78.5" y2="21.5" stroke="#ff6c06" stroke-width="0.25" stroke-dasharray="0.5,1"></line>
+			<line x1="50" y1="50" x2="39.5" y2="11.03" stroke="#ffff00" stroke-width="0.25" stroke-dasharray="0.5,1"></line>
+			<line x1="50" y1="50" x2="22" y2="19" stroke="#00ff00" stroke-width="0.25" stroke-dasharray="0.5,1"></line>
+			<line x1="50" y1="50" x2="5" y2="50" stroke="#36ffe2" stroke-width="0.25" stroke-dasharray="0.5,1"></line>
+			<line x1="50" y1="50" x2="45.8" y2="90" stroke="#0000ff" stroke-width="0.25" stroke-dasharray="0.5,1"></line>
+			<line x1="50" y1="50" x2="72.5" y2="88.97" stroke="#9201fd" stroke-width="0.25" stroke-dasharray="0.5,1"></line>
+			<path
+				d="M 95,50 L 72.5,11.029 L 27.5,11.029 L 5,50"
+				fill="none"
+				stroke="url(#gradientTop)"
+				stroke-width="0.5"
+			></path>
+			<path
+				d="M 5,50 L 27.5,88.971 L 72.5,88.971 L 95,50"
+				fill="none"
+				stroke="url(#gradientBottom)"
+				stroke-width="0.5"
+				stroke-linecap="round"
+			></path>
+			<polygon
+				points="72.5,50 61.25,69.48 38.75,69.48 27.5,50 38.75,30.52 61.25,30.52"
+				fill="url(#centerMaskFade)"
+			></polygon>
+			@templ.Raw(renderCircles(colors, true))
+		</svg>
+	</div>
+}
+
+func renderCircles(colors []ColorScaleView, lightness bool) string {
 	svg := ""
 	for _, color := range colors {
 		for _, shade := range color.Shades {
 			if shade.Hex == "#000000" {
 				continue
 			}
-			svg += fmt.Sprintf(`<circle cx="%.6f" cy="%.6f" r="1" fill="%s" />`, shade.Cx, shade.Cy, shade.Hex)
+			if lightness {
+				svg += fmt.Sprintf(`<circle cx="%.6f" cy="%.6f" r="1" fill="%s" />`, shade.Clx, shade.Cly, shade.Hex)
+			} else {
+				svg += fmt.Sprintf(`<circle cx="%.6f" cy="%.6f" r="1" fill="%s" />`, shade.Cx, shade.Cy, shade.Hex)
+			}
 		}
 	}
 	return svg
@@ -135,6 +213,7 @@ type Shade struct {
 	RL, CR               float64
 	Hex                  string
 	Cx, Cy               float64
+	Clx, Cly             float64
 }
 
 func tern(cond bool, a, b string) string {
@@ -147,7 +226,7 @@ func tern(cond bool, a, b string) string {
 templ ColorSwatch(s Shade) {
 	<div class={ fmt.Sprintf("h-12 w-full text-[10px] font-mono %s rounded bg-%s-%s relative", tern(s.CR <= 2.00, "text-fgc-500", "text-bgc-500"), s.Code, s.Value) }>
 		<div class={ fmt.Sprintf("absolute -top-5 left-0 right-0 text-center text-[10px] font-semibold text-%s-%s", s.Code, s.Value) }>
-			{ s.C }
+			{ s.L }
 		</div>
 		<div class="absolute inset-0 flex flex-col justify-between p-1 opacity-0 group-[.show-rlcr]:group-hover:opacity-100 transition-opacity duration-200">
 			<div class="">{ fmt.Sprintf("%0.3f", s.RL) }</div>
