@@ -154,13 +154,7 @@ func paletteCmd(stdout, stderr io.Writer, args []string) (code int) {
 
 	lg.Info("Generating palette for color:", slog.String("hex", hexColor))
 
-	oklchColor, err := palette.HexToOklch(hexColor)
-	if err != nil {
-		lg.Error("Failed to convert hex to OKLCH", slog.String("error", err.Error()))
-		return 1
-	}
-
-	generatedPalette := palette.Generate(oklchColor)
+	generatedPalette := palette.Generate(hexColor)
 
 	outputFile := "static/css/colors.css"
 	f, err := os.Create(outputFile)

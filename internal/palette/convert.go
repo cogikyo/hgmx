@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	"github.com/alltom/oklab"
-	// Assuming zerolog is initialized elsewhere
 )
 
 // HexToOklch converts a hex color string (e.g., "#RRGGBB") to its OKLCH representation.

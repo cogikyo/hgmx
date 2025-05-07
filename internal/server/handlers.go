@@ -17,9 +17,11 @@ func Index(c echo.Context) error {
 }
 
 func Palette(c echo.Context) error {
-	hex := "#222536"
-	oklch, _ := palette.HexToOklch(hex)
-	p := palette.Generate(oklch)
+	hex := c.QueryParam("hex")
+	if hex == "" {
+		hex = "#222536"
+	}
+	p := palette.Generate(hex)
 	viewModel := p.ToView()
 
 	cmp := views.FullPage(views.Page{

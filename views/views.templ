@@ -17,7 +17,7 @@ type Page struct {
 
 templ FullPage(page Page) {
 	<!DOCTYPE html>
-	<html 
+	<html
 		lang="en"
 		class="cursor-default scrollbar-thin"
 	>
@@ -45,7 +45,7 @@ templ Head() {
 }
 
 templ Body(content templ.Component) {
-	<body class="font-sans bg-bgc-500 text-fgc-500 h-svh">
+	<body class="font-sans bg-bgc-600 text-fgc-600 h-svh">
 		@Main(content)
 	</body>
 }

@@ -3,212 +3,293 @@ package palette
 import (
 	"fmt"
 	"io"
+	"log"
 	"math"
-	"strings"
 
 	"github.com/alltom/oklab"
 	"github.com/nosvagor/hgmx/views/builder"
 )
 
-type ColorScale struct {
-	name  string
-	shade map[int]*oklab.Oklch
-	rl    map[int]float64
-	cr    map[int]float64
-}
-
-var shades = []int{50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950}
-
-func (cs ColorScale) New(name string) ColorScale {
-	cs = ColorScale{
-		name:  name,
-		shade: make(map[int]*oklab.Oklch),
-		rl:    make(map[int]float64),
-		cr:    make(map[int]float64),
+func Generate(seed string) Palette {
+	p := make(Palette)
+	for code, color := range colors {
+		if code == "bgc" {
+			color.Seed = Hex(seed)
+		}
+		code.valid()
+		oklch := color.Seed.toOklch()
+		details := &ColorDetails{Color: color, Base: *oklch}
+		p[code] = details
+		details.generate()
 	}
-	for _, shade := range shades {
-		cs.shade[shade] = &oklab.Oklch{}
+	return p
+}
+
+// === Models ==================================================================
+
+var shadeValues = []int{50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950}
+
+var orderedCodes = []Code{
+	"bgc", "fgc", "tes",
+	"rse", "bry", "chy", "rby", "red", "crl", "pmk", "orn", "sun", "gld", "hny", "yel",
+	"lem", "acd", "lim", "spr", "grn", "emr", "jde", "frs", "lea", "tea", "cyn",
+	"aqu", "rbn", "azr", "sky", "blu", "cbt", "sph", "ind", "lav", "prp", "vio", "pnk", "mag",
+	"blk", "gry", "wht",
+}
+
+type Code string
+
+func (c Code) valid() {
+	if len(c) != 3 {
+		panic(fmt.Sprintf("invalid code: %s", c))
 	}
-	return cs
 }
 
-// Palette holds the complete set of color scales for the theme.
-type Palette struct {
-	seed oklab.Oklch
-	// Base
-	Background ColorScale
-	Foreground ColorScale
-	// Colors
-	Red      ColorScale
-	Berry    ColorScale
-	Cherry   ColorScale
-	Ruby     ColorScale
-	Coral    ColorScale
-	Orange   ColorScale
-	Pumpkin  ColorScale
-	Sun      ColorScale
-	Gold     ColorScale
-	Yellow   ColorScale
-	Lemon    ColorScale
-	Lime     ColorScale
-	Acid     ColorScale
-	Kiwi     ColorScale
-	Teal     ColorScale
-	Green    ColorScale
-	Spring   ColorScale
-	Emerald  ColorScale
-	Jade     ColorScale
-	Forest   ColorScale
-	Leaf     ColorScale
-	Cyan     ColorScale
-	Robin    ColorScale
-	Azure    ColorScale
-	Aqua     ColorScale
-	Sky      ColorScale
-	Cobalt   ColorScale
-	Sapphire ColorScale
-	Indigo   ColorScale
-	Blue     ColorScale
-	Lavender ColorScale
-	Purple   ColorScale
-	Violet   ColorScale
-	Magenta  ColorScale
-	Rose     ColorScale
-	Pink     ColorScale
-	// Grays
-	Black ColorScale
-	Gray  ColorScale
-	White ColorScale
+type Hex string
+
+func (h Hex) toOklch() *oklab.Oklch {
+	c, err := HexToOklch(string(h))
+	if err != nil {
+		panic(err)
+	}
+	return &c
 }
 
-func Generate(base oklab.Oklch) (p Palette) {
-	p.seed = base
-	// Base
-	p.Background = Background(base)
-	p.Foreground = Foreground(base)
-	// Colors
-	p.Red = Red(base)
-	p.Berry = Berry(base)
-	p.Cherry = Cherry(base)
-	p.Ruby = Ruby(base)
-	p.Coral = Coral(base)
-	p.Orange = Orange(base)
-	p.Pumpkin = Pumpkin(base)
-	p.Sun = Sun(base)
-	p.Gold = Gold(base)
-	p.Yellow = Yellow(base)
-	p.Lemon = Lemon(base)
-	p.Lime = Lime(base)
-	p.Acid = Acid(base)
-	p.Kiwi = Kiwi(base)
-	p.Green = Green(base)
-	p.Spring = Spring(base)
-	p.Emerald = Emerald(base)
-	p.Jade = Jade(base)
-	p.Forest = Forest(base)
-	p.Leaf = Leaf(base)
-	p.Spring = Spring(base)
-	p.Teal = Teal(base)
-	p.Aqua = Aqua(base)
-	p.Cyan = Cyan(base)
-	p.Robin = Robin(base)
-	p.Sky = Sky(base)
-	p.Azure = Azure(base)
-	p.Cobalt = Cobalt(base)
-	p.Sapphire = Sapphire(base)
-	p.Indigo = Indigo(base)
-	p.Blue = Blue(base)
-	p.Lavender = Lavender(base)
-	p.Purple = Purple(base)
-	p.Violet = Violet(base)
-	p.Magenta = Magenta(base)
-	p.Rose = Rose(base)
-	p.Pink = Pink(base)
-	// Grays
-	p.Black = Black(base)
-	p.Gray = Gray(base)
-	p.White = White(base)
-	return
+type Colors map[Code]Color
+
+type Color struct {
+	Seed Hex
+	Name string
+}
+
+type Details struct {
+	oklab.Oklch
+	RL float64
+	CR float64
+}
+
+type ColorDetails struct {
+	Color
+	Base   oklab.Oklch
+	Shades map[int]Details
+}
+
+type Palette map[Code]*ColorDetails
+
+var colors = Colors{
+	"bgc": Color{"", "Background"},
+	"fgc": Color{"#aeb9f8", "Foreground"},
+	// "tes": Color{"#000000", "Test"},
+	"rse": Color{"#fc0086", "Rose"},
+	"bry": Color{"#fd016f", "Berry"},
+	"chy": Color{"#ff0457", "Cherry"},
+	"rby": Color{"#f9043a", "Ruby"},
+	"red": Color{"#fd181a", "Red"},
+	"crl": Color{"#fb3d03", "Coral"},
+	"pmk": Color{"#fd5802", "Pumpkin"},
+	"orn": Color{"#ff7220", "Orange"},
+	"sun": Color{"#ff9004", "Sun"},
+	"gld": Color{"#fead05", "Gold"},
+	"hny": Color{"#ffcc00", "Honey"},
+	"yel": Color{"#fddf00", "Yellow"},
+	"lem": Color{"#ecec00", "Lemon"},
+	"acd": Color{"#cdf118", "Acid"},
+	"lim": Color{"#aae801", "Lime"},
+	"spr": Color{"#86e401", "Spring"},
+	"grn": Color{"#58d300", "Green"},
+	"emr": Color{"#28c624", "Emerald"},
+	"jde": Color{"#01b947", "Jade"},
+	"frs": Color{"#03bb65", "Forest"},
+	"lea": Color{"#01c37e", "Leaf"},
+	"tea": Color{"#0ed39a", "Teal"},
+	"cyn": Color{"#00e7cb", "Cyan"},
+	"aqu": Color{"#02eeef", "Aqua"},
+	"rbn": Color{"#07e3fe", "Robin"},
+	"azr": Color{"#0acbff", "Azure"},
+	"sky": Color{"#0aafff", "Sky"},
+	"blu": Color{"#0184fe", "Blue"},
+	"cbt": Color{"#256eff", "Cobalt"},
+	"sph": Color{"#4158fa", "Sapphire"},
+	"ind": Color{"#5a4aff", "Indigo"},
+	"lav": Color{"#6e40ff", "Lavender"},
+	"prp": Color{"#972eff", "Purple"},
+	"vio": Color{"#c602fe", "Violet"},
+	"pnk": Color{"#ea0aeb", "Pink"},
+	"mag": Color{"#fd01b9", "Magenta"},
+	// "blk": Color{"#1d1d21", "Black"},
+	// "gry": Color{"#4f5163", "Gray"},
+	// "wht": Color{"#ddddf6", "White"},
+}
+
+// generate dynamically creates all shades from 50-950.
+// It uses linear interpolation from the Base color towards hardcoded targets for 50 and 950,
+// with special final-step adjustments for shades 50 and 950.
+func (c *ColorDetails) generate() {
+	c.Shades = make(map[int]Details, len(shadeValues))
+	for _, shade := range shadeValues {
+		c.Shades[shade] = Details{Oklch: oklab.Oklch{}}
+	}
+	if _, ok := c.Shades[600]; !ok {
+		panic("Shade 600 must be in shadeValues for generation")
+	}
+	c.Shades[600] = Details{Oklch: c.Base}
+	hue := c.Base.H
+
+	shadesMap := make(map[int]int, len(shadeValues))
+	for i, v := range shadeValues {
+		shadesMap[v] = i
+	}
+
+	// --- Constants for Light Shades (50-500) ---
+	const targetL50 = 0.97
+	const targetC50 = 0.01
+	const adjustL50 = 0.25
+	const adjustC50 = 0.37
+	numIntervalsLight := float64(shadesMap[600] - shadesMap[50])
+
+	// First, calculate all light shades (50-500) with linear interpolation
+	for shadeValue, index := range shadesMap {
+		if shadeValue > 500 {
+			continue
+		}
+		t := float64(index) / numIntervalsLight
+		l := targetL50 + (c.Base.L-targetL50)*t
+		chroma := max(targetC50+(c.Base.C-targetC50)*t, 0)
+		detail := c.Shades[shadeValue]
+		detail.Oklch = oklab.Oklch{L: max(0, min(l, 1)), C: chroma, H: hue}
+		c.Shades[shadeValue] = detail
+	}
+
+	// Special adjustment for shade 50's lightness and chroma
+	details100, ok100 := c.Shades[100]
+	details50, ok50 := c.Shades[50]
+	if ok100 && ok50 {
+		l100_linear := details100.L
+		l50_initial_linear := details50.L
+		l50_adjusted := l50_initial_linear + (l100_linear-l50_initial_linear)*adjustL50
+		details50.L = max(0, min(l50_adjusted, 1))
+
+		c100_linear := details100.C
+		c50_initial_linear := details50.C
+		c50_adjusted := c50_initial_linear + (c100_linear-c50_initial_linear)*adjustC50
+		details50.C = max(c50_adjusted, 0)
+		c.Shades[50] = details50
+	}
+
+	// --- Constants for Dark Shades (700-950) ---
+	const targetL950 = 0.25
+	const targetC950 = 0.05
+	const adjustL950 = 0.37
+	const adjustC950 = 0.42
+	numIntervalsDark := float64(shadesMap[950] - shadesMap[600])
+	baseIndexDark := float64(shadesMap[600])
+
+	// Calculate all dark shades (700-950) with linear interpolation
+	for shadeValue, index := range shadesMap {
+		if shadeValue < 700 {
+			continue
+		}
+		t := (float64(index) - baseIndexDark) / numIntervalsDark
+		l := c.Base.L + (targetL950-c.Base.L)*t
+		chroma := c.Base.C + (targetC950-c.Base.C)*t
+		detail := c.Shades[shadeValue]
+		detail.Oklch = oklab.Oklch{L: max(0, min(l, 1)), C: max(chroma, 0), H: hue}
+		c.Shades[shadeValue] = detail
+	}
+
+	// Special adjustment for shade 950's lightness and chroma
+	details900, ok900 := c.Shades[900]
+	details950, ok950 := c.Shades[950]
+	if ok900 && ok950 {
+		l900 := details900.L
+		l950_initial := details950.L
+		l950_adjusted := l950_initial + (l900-l950_initial)*adjustL950
+		details950.L = max(0, min(l950_adjusted, 1))
+
+		c900 := details900.C
+		c950_initial := details950.C
+		c950_adjusted := c950_initial + (c900-c950_initial)*adjustC950
+		details950.C = max(c950_adjusted, 0)
+		c.Shades[950] = details950
+	}
 }
 
 func (p *Palette) ToCSS(w io.Writer) {
+	seed := (*p)["bgc"].Base
 	fmt.Fprintln(w, ":root {")
-	// Base
-	p.Background.ToCSS(w, p.seed)
-	p.Foreground.ToCSS(w, p.seed)
-	// Colors
-	p.Berry.ToCSS(w, p.seed)
-	p.Cherry.ToCSS(w, p.seed)
-	p.Red.ToCSS(w, p.seed)
-	p.Ruby.ToCSS(w, p.seed)
-	p.Coral.ToCSS(w, p.seed)
-	p.Pumpkin.ToCSS(w, p.seed)
-	p.Orange.ToCSS(w, p.seed)
-	p.Sun.ToCSS(w, p.seed)
-	p.Gold.ToCSS(w, p.seed)
-	p.Yellow.ToCSS(w, p.seed)
-	p.Lemon.ToCSS(w, p.seed)
-	p.Lime.ToCSS(w, p.seed)
-	p.Acid.ToCSS(w, p.seed)
-	p.Kiwi.ToCSS(w, p.seed)
-	p.Green.ToCSS(w, p.seed)
-	p.Spring.ToCSS(w, p.seed)
-	p.Emerald.ToCSS(w, p.seed)
-	p.Jade.ToCSS(w, p.seed)
-	p.Forest.ToCSS(w, p.seed)
-	p.Leaf.ToCSS(w, p.seed)
-	p.Spring.ToCSS(w, p.seed)
-	p.Teal.ToCSS(w, p.seed)
-	p.Aqua.ToCSS(w, p.seed)
-	p.Cyan.ToCSS(w, p.seed)
-	p.Robin.ToCSS(w, p.seed)
-	p.Sky.ToCSS(w, p.seed)
-	p.Azure.ToCSS(w, p.seed)
-	p.Cobalt.ToCSS(w, p.seed)
-	p.Sapphire.ToCSS(w, p.seed)
-	p.Indigo.ToCSS(w, p.seed)
-	p.Blue.ToCSS(w, p.seed)
-	p.Lavender.ToCSS(w, p.seed)
-	p.Purple.ToCSS(w, p.seed)
-	p.Violet.ToCSS(w, p.seed)
-	p.Magenta.ToCSS(w, p.seed)
-	p.Rose.ToCSS(w, p.seed)
-	p.Pink.ToCSS(w, p.seed)
-	// Grays
-	p.Black.ToCSS(w, p.seed)
-	p.Gray.ToCSS(w, p.seed)
-	p.White.ToCSS(w, p.seed)
+	// Iterate using the defined order
+	for _, code := range orderedCodes {
+		colorDetails, ok := (*p)[code]
+		if ok {
+			colorDetails.ToCSS(w, code, seed)
+		}
+	}
+	fmt.Fprintln(w, "}")
+	fmt.Fprintln(w, "")
+	fmt.Fprintln(w, "@theme {")
+	// Iterate using the defined order
+	for _, code := range orderedCodes {
+		colorDetails, ok := (*p)[code]
+		if ok {
+			colorDetails.ToTheme(w, code, seed)
+		}
+	}
 	fmt.Fprintln(w, "}")
 }
 
-func (s ColorScale) ToCSS(w io.Writer, seed oklab.Oklch) {
-	for _, shadeKey := range shades {
-		color := s.shade[shadeKey]
-		css := OklchToString(color)
-		rl, cr := OklchCompare(seed, *color)
-		if shadeKey == 50 {
-			fmt.Fprintf(w, "  --%s-50:  %s; /* RL: %0.4f, CR: %05.2f */\n", strings.ToLower(s.name), css, rl, cr)
-		} else {
-			fmt.Fprintf(w, "  --%s-%d: %s; /* RL: %0.4f, CR: %05.2f */\n", strings.ToLower(s.name), shadeKey, css, rl, cr)
-		}
+func (c ColorDetails) ToCSS(w io.Writer, code Code, seed oklab.Oklch) {
+	fmt.Fprintln(w, "\t/*", c.Name, "*/")
+	// Iterate using the ordered shadeValues slice
+	for _, shadeKey := range shadeValues {
+		color, ok := c.Shades[shadeKey]
+		if !ok {
+			continue
+		} // Skip if a shade is missing (shouldn't happen)
+		css := OklchToString(&color.Oklch)
+		fmt.Fprintf(w, "  --%s-%d: %s;\n", string(code), shadeKey, css)
 	}
 	fmt.Fprintln(w, " ")
 }
 
-func (p *Palette) ToView() []builder.ColorScaleView {
+func (c ColorDetails) ToTheme(w io.Writer, code Code, seed oklab.Oklch) {
+	// Iterate using the ordered shadeValues slice
+	for _, shadeKey := range shadeValues {
+		color, ok := c.Shades[shadeKey]
+		if !ok {
+			continue
+		} // Skip if a shade is missing
+		css := OklchToString(&color.Oklch)
+		fmt.Fprintf(w, "  --color-%s-%d: %s;\n", string(code), shadeKey, css)
+	}
+	fmt.Fprintln(w, " ")
+}
+
+func (p Palette) ToView() []builder.ColorScaleView {
 	var views []builder.ColorScaleView
 
-	convertScale := func(name, code string, scale ColorScale) builder.ColorScaleView {
+	bgcDetails, ok := p["bgc"]
+	if !ok {
+		log.Println("Warning: Background color 'bgc' not found in palette for ToView seed.")
+		return views
+	}
+	seed := bgcDetails.Base
+
+	convertScale := func(code Code, scale *ColorDetails) builder.ColorScaleView {
 		view := builder.ColorScaleView{
-			Name:   name,
-			Code:   code,
-			Value:  *scale.shade[600],
-			Shades: make([]builder.Shade, len(shades)),
+			Name:   scale.Name,
+			Code:   string(code),
+			Value:  scale.Shades[600].Oklch,
+			Shades: make([]builder.Shade, len(shadeValues)),
 		}
 
-		for i, shade := range shades {
-			color := scale.shade[shade]
-			rl, cr := OklchCompare(p.seed, *color)
+		for i, shadeVal := range shadeValues {
+			colorDetails, ok := scale.Shades[shadeVal]
+			if !ok {
+				continue
+			}
+
+			color := colorDetails.Oklch
+			rl, cr := OklchCompare(seed, color)
 			hue := toDegree(color.H)
 
 			scaledRadiusC := 37.0 * math.Tanh(6.0*color.C)
@@ -219,14 +300,14 @@ func (p *Palette) ToView() []builder.ColorScaleView {
 
 			angle := -color.H
 			view.Shades[i] = builder.Shade{
-				Code:  code,
-				Value: fmt.Sprintf("%d", shade),
+				Code:  string(code),
+				Value: shadeVal,
 				RL:    rl,
 				CR:    cr,
 				L:     fmt.Sprintf("%0.1f%%", color.L*100),
 				C:     fmt.Sprintf("%0.2f", color.C),
 				H:     fmt.Sprintf("%0.1f", hue),
-				Hex:   OklchToHex(color),
+				Hex:   OklchToHex(&color),
 				Cx:    50.0 + totalDistanceC*math.Cos(angle),
 				Cy:    50.0 + totalDistanceC*math.Sin(angle),
 				Clx:   50.0 + totalDistanceL*math.Cos(angle),
@@ -236,47 +317,15 @@ func (p *Palette) ToView() []builder.ColorScaleView {
 		return view
 	}
 
-	// Base colors
-	// views = append(views, convertScale("Bg", "bgc", p.Background))
-	// views = append(views, convertScale("Text", "fgc", p.Foreground))
-
-	// Colors
-	views = append(views, convertScale("Rose", "ros", p.Rose))
-	views = append(views, convertScale("Berry", "bry", p.Berry))
-	views = append(views, convertScale("Cherry", "chy", p.Cherry))
-	views = append(views, convertScale("Ruby", "rby", p.Ruby))
-	views = append(views, convertScale("Red", "red", p.Red))
-	views = append(views, convertScale("Coral", "crl", p.Coral))
-	views = append(views, convertScale("Pumpkin", "pmk", p.Pumpkin))
-	views = append(views, convertScale("Orange", "orn", p.Orange))
-	views = append(views, convertScale("Sun", "sun", p.Sun))
-	views = append(views, convertScale("Gold", "gld", p.Gold))
-	views = append(views, convertScale("Yellow", "yel", p.Yellow))
-	views = append(views, convertScale("Lemon", "lem", p.Lemon))
-	views = append(views, convertScale("Acid", "acd", p.Acid))
-	views = append(views, convertScale("Lime", "lim", p.Lime))
-	views = append(views, convertScale("Kiwi", "kwi", p.Kiwi))
-	views = append(views, convertScale("Green", "grn", p.Green))
-	views = append(views, convertScale("Spring", "spr", p.Spring))
-	views = append(views, convertScale("Emerald", "emr", p.Emerald))
-	views = append(views, convertScale("Jade", "jde", p.Jade))
-	views = append(views, convertScale("Forest", "frs", p.Forest))
-	views = append(views, convertScale("Leaf", "lea", p.Leaf))
-	views = append(views, convertScale("Teal", "tea", p.Teal))
-	views = append(views, convertScale("Cyan", "cyn", p.Cyan))
-	views = append(views, convertScale("Aqua", "aqu", p.Aqua))
-	views = append(views, convertScale("Robin", "rbn", p.Robin))
-	views = append(views, convertScale("Azure", "azr", p.Azure))
-	views = append(views, convertScale("Sky", "sky", p.Sky))
-	views = append(views, convertScale("Blue", "blu", p.Blue))
-	views = append(views, convertScale("Cobalt", "cbt", p.Cobalt))
-	views = append(views, convertScale("Sapphire", "sph", p.Sapphire))
-	views = append(views, convertScale("Indigo", "ind", p.Indigo))
-	views = append(views, convertScale("Lavender", "lav", p.Lavender))
-	views = append(views, convertScale("Purple", "prp", p.Purple))
-	views = append(views, convertScale("Violet", "vio", p.Violet))
-	views = append(views, convertScale("Pink", "pnk", p.Pink))
-	views = append(views, convertScale("Magenta", "mag", p.Magenta))
+	for _, code := range orderedCodes {
+		if code == "bgc" || code == "fgc" {
+			continue
+		}
+		details, ok := p[code]
+		if ok {
+			views = append(views, convertScale(code, details))
+		}
+	}
 
 	return views
 }
