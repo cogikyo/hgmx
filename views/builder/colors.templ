@@ -226,7 +226,7 @@ func tern(cond bool, a, b string) string {
 templ ColorSwatch(s Shade) {
 	<div class={ fmt.Sprintf("h-12 w-full text-[10px] font-mono %s rounded bg-%s-%s relative", tern(s.CR <= 2.00, "text-fgc-500", "text-bgc-500"), s.Code, s.Value) }>
 		<div class={ fmt.Sprintf("absolute -top-5 left-0 right-0 text-center text-[10px] font-semibold text-%s-%s", s.Code, s.Value) }>
-			{ s.L }
+			{ s.C }
 		</div>
 		<div class="absolute inset-0 flex flex-col justify-between p-1 opacity-0 group-[.show-rlcr]:group-hover:opacity-100 transition-opacity duration-200">
 			<div class="">{ fmt.Sprintf("%0.3f", s.RL) }</div>

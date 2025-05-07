@@ -75,15 +75,6 @@ type Palette struct {
 	Magenta  ColorScale
 	Rose     ColorScale
 	Pink     ColorScale
-	// Muted
-	Adenine  ColorScale
-	Rust     ColorScale
-	Cytosine ColorScale
-	Olive    ColorScale
-	Slate    ColorScale
-	Thymine  ColorScale
-	Guanine  ColorScale
-	Plum     ColorScale
 	// Grays
 	Black ColorScale
 	Gray  ColorScale
@@ -133,15 +124,6 @@ func Generate(base oklab.Oklch) (p Palette) {
 	p.Magenta = Magenta(base)
 	p.Rose = Rose(base)
 	p.Pink = Pink(base)
-	// Muted
-	p.Adenine = Adenine(base)
-	p.Rust = Rust(base)
-	p.Cytosine = Cytosine(base)
-	p.Olive = Olive(base)
-	p.Slate = Slate(base)
-	p.Thymine = Thymine(base)
-	p.Guanine = Guanine(base)
-	p.Plum = Plum(base)
 	// Grays
 	p.Black = Black(base)
 	p.Gray = Gray(base)
@@ -155,9 +137,9 @@ func (p *Palette) ToCSS(w io.Writer) {
 	p.Background.ToCSS(w, p.seed)
 	p.Foreground.ToCSS(w, p.seed)
 	// Colors
-	p.Red.ToCSS(w, p.seed)
 	p.Berry.ToCSS(w, p.seed)
 	p.Cherry.ToCSS(w, p.seed)
+	p.Red.ToCSS(w, p.seed)
 	p.Ruby.ToCSS(w, p.seed)
 	p.Coral.ToCSS(w, p.seed)
 	p.Pumpkin.ToCSS(w, p.seed)
@@ -192,15 +174,6 @@ func (p *Palette) ToCSS(w io.Writer) {
 	p.Magenta.ToCSS(w, p.seed)
 	p.Rose.ToCSS(w, p.seed)
 	p.Pink.ToCSS(w, p.seed)
-	// Muted
-	p.Adenine.ToCSS(w, p.seed)
-	p.Rust.ToCSS(w, p.seed)
-	p.Cytosine.ToCSS(w, p.seed)
-	p.Olive.ToCSS(w, p.seed)
-	p.Slate.ToCSS(w, p.seed)
-	p.Thymine.ToCSS(w, p.seed)
-	p.Guanine.ToCSS(w, p.seed)
-	p.Plum.ToCSS(w, p.seed)
 	// Grays
 	p.Black.ToCSS(w, p.seed)
 	p.Gray.ToCSS(w, p.seed)
@@ -287,8 +260,8 @@ func (p *Palette) ToView() []builder.ColorScaleView {
 	views = append(views, convertScale("Spring", "spr", p.Spring))
 	views = append(views, convertScale("Emerald", "emr", p.Emerald))
 	views = append(views, convertScale("Jade", "jde", p.Jade))
-	views = append(views, convertScale("Leaf", "lea", p.Leaf))
 	views = append(views, convertScale("Forest", "frs", p.Forest))
+	views = append(views, convertScale("Leaf", "lea", p.Leaf))
 	views = append(views, convertScale("Teal", "tea", p.Teal))
 	views = append(views, convertScale("Cyan", "cyn", p.Cyan))
 	views = append(views, convertScale("Aqua", "aqu", p.Aqua))
@@ -305,14 +278,5 @@ func (p *Palette) ToView() []builder.ColorScaleView {
 	views = append(views, convertScale("Pink", "pnk", p.Pink))
 	views = append(views, convertScale("Magenta", "mag", p.Magenta))
 
-	// Muted colors
-	// views = append(views, convertScale("Cytosine", "cyt", p.Cytosine))
-	// views = append(views, convertScale("Adenine", "ade", p.Adenine))
-	// views = append(views, convertScale("Guanine", "gau", p.Guanine))
-	// views = append(views, convertScale("Thymine", "thy", p.Thymine))
-	// views = append(views, convertScale("Plum", "plm", p.Plum))
-	// views = append(views, convertScale("Olive", "olv", p.Olive))
-	// views = append(views, convertScale("Slate", "slt", p.Slate))
-	// views = append(views, convertScale("Rust", "rst", p.Rust))
 	return views
 }
