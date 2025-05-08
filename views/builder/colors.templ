@@ -3,6 +3,7 @@ package builder
 import (
 	"fmt"
 	"github.com/alltom/oklab"
+	"slices"
 )
 
 type ColorScaleView struct {
@@ -41,7 +42,7 @@ templ Palette(colors []ColorScaleView, hex string) {
 			}
 		</div>
 	</div>
-	@HexPalette(hex, colors, "Bounds")
+	@HexPalette(hex, colors, "Gray")
 	@HexPalette(hex, colors, "Lightness")
 	@HexPalette(hex, colors, "Chroma")
 	@HexPalette(hex, colors, "Light Chroma")
@@ -134,8 +135,8 @@ func renderCircles(colors []ColorScaleView, perspective string) string {
 			if shade.Hex == "#000000" {
 				continue
 			}
-			isDark := color.Code == "bgc" || color.Code == "fgc"
-			if isDark && perspective != "Bounds" {
+			isGray := slices.Contains([]string{"bgc", "fgc", "brk", "rst", "olv", "mss", "slt", "gry", "stn", "ash", "bej", "znc"}, color.Code)
+			if isGray && perspective != "Gray" {
 				continue
 			}
 			switch perspective {
@@ -151,8 +152,8 @@ func renderCircles(colors []ColorScaleView, perspective string) string {
 				}
 			case "Chroma":
 				svg += fmt.Sprintf(`<circle cx="%.6f" cy="%.6f" r="1" fill="%s" />`, shade.Cx, shade.Cy, shade.Hex)
-			case "Bounds":
-				if isDark {
+			case "Gray":
+				if isGray {
 					svg += fmt.Sprintf(`<circle cx="%.6f" cy="%.6f" r="1" fill="%s" />`, shade.Clx, shade.Cly, shade.Hex)
 				}
 			}
