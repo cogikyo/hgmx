@@ -26,7 +26,7 @@ func Palette(c echo.Context) error {
 
 	cmp := views.FullPage(views.Page{
 		Title:   "Palette View",
-		Content: builder.Palette(viewModel),
+		Content: builder.Palette(viewModel, hex),
 	})
 
 	return cmp.Render(c.Request().Context(), c.Response().Writer)

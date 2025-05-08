@@ -12,21 +12,35 @@ import (
 
 func Generate(seed string) Palette {
 	p := make(Palette)
-	for code, color := range colors {
-		if code == "bgc" {
+	for _, code := range orderedCodes {
+		color, ok := colors[code]
+		if !ok {
+			log.Println("[Warning]", code, "not found in palette for seed.")
+			continue
+		}
+		if code == "bgc" || code == "fgc" {
 			color.Seed = Hex(seed)
 		}
 		code.valid()
 		oklch := color.Seed.toOklch()
-		details := &ColorDetails{Color: color, Base: *oklch}
+		details := &ColorDetails{Color: color, Base: *oklch, Shades: make(map[int]Details, len(shadesMap))}
 		p[code] = details
-		details.generate()
+
+		switch code {
+		case "bgc":
+			details.generateBg()
+		case "fgc":
+			details.generateFg(p["bgc"].Shades[50].Oklch)
+		default:
+			details.generateColor()
+		}
 	}
 	return p
 }
 
 // === Models ==================================================================
 
+var shadesMap = map[int]int{50: 0, 100: 1, 200: 2, 300: 3, 400: 4, 500: 5, 600: 6, 700: 7, 800: 8, 900: 9, 950: 10}
 var shadeValues = []int{50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950}
 
 var orderedCodes = []Code{
@@ -77,9 +91,8 @@ type ColorDetails struct {
 type Palette map[Code]*ColorDetails
 
 var colors = Colors{
-	"bgc": Color{"", "Background"},
-	"fgc": Color{"#aeb9f8", "Foreground"},
-	// "tes": Color{"#000000", "Test"},
+	"bgc": Color{"", "Base"},
+	"fgc": Color{"", "Surface"},
 	"rse": Color{"#fc0086", "Rose"},
 	"bry": Color{"#fd016f", "Berry"},
 	"chy": Color{"#ff0457", "Cherry"},
@@ -116,29 +129,128 @@ var colors = Colors{
 	"vio": Color{"#c602fe", "Violet"},
 	"pnk": Color{"#ea0aeb", "Pink"},
 	"mag": Color{"#fd01b9", "Magenta"},
-	// "blk": Color{"#1d1d21", "Black"},
-	// "gry": Color{"#4f5163", "Gray"},
-	// "wht": Color{"#ddddf6", "White"},
 }
 
-// generate dynamically creates all shades from 50-950.
-// It uses linear interpolation from the Base color towards hardcoded targets for 50 and 950,
-// with special final-step adjustments for shades 50 and 950.
-func (c *ColorDetails) generate() {
-	c.Shades = make(map[int]Details, len(shadeValues))
-	for _, shade := range shadeValues {
-		c.Shades[shade] = Details{Oklch: oklab.Oklch{}}
-	}
-	if _, ok := c.Shades[600]; !ok {
-		panic("Shade 600 must be in shadeValues for generation")
-	}
+func (c *ColorDetails) generateBg() {
 	c.Shades[600] = Details{Oklch: c.Base}
 	hue := c.Base.H
 
-	shadesMap := make(map[int]int, len(shadeValues))
-	for i, v := range shadeValues {
-		shadesMap[v] = i
+	// --- Light Shades (50-600) ---
+	targetL50 := min(c.Base.L*1.8, 1.0)
+	targetC50 := c.Base.C * 2.0
+	const lightPower = 1.3
+
+	numIntervalsLight := float64(shadesMap[600] - shadesMap[50])
+	for shadeValue, index := range shadesMap {
+		if shadeValue >= 600 {
+			continue
+		}
+		t_light := 1.0 - (float64(index) / numIntervalsLight)
+		t_light_curved := math.Pow(t_light, lightPower)
+
+		l := c.Base.L + (targetL50-c.Base.L)*t_light_curved
+		chroma := c.Base.C + (targetC50-c.Base.C)*t_light
+
+		detail := c.Shades[shadeValue]
+		detail.Oklch = oklab.Oklch{L: max(0, min(l, 1)), C: max(chroma, 0), H: hue}
+		c.Shades[shadeValue] = detail
 	}
+
+	// --- Darker Shades (600-950) ---
+	targetC950 := c.Base.C * 0.667
+	targetL950 := c.Base.L * 0.667
+	const darkPower = 1.5
+
+	numIntervalsDark := float64(shadesMap[950] - shadesMap[600])
+	baseIndexDark := float64(shadesMap[600])
+	for shadeValue, index := range shadesMap {
+		if shadeValue < 700 {
+			continue
+		}
+		t_dark := (float64(index) - baseIndexDark) / numIntervalsDark
+		t_dark_curved := math.Pow(t_dark, darkPower)
+
+		l := c.Base.L + (targetL950-c.Base.L)*t_dark_curved
+		chroma := c.Base.C + (targetC950-c.Base.C)*t_dark
+
+		detail := c.Shades[shadeValue]
+		detail.Oklch = oklab.Oklch{L: max(0, min(l, 1)), C: max(chroma, 0), H: hue}
+		c.Shades[shadeValue] = detail
+	}
+}
+
+func (c *ColorDetails) generateFg(bgc50 oklab.Oklch) {
+	baseFg := c.Base
+	if baseFg.L <= 0.5 {
+		baseFg = oklab.Oklch{L: 0.85, C: baseFg.C, H: baseFg.H}
+	} else {
+		baseFg = oklab.Oklch{L: 0.25, C: baseFg.C, H: baseFg.H}
+	}
+	c.Shades[400] = Details{Oklch: baseFg}
+	hue := baseFg.H
+
+	// --- Generate Lighter Shades (50-300) ---
+	targetL50 := min(baseFg.L*1.25, 0.98)
+	targetC50 := baseFg.C * 1.5
+	lightPower := 1.5
+
+	numIntervalsLight := float64(shadesMap[400] - shadesMap[50])
+	baseIndexLight := float64(shadesMap[400])
+	for shadeValue, index := range shadesMap {
+		if shadeValue >= 400 {
+			continue
+		}
+		t_light := (baseIndexLight - float64(index)) / numIntervalsLight
+		t_light_curved := math.Pow(t_light, lightPower)
+
+		l := baseFg.L + (targetL50-baseFg.L)*t_light_curved
+		chroma := baseFg.C + (targetC50-baseFg.C)*t_light
+
+		detail := c.Shades[shadeValue]
+		detail.Oklch = oklab.Oklch{L: max(0, min(l, 1)), C: max(chroma, 0), H: hue}
+		c.Shades[shadeValue] = detail
+	}
+
+	// --- Generate Darker Shades (500-950) ---
+	targetL950 := bgc50.L
+	targetC950 := bgc50.C
+	darkPower := 1.2
+
+	numIntervalsDark := float64(shadesMap[950] - shadesMap[400])
+	baseIndexDark := float64(shadesMap[400])
+
+	index900 := float64(shadesMap[900])
+	t_dark_900 := (index900 - baseIndexDark) / numIntervalsDark
+	t_dark_curved_900 := math.Pow(t_dark_900, darkPower)
+
+	calculatedL900 := baseFg.L + (targetL950-baseFg.L)*t_dark_curved_900
+	calculatedC900 := baseFg.C + (targetC950-baseFg.C)*t_dark_900
+
+	newTargetL950 := calculatedL900
+	newTargetC950 := calculatedC900
+
+	for shadeValue, index := range shadesMap {
+		if shadeValue <= 400 {
+			continue
+		}
+		t_dark := (float64(index) - baseIndexDark) / numIntervalsDark
+		t_dark_curved := math.Pow(t_dark, darkPower)
+
+		l := baseFg.L + (newTargetL950-baseFg.L)*t_dark_curved
+		chroma := baseFg.C + (newTargetC950-baseFg.C)*t_dark
+
+		detail := c.Shades[shadeValue]
+		detail.Oklch = oklab.Oklch{L: max(0, min(l, 1)), C: max(chroma, 0), H: hue}
+		c.Shades[shadeValue] = detail
+	}
+}
+
+// generateColor dynamically creates all shades from 50-950.
+// It uses linear interpolation from the Base color towards hardcoded targets for 50 and 950,
+// with special final-step adjustments for shades 50 and 950.
+func (c *ColorDetails) generateColor() {
+	c.Shades[600] = Details{Oklch: c.Base}
+	hue := c.Base.H
 
 	// --- Constants for Light Shades (50-500) ---
 	const targetL50 = 0.97
@@ -146,8 +258,6 @@ func (c *ColorDetails) generate() {
 	const adjustL50 = 0.25
 	const adjustC50 = 0.37
 	numIntervalsLight := float64(shadesMap[600] - shadesMap[50])
-
-	// First, calculate all light shades (50-500) with linear interpolation
 	for shadeValue, index := range shadesMap {
 		if shadeValue > 500 {
 			continue
@@ -160,7 +270,6 @@ func (c *ColorDetails) generate() {
 		c.Shades[shadeValue] = detail
 	}
 
-	// Special adjustment for shade 50's lightness and chroma
 	details100, ok100 := c.Shades[100]
 	details50, ok50 := c.Shades[50]
 	if ok100 && ok50 {
@@ -183,8 +292,6 @@ func (c *ColorDetails) generate() {
 	const adjustC950 = 0.42
 	numIntervalsDark := float64(shadesMap[950] - shadesMap[600])
 	baseIndexDark := float64(shadesMap[600])
-
-	// Calculate all dark shades (700-950) with linear interpolation
 	for shadeValue, index := range shadesMap {
 		if shadeValue < 700 {
 			continue
@@ -197,7 +304,6 @@ func (c *ColorDetails) generate() {
 		c.Shades[shadeValue] = detail
 	}
 
-	// Special adjustment for shade 950's lightness and chroma
 	details900, ok900 := c.Shades[900]
 	details950, ok950 := c.Shades[950]
 	if ok900 && ok950 {
@@ -217,7 +323,6 @@ func (c *ColorDetails) generate() {
 func (p *Palette) ToCSS(w io.Writer) {
 	seed := (*p)["bgc"].Base
 	fmt.Fprintln(w, ":root {")
-	// Iterate using the defined order
 	for _, code := range orderedCodes {
 		colorDetails, ok := (*p)[code]
 		if ok {
@@ -227,7 +332,6 @@ func (p *Palette) ToCSS(w io.Writer) {
 	fmt.Fprintln(w, "}")
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, "@theme {")
-	// Iterate using the defined order
 	for _, code := range orderedCodes {
 		colorDetails, ok := (*p)[code]
 		if ok {
@@ -239,12 +343,11 @@ func (p *Palette) ToCSS(w io.Writer) {
 
 func (c ColorDetails) ToCSS(w io.Writer, code Code, seed oklab.Oklch) {
 	fmt.Fprintln(w, "\t/*", c.Name, "*/")
-	// Iterate using the ordered shadeValues slice
 	for _, shadeKey := range shadeValues {
 		color, ok := c.Shades[shadeKey]
 		if !ok {
 			continue
-		} // Skip if a shade is missing (shouldn't happen)
+		}
 		css := OklchToString(&color.Oklch)
 		fmt.Fprintf(w, "  --%s-%d: %s;\n", string(code), shadeKey, css)
 	}
@@ -252,12 +355,11 @@ func (c ColorDetails) ToCSS(w io.Writer, code Code, seed oklab.Oklch) {
 }
 
 func (c ColorDetails) ToTheme(w io.Writer, code Code, seed oklab.Oklch) {
-	// Iterate using the ordered shadeValues slice
 	for _, shadeKey := range shadeValues {
 		color, ok := c.Shades[shadeKey]
 		if !ok {
 			continue
-		} // Skip if a shade is missing
+		}
 		css := OklchToString(&color.Oklch)
 		fmt.Fprintf(w, "  --color-%s-%d: %s;\n", string(code), shadeKey, css)
 	}
@@ -269,7 +371,6 @@ func (p Palette) ToView() []builder.ColorScaleView {
 
 	bgcDetails, ok := p["bgc"]
 	if !ok {
-		log.Println("Warning: Background color 'bgc' not found in palette for ToView seed.")
 		return views
 	}
 	seed := bgcDetails.Base
@@ -292,10 +393,12 @@ func (p Palette) ToView() []builder.ColorScaleView {
 			rl, cr := OklchCompare(seed, color)
 			hue := toDegree(color.H)
 
-			scaledRadiusC := 37.0 * math.Tanh(6.0*color.C)
+			radius := 37.0
+
+			scaledRadiusC := radius * math.Tanh(6.0*color.C)
 			totalDistanceC := scaledRadiusC
 
-			scaledRadiusL := 37.0 * math.Pow(color.L, 1.5)
+			scaledRadiusL := radius * math.Pow(color.L, 1.5)
 			totalDistanceL := scaledRadiusL
 
 			angle := -color.H
@@ -318,9 +421,6 @@ func (p Palette) ToView() []builder.ColorScaleView {
 	}
 
 	for _, code := range orderedCodes {
-		if code == "bgc" || code == "fgc" {
-			continue
-		}
 		details, ok := p[code]
 		if ok {
 			views = append(views, convertScale(code, details))
