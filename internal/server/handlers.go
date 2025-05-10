@@ -21,6 +21,7 @@ func Palette(c echo.Context) error {
 	if hex == "" {
 		hex = "#222536"
 	}
+	// hex = "#ffffff"
 	p := palette.Generate(hex)
 	viewModel := p.ToView()
 

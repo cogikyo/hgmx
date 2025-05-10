@@ -135,6 +135,10 @@ func renderCircles(colors []ColorScaleView, perspective string) string {
 			if shade.Hex == "#000000" {
 				continue
 			}
+			isBw := slices.Contains([]string{"blk", "wht"}, color.Code)
+			if isBw {
+				continue
+			}
 			isGray := slices.Contains([]string{"bgc", "fgc", "brk", "rst", "olv", "mss", "slt", "gry", "stn", "ash", "bej", "znc"}, color.Code)
 			if isGray && perspective != "Gray" {
 				continue
@@ -184,8 +188,9 @@ templ ColorSwatch(s Shade) {
 			class={ fmt.Sprintf("absolute -top-5 left-0 right-0 text-center text-[10px] font-semibold %s", tern( s.Code == "bgc", "text-fgc-600", 
 		                                                                                                   tern(s.CR <= 2.00, fmt.Sprintf("text-%s-%d", s.Code, 500), fmt.Sprintf("text-%s-%d", s.Code, s.Value)))) }
 		>
-			{ fmt.Sprintf("%04.2f", s.CR) }
+			// { fmt.Sprintf("%04.2f", s.CR) }
 			// { s.L }
+			{ s.Hex }
 		</div>
 		<div class="absolute inset-0 flex flex-col justify-between p-1 opacity-0 group-[.show-rlcr]:group-hover:opacity-100 transition-opacity duration-200">
 			<div class="">{ fmt.Sprintf("%0.3f", s.RL) }</div>
