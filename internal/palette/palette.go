@@ -7,7 +7,7 @@ import (
 	"math"
 
 	"github.com/alltom/oklab"
-	"github.com/nosvagor/hgmx/views/builder"
+	colorsPage "github.com/nosvagor/hgmx/app/views/pages/colors"
 )
 
 // === Models ==================================================================
@@ -199,8 +199,8 @@ func (c ColorDetails) ToTheme(w io.Writer, code Code, seed oklab.Oklch) {
 	fmt.Fprintln(w, " ")
 }
 
-func (p Palette) ToView() []builder.ColorScaleView {
-	var views []builder.ColorScaleView
+func (p Palette) ToView() []colorsPage.ColorScaleView {
+	var views []colorsPage.ColorScaleView
 
 	bgcDetails, ok := p["bgc"]
 	if !ok {
@@ -208,12 +208,12 @@ func (p Palette) ToView() []builder.ColorScaleView {
 	}
 	seed := bgcDetails.Base
 
-	convertScale := func(code Code, scale *ColorDetails) builder.ColorScaleView {
-		view := builder.ColorScaleView{
+	convertScale := func(code Code, scale *ColorDetails) colorsPage.ColorScaleView {
+		view := colorsPage.ColorScaleView{
 			Name:   scale.Name,
 			Code:   string(code),
 			Value:  scale.Shades[600].Oklch,
-			Shades: make([]builder.Shade, len(shadeValues)),
+			Shades: make([]colorsPage.Shade, len(shadeValues)),
 		}
 
 		for i, shadeVal := range shadeValues {
@@ -235,7 +235,7 @@ func (p Palette) ToView() []builder.ColorScaleView {
 			totalDistanceL := scaledRadiusL
 
 			angle := -color.H
-			view.Shades[i] = builder.Shade{
+			view.Shades[i] = colorsPage.Shade{
 				Code:  string(code),
 				Value: shadeVal,
 				RL:    rl,

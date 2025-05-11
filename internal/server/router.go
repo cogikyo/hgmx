@@ -26,7 +26,6 @@ func NewRouter() *echo.Echo {
 	// --- Application Routes ---
 	e.GET("/", Index)
 	e.GET("/palette", Palette)
-	e.GET("/testing", Testing)
 
 	return e
 }

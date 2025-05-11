@@ -5,15 +5,18 @@ import (
 	// "net/http"
 
 	"github.com/labstack/echo/v4"
+	views "github.com/nosvagor/hgmx/app/views"
+	colors "github.com/nosvagor/hgmx/app/views/pages/colors"
 	"github.com/nosvagor/hgmx/internal/palette"
-	"github.com/nosvagor/hgmx/views"
-	"github.com/nosvagor/hgmx/views/builder"
-	"github.com/nosvagor/hgmx/views/testing"
 )
 
 // Index handler for the root path using Echo context.
 func Index(c echo.Context) error {
-	return Palette(c)
+	cmp := views.FullPage(views.Page{
+		Title: "Index",
+	})
+
+	return cmp.Render(c.Request().Context(), c.Response().Writer)
 }
 
 func Palette(c echo.Context) error {
@@ -27,16 +30,7 @@ func Palette(c echo.Context) error {
 
 	cmp := views.FullPage(views.Page{
 		Title:   "Palette View",
-		Content: builder.Palette(viewModel, hex),
-	})
-
-	return cmp.Render(c.Request().Context(), c.Response().Writer)
-}
-
-func Testing(c echo.Context) error {
-	cmp := views.FullPage(views.Page{
-		Title:   "Testing",
-		Content: testing.Main(),
+		Content: colors.Palette(viewModel, hex),
 	})
 
 	return cmp.Render(c.Request().Context(), c.Response().Writer)

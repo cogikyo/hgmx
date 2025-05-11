@@ -24,7 +24,7 @@ commands:
   info      	Displays information about the hgmx environment
   init      	Initializes a new hgmx project
   palette   	Generates a color palette based on the input hex color
-  version 	-v  Prints the version
+  version 	-v  Prints the versio
 `
 
 func run(stdin io.Reader, stdout, stderr io.Writer, args []string) (code int) {

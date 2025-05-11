@@ -80,7 +80,7 @@ func initCmd(stdout, stderr io.Writer, args []string) (code int) {
 	// Copy static directory
 	srcStatic := "static"
 	dstStatic := "static"
-	if err := copyEmbedDir(hgmx.StaticFS, srcStatic, dstStatic); err != nil {
+	if err := copyEmbedDir(hgmx.LibraryFS, srcStatic, dstStatic); err != nil {
 		l.Error("Failed to copy static directory", slog.String("error", err.Error()))
 		return 1
 	}
@@ -94,7 +94,7 @@ func initCmd(stdout, stderr io.Writer, args []string) (code int) {
 
 	src := "components/index/index.templ"
 	dst := "views/index.templ"
-	data, err := hgmx.StaticFS.ReadFile(src)
+	data, err := hgmx.LibraryFS.ReadFile(src)
 	if err != nil {
 		l.Error("Failed to read embedded index.templ", slog.String("file", src), slog.String("error", err.Error()))
 		return 1
