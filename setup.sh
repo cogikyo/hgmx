@@ -20,7 +20,6 @@ for category in "${!blocks[@]}"; do
   category_dir="$base_dir/$category"
   mkdir -p "$category_dir"
 
-  # Split blocks string into array and loop
   IFS=' ' read -r -a block_array <<< "${blocks[$category]}"
   for block in "${block_array[@]}"; do
     templ_file="$category_dir/$block.templ"
