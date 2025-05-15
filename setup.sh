@@ -32,7 +32,6 @@ package $category
 templ $block_name() {}
 EOF
     echo "Created $templ_file"
-
     css_file="$category_dir/$block.css"
     touch "$css_file"
     echo "Created $css_file"
