@@ -14,9 +14,7 @@ base_dir="library/blocks"
 # Create blocks directory if it doesn't exist
 mkdir -p "$base_dir"
 
-# Loop through each category
 for category in "${!blocks[@]}"; do
-  # Create category subdirectory
   category_dir="$base_dir/$category"
   mkdir -p "$category_dir"
 
