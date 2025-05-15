@@ -1,7 +1,6 @@
 package main
 
 import (
-	"embed"
 	"flag"
 	"fmt"
 	"io"
@@ -50,6 +49,8 @@ func infoCmd(stdout, stderr io.Writer, args []string) (code int) {
 	return 0
 }
 
+// --- init command ---
+
 const initUsageText = `usage: hgmx init [options]
 
 Initializes a new hgmx project in ./app.
@@ -88,123 +89,43 @@ func initCmd(stdout, stderr io.Writer, args []string) (code int) {
 		return 1
 	}
 
-	// Copy static directory
-	if err := copyEmbedDir(hgmx.LibraryFS, "static", filepath.Join(appDir, "static")); err != nil {
-		l.Error("Failed to copy static directory", slog.String("error", err.Error()))
-		return 1
-	}
-	l.Info("Copied static directory", slog.String("to", filepath.Join(appDir, "static")))
-
-	// Copy all components
-	if err := copyEmbedDir(hgmx.LibraryFS, "components", filepath.Join(appDir, "components")); err != nil {
-		l.Error("Failed to copy components directory", slog.String("error", err.Error()))
-		return 1
-	}
-	l.Info("Copied components directory", slog.String("to", filepath.Join(appDir, "components")))
-
-	// Copy pages/home/home.templ
-	if err := copyEmbedFile(hgmx.LibraryFS, "pages/home/home.templ", filepath.Join(appDir, "pages", "home", "home.templ")); err != nil {
-		l.Error("Failed to copy home.templ", slog.String("error", err.Error()))
-		return 1
-	}
-
-	// Copy blocks/layouts/base.templ and auth.templ
-	if err := copyEmbedFile(hgmx.LibraryFS, "blocks/layouts/base.templ", filepath.Join(appDir, "blocks", "layouts", "base.templ")); err != nil {
-		l.Error("Failed to copy base.templ", slog.String("error", err.Error()))
-		return 1
-	}
-	if err := copyEmbedFile(hgmx.LibraryFS, "blocks/layouts/auth.templ", filepath.Join(appDir, "blocks", "layouts", "auth.templ")); err != nil {
-		l.Error("Failed to copy auth.templ", slog.String("error", err.Error()))
-		return 1
-	}
-
-	// Copy blocks/forms/settings.templ
-	if err := copyEmbedFile(hgmx.LibraryFS, "blocks/forms/settings.templ", filepath.Join(appDir, "blocks", "forms", "settings.templ")); err != nil {
-		l.Error("Failed to copy settings.templ", slog.String("error", err.Error()))
-		return 1
-	}
-
-	// Copy blocks/content/hero.templ
-	if err := copyEmbedFile(hgmx.LibraryFS, "blocks/content/hero.templ", filepath.Join(appDir, "blocks", "content", "hero.templ")); err != nil {
-		l.Error("Failed to copy hero.templ", slog.String("error", err.Error()))
-		return 1
-	}
-
-	// Copy blocks/navigation/navbar.templ
-	if err := copyEmbedFile(hgmx.LibraryFS, "blocks/navigation/navbar.templ", filepath.Join(appDir, "blocks", "navigation", "navbar.templ")); err != nil {
-		l.Error("Failed to copy navbar.templ", slog.String("error", err.Error()))
-		return 1
-	}
-
-	// Copy blocks/partials/alert.templ
-	if err := copyEmbedFile(hgmx.LibraryFS, "blocks/partials/alert.templ", filepath.Join(appDir, "blocks", "partials", "alert.templ")); err != nil {
-		l.Error("Failed to copy alert.templ", slog.String("error", err.Error()))
-		return 1
-	}
-
-	// Ensure CSS directories exist
 	cssDir := filepath.Join(appDir, "static", "css")
 	if err := os.MkdirAll(cssDir, 0o755); err != nil {
 		l.Error("Failed to create css directory", slog.String("error", err.Error()))
 		return 1
 	}
 
-	// Write import statements for CSS files
-	blocksCSS := filepath.Join(cssDir, "blocks.css")
-	componentsCSS := filepath.Join(cssDir, "components.css")
-	pagesCSS := filepath.Join(cssDir, "pages.css")
+	copyDirs := []struct {
+		src, dst string
+	}{
+		{"library/static", filepath.Join(appDir, "static")},
+		{"library/components", filepath.Join(appDir, "components")},
+	}
+	for _, d := range copyDirs {
+		if err := copyEmbedDir(hgmx.LibraryFS, d.src, d.dst); err != nil {
+			l.Error("Failed to copy directory", slog.String("src", d.src), slog.String("error", err.Error()))
+			return 1
+		}
+	}
 
-	writeCSSImports(blocksCSS, []string{
-		"../../blocks/layouts/base.css",
-		"../../blocks/layouts/auth.css",
-		"../../blocks/forms/settings.css",
-		"../../blocks/content/hero.css",
-		"../../blocks/navigation/navbar.css",
-		"../../blocks/partials/alert.css",
-	})
-	writeCSSImports(componentsCSS, collectComponentCSSImports("../../components"))
-	writeCSSImports(pagesCSS, []string{
-		"../../pages/home/home.css",
-	})
+	targets := []copyTarget{
+		{"library/blocks/layouts", filepath.Join(appDir, "blocks", "layouts"), "base", "blocks"},
+		{"library/blocks/layouts", filepath.Join(appDir, "blocks", "layouts"), "auth", "blocks"},
+		{"library/blocks/forms", filepath.Join(appDir, "blocks", "forms"), "settings", "blocks"},
+		{"library/blocks/content", filepath.Join(appDir, "blocks", "content"), "hero", "blocks"},
+		{"library/blocks/navigation", filepath.Join(appDir, "blocks", "navigation"), "navbar", "blocks"},
+		{"library/blocks/partials", filepath.Join(appDir, "blocks", "partials"), "alert", "blocks"},
+		{"library/pages/home", filepath.Join(appDir, "pages", "home"), "home", "pages"},
+	}
+	for _, t := range targets {
+		if err := copyTemplAndCSS(hgmx.LibraryFS, t.srcDir, t.dstDir, t.name, t.cssGroup, cssDir); err != nil {
+			l.Error("Failed to copy templ/css", slog.String("srcDir", t.srcDir), slog.String("name", t.name), slog.String("error", err.Error()))
+			return 1
+		}
+	}
 
 	l.Info("hgmx project initialized successfully in ./app")
 	return 0
-}
-
-func copyEmbedFile(efs embed.FS, src, dst string) error {
-	data, err := efs.ReadFile(src)
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(dst, data, 0o644)
-}
-
-func writeCSSImports(target string, imports []string) {
-	f, err := os.Create(target)
-	if err != nil {
-		return
-	}
-	defer f.Close()
-	for _, imp := range imports {
-		fmt.Fprintf(f, "@import '%s';\n", imp)
-	}
-}
-
-func collectComponentCSSImports(base string) []string {
-	var imports []string
-	filepath.Walk(base, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil
-		}
-		if !info.IsDir() && filepath.Ext(path) == ".css" {
-			imports = append(imports, path)
-		}
-		return nil
-	})
-	return imports
 }
 
 // --- palette command ---
@@ -263,33 +184,4 @@ func paletteCmd(stdout, stderr io.Writer, args []string) (code int) {
 
 	lg.Info("Palette successfully generated and written", slog.String("file", outputFile))
 	return 0
-}
-
-// Helper to recursively copy a directory from embed.FS to disk
-func copyEmbedDir(efs embed.FS, src, dst string) error {
-	entries, err := efs.ReadDir(src)
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(dst, 0o755); err != nil {
-		return err
-	}
-	for _, entry := range entries {
-		srcPath := filepath.Join(src, entry.Name())
-		dstPath := filepath.Join(dst, entry.Name())
-		if entry.IsDir() {
-			if err := copyEmbedDir(efs, srcPath, dstPath); err != nil {
-				return err
-			}
-		} else {
-			data, err := efs.ReadFile(srcPath)
-			if err != nil {
-				return err
-			}
-			if err := os.WriteFile(dstPath, data, 0o644); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }

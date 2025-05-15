@@ -7,12 +7,12 @@ import (
 //go:embed .version
 var version string
 
-//go:embed library/**
-var LibraryFS embed.FS
-
 func Version() string {
 	return version
 }
+
+//go:embed library/**
+var LibraryFS embed.FS
 
 func Library() embed.FS {
 	return LibraryFS
