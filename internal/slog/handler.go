@@ -55,7 +55,7 @@ func NewHandler(w io.Writer, opts *slog.HandlerOptions) *Handler {
 	}
 }
 
-func NewLogger(logLevel string, verbose bool, stderr io.Writer) *slog.Logger {
+func NewLogger(logLevel string, stderr io.Writer) *slog.Logger {
 	level := slog.LevelInfo
 	switch logLevel {
 	case "debug":
@@ -64,14 +64,10 @@ func NewLogger(logLevel string, verbose bool, stderr io.Writer) *slog.Logger {
 		level = slog.LevelWarn
 	case "error":
 		level = slog.LevelError
+	case "info":
+		level = slog.LevelInfo
 	default:
-		if logLevel != "info" {
-			fmt.Fprintf(stderr, "Invalid log level %q, defaulting to info\n", logLevel)
-		}
-	}
-
-	if verbose {
-		logLevel = "debug"
+		fmt.Fprintf(stderr, "Invalid log level %q, defaulting to info\n", logLevel)
 	}
 
 	handler := NewHandler(stderr, &slog.HandlerOptions{Level: level})

@@ -12,6 +12,9 @@ default:
 gen:
     @templ generate
 
+templ-update:
+    go install github.com/a-h/templ/cmd/templ@latest
+
 build: gen
     @go build -ldflags="-X {{VERSION_VAR_PATH}}={{GIT_VERSION}}" -o {{BINARY_NAME}} {{MAIN_PACKAGE_PATH}}
 

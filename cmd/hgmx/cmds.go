@@ -22,14 +22,12 @@ const infoUsageText = `usage: hgmx info [<args>]
 Displays information about the hgmx environment.
 
 Args:
-  -v           Set log verbosity level to "debug". (default "info")
-  -log-level   Set log verbosity level. (default "info", options: "debug", "info", "warn", "error")
+  -l	Set log verbosity level. (default "info", options: "debug", "info", "warn", "error")
 `
 
 func infoCmd(stdout, stderr io.Writer, args []string) (code int) {
 	cmd := flag.NewFlagSet("info", flag.ExitOnError)
-	verboseFlag := cmd.Bool("v", false, "")
-	logLevelFlag := cmd.String("log-level", "info", "")
+	logLevelFlag := cmd.String("l", "info", "")
 
 	cmd.Usage = func() {
 		fmt.Fprint(stderr, infoUsageText)
@@ -40,7 +38,7 @@ func infoCmd(stdout, stderr io.Writer, args []string) (code int) {
 		return 64
 	}
 
-	l := l.NewLogger(*logLevelFlag, *verboseFlag, stderr)
+	l := l.NewLogger(*logLevelFlag, stderr)
 
 	l.Info("Environment:",
 		slog.Group("versions",
@@ -52,19 +50,21 @@ func infoCmd(stdout, stderr io.Writer, args []string) (code int) {
 	return 0
 }
 
-const initUsageText = `usage: hgmx init
+const initUsageText = `usage: hgmx init [options]
 
-Initializes a new hgmx project.
+Initializes a new hgmx project in ./app.
 
-Args:
-  -v           Set log verbosity level to "debug". (default "info")
-  -log-level   Set log verbosity level. (default "info", options: "debug", "info", "warn", "error")
+Options:
+  -b, --base   Only copy essential files (not yet implemented)
+  -l, --log    Set log verbosity level. (default "info", options: "debug", "info", "warn", "error")
 `
 
 func initCmd(stdout, stderr io.Writer, args []string) (code int) {
 	cmd := flag.NewFlagSet("init", flag.ExitOnError)
-	verboseFlag := cmd.Bool("v", false, "")
-	logLevelFlag := cmd.String("log-level", "info", "")
+	baseFlag := cmd.Bool("b", false, "only copy essentials")
+	cmd.BoolVar(baseFlag, "base", false, "only copy essentials")
+	logLevelFlag := cmd.String("l", "info", "")
+	cmd.StringVar(logLevelFlag, "log", "info", "set log verbosity level")
 
 	cmd.Usage = func() {
 		fmt.Fprint(stderr, initUsageText)
@@ -75,38 +75,136 @@ func initCmd(stdout, stderr io.Writer, args []string) (code int) {
 		return 64
 	}
 
-	l := l.NewLogger(*logLevelFlag, *verboseFlag, stderr)
+	l := l.NewLogger(*logLevelFlag, stderr)
+
+	if *baseFlag {
+		l.Info("Base/essentials-only mode is not yet implemented")
+		return 1
+	}
+
+	appDir := "app"
+	if err := os.MkdirAll(appDir, 0o755); err != nil {
+		l.Error("Failed to create app directory", slog.String("error", err.Error()))
+		return 1
+	}
 
 	// Copy static directory
-	srcStatic := "static"
-	dstStatic := "static"
-	if err := copyEmbedDir(hgmx.LibraryFS, srcStatic, dstStatic); err != nil {
+	if err := copyEmbedDir(hgmx.LibraryFS, "static", filepath.Join(appDir, "static")); err != nil {
 		l.Error("Failed to copy static directory", slog.String("error", err.Error()))
 		return 1
 	}
-	l.Info("Copied static directory", slog.String("from", srcStatic), slog.String("to", dstStatic))
+	l.Info("Copied static directory", slog.String("to", filepath.Join(appDir, "static")))
 
-	// Ensure views directory exists
-	if err := os.MkdirAll("views", 0o755); err != nil {
-		l.Error("Failed to create views directory", slog.String("error", err.Error()))
+	// Copy all components
+	if err := copyEmbedDir(hgmx.LibraryFS, "components", filepath.Join(appDir, "components")); err != nil {
+		l.Error("Failed to copy components directory", slog.String("error", err.Error()))
+		return 1
+	}
+	l.Info("Copied components directory", slog.String("to", filepath.Join(appDir, "components")))
+
+	// Copy pages/home/home.templ
+	if err := copyEmbedFile(hgmx.LibraryFS, "pages/home/home.templ", filepath.Join(appDir, "pages", "home", "home.templ")); err != nil {
+		l.Error("Failed to copy home.templ", slog.String("error", err.Error()))
 		return 1
 	}
 
-	src := "components/index/index.templ"
-	dst := "views/index.templ"
-	data, err := hgmx.LibraryFS.ReadFile(src)
-	if err != nil {
-		l.Error("Failed to read embedded index.templ", slog.String("file", src), slog.String("error", err.Error()))
+	// Copy blocks/layouts/base.templ and auth.templ
+	if err := copyEmbedFile(hgmx.LibraryFS, "blocks/layouts/base.templ", filepath.Join(appDir, "blocks", "layouts", "base.templ")); err != nil {
+		l.Error("Failed to copy base.templ", slog.String("error", err.Error()))
 		return 1
 	}
-	if err := os.WriteFile(dst, data, 0o644); err != nil {
-		l.Error("Failed to write index.templ", slog.String("file", dst), slog.String("error", err.Error()))
+	if err := copyEmbedFile(hgmx.LibraryFS, "blocks/layouts/auth.templ", filepath.Join(appDir, "blocks", "layouts", "auth.templ")); err != nil {
+		l.Error("Failed to copy auth.templ", slog.String("error", err.Error()))
 		return 1
 	}
-	l.Info("Copied index.templ to views directory")
 
-	l.Info("hgmx project initialized successfully")
+	// Copy blocks/forms/settings.templ
+	if err := copyEmbedFile(hgmx.LibraryFS, "blocks/forms/settings.templ", filepath.Join(appDir, "blocks", "forms", "settings.templ")); err != nil {
+		l.Error("Failed to copy settings.templ", slog.String("error", err.Error()))
+		return 1
+	}
+
+	// Copy blocks/content/hero.templ
+	if err := copyEmbedFile(hgmx.LibraryFS, "blocks/content/hero.templ", filepath.Join(appDir, "blocks", "content", "hero.templ")); err != nil {
+		l.Error("Failed to copy hero.templ", slog.String("error", err.Error()))
+		return 1
+	}
+
+	// Copy blocks/navigation/navbar.templ
+	if err := copyEmbedFile(hgmx.LibraryFS, "blocks/navigation/navbar.templ", filepath.Join(appDir, "blocks", "navigation", "navbar.templ")); err != nil {
+		l.Error("Failed to copy navbar.templ", slog.String("error", err.Error()))
+		return 1
+	}
+
+	// Copy blocks/partials/alert.templ
+	if err := copyEmbedFile(hgmx.LibraryFS, "blocks/partials/alert.templ", filepath.Join(appDir, "blocks", "partials", "alert.templ")); err != nil {
+		l.Error("Failed to copy alert.templ", slog.String("error", err.Error()))
+		return 1
+	}
+
+	// Ensure CSS directories exist
+	cssDir := filepath.Join(appDir, "static", "css")
+	if err := os.MkdirAll(cssDir, 0o755); err != nil {
+		l.Error("Failed to create css directory", slog.String("error", err.Error()))
+		return 1
+	}
+
+	// Write import statements for CSS files
+	blocksCSS := filepath.Join(cssDir, "blocks.css")
+	componentsCSS := filepath.Join(cssDir, "components.css")
+	pagesCSS := filepath.Join(cssDir, "pages.css")
+
+	writeCSSImports(blocksCSS, []string{
+		"../../blocks/layouts/base.css",
+		"../../blocks/layouts/auth.css",
+		"../../blocks/forms/settings.css",
+		"../../blocks/content/hero.css",
+		"../../blocks/navigation/navbar.css",
+		"../../blocks/partials/alert.css",
+	})
+	writeCSSImports(componentsCSS, collectComponentCSSImports("../../components"))
+	writeCSSImports(pagesCSS, []string{
+		"../../pages/home/home.css",
+	})
+
+	l.Info("hgmx project initialized successfully in ./app")
 	return 0
+}
+
+func copyEmbedFile(efs embed.FS, src, dst string) error {
+	data, err := efs.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(dst, data, 0o644)
+}
+
+func writeCSSImports(target string, imports []string) {
+	f, err := os.Create(target)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	for _, imp := range imports {
+		fmt.Fprintf(f, "@import '%s';\n", imp)
+	}
+}
+
+func collectComponentCSSImports(base string) []string {
+	var imports []string
+	filepath.Walk(base, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if !info.IsDir() && filepath.Ext(path) == ".css" {
+			imports = append(imports, path)
+		}
+		return nil
+	})
+	return imports
 }
 
 // --- palette command ---
@@ -117,13 +215,11 @@ Generates a color palette based on the input hex color using OKLCH.
 
 Args:
   color    The base background color in hex format (e.g., "#RRGGBB").
-  -v           Set log verbosity level to "debug". (default "info")
-  -log-level   Set log verbosity level. (default "info", options: "debug", "info", "warn", "error")
+  -l       Set log verbosity level. (default "info", options: "debug", "info", "warn", "error")
 `
 
 func paletteCmd(stdout, stderr io.Writer, args []string) (code int) {
 	cmd := flag.NewFlagSet("palette", flag.ExitOnError)
-	verboseFlag := cmd.Bool("v", false, "")
 	logLevelFlag := cmd.String("log-level", "info", "")
 
 	cmd.Usage = func() {
@@ -135,7 +231,7 @@ func paletteCmd(stdout, stderr io.Writer, args []string) (code int) {
 		return 64
 	}
 
-	lg := l.NewLogger(*logLevelFlag, *verboseFlag, stderr)
+	lg := l.NewLogger(*logLevelFlag, stderr)
 
 	remainingArgs := cmd.Args()
 	if len(remainingArgs) != 1 {
