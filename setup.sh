@@ -23,9 +23,7 @@ for category in "${!blocks[@]}"; do
   # Split blocks string into array and loop
   IFS=' ' read -r -a block_array <<< "${blocks[$category]}"
   for block in "${block_array[@]}"; do
-    # Create .templ file
     templ_file="$category_dir/$block.templ"
-    # Capitalize first letter of block name for templ function
     block_name="$(echo "$block" | awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}')"
     cat << EOF > "$templ_file"
 package $category
