@@ -58,12 +58,13 @@ patch-undo:
     #!/usr/bin/env bash
     set -euo pipefail
     # Get the most recently created tag
-    LATEST_TAG=$(git tag --sort=-creatordate | tail -n 1)
+    LATEST_TAG=$(git tag --sort=creatordate | tail -n 1)
     if [[ -z "$LATEST_TAG" ]]; then
       echo "Error: No tags found to delete."
       exit 1
     fi
     git tag -d $LATEST_TAG
+    git push origin --delete $LATEST_TAG
 
 release:
     @just patch 

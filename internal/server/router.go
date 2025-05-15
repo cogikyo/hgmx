@@ -24,8 +24,8 @@ func NewRouter() *echo.Echo {
 	e.Static("/static", "static")
 
 	// --- Application Routes ---
-	e.GET("/", Index)
-	e.GET("/palette", Palette)
+	// e.GET("/", Index)
+	// e.GET("/palette", Palette)
 
 	return e
 }

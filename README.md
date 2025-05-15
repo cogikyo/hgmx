@@ -24,9 +24,3 @@ Initialize a new project:
 ```bash
 hgmx init
 ```
-
-Add components:
-
-```bash
-hgmx add button
-```

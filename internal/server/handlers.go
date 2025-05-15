@@ -1,9 +1,6 @@
 package server
 
 import (
-
-	// "net/http"
-
 	"github.com/labstack/echo/v4"
 	views "github.com/nosvagor/hgmx/app/views"
 	colors "github.com/nosvagor/hgmx/app/views/pages/colors"
