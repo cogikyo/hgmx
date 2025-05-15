@@ -8,13 +8,6 @@ import (
 	"path/filepath"
 )
 
-type copyTarget struct {
-	srcDir   string
-	dstDir   string
-	name     string
-	cssGroup string
-}
-
 func cssImport(targetCSS, importPath string) error {
 	data, err := os.ReadFile(targetCSS)
 	if err == nil && bytes.Contains(data, []byte(importPath)) {
@@ -40,7 +33,7 @@ func copyEmbedFile(efs embed.FS, src, dst string) error {
 	return os.WriteFile(dst, data, 0o644)
 }
 
-func copyTemplAndCSS(fs embed.FS, srcDir, dstDir, name, cssGroup, cssDir string) error {
+func addComponent(fs embed.FS, srcDir, dstDir, name, cssGroup, cssDir string) error {
 	for _, ext := range []string{".templ", ".css"} {
 		src := filepath.Join(srcDir, name+ext)
 		dst := filepath.Join(dstDir, name+ext)
@@ -69,7 +62,7 @@ func copyTemplAndCSS(fs embed.FS, srcDir, dstDir, name, cssGroup, cssDir string)
 	return nil
 }
 
-func copyEmbedDir(efs embed.FS, src, dst string) error {
+func copyDirDirect(efs embed.FS, src, dst string) error {
 	entries, err := efs.ReadDir(src)
 	if err != nil {
 		return err
@@ -81,7 +74,7 @@ func copyEmbedDir(efs embed.FS, src, dst string) error {
 		srcPath := filepath.Join(src, entry.Name())
 		dstPath := filepath.Join(dst, entry.Name())
 		if entry.IsDir() {
-			if err := copyEmbedDir(efs, srcPath, dstPath); err != nil {
+			if err := copyDirDirect(efs, srcPath, dstPath); err != nil {
 				return err
 			}
 		} else {

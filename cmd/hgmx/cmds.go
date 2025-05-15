@@ -60,6 +60,31 @@ Options:
   -l, --log    Set log verbosity level. (default "info", options: "debug", "info", "warn", "error")
 `
 
+type templateLocation struct {
+	Dir  string
+	Name string
+}
+
+var components = map[string]templateLocation{
+	"button": {"library/components/action", "button"},
+	"avatar": {"library/components/display", "avatar"},
+	"text":   {"library/components/display", "text"},
+	"loader": {"library/components/feedback", "loader"},
+	"input":  {"library/components/input", "input"},
+}
+
+var blocks = map[string]templateLocation{
+	"base":     {"library/blocks/layouts", "base"},
+	"settings": {"library/blocks/forms", "settings"},
+	"hero":     {"library/blocks/content", "hero"},
+	"navbar":   {"library/blocks/navigation", "navbar"},
+	"alert":    {"library/blocks/partials", "alert"},
+}
+
+var pages = map[string]templateLocation{
+	"home": {"library/pages/home", "home"},
+}
+
 func initCmd(stdout, stderr io.Writer, args []string) (code int) {
 	cmd := flag.NewFlagSet("init", flag.ExitOnError)
 	baseFlag := cmd.Bool("b", false, "only copy essentials")
@@ -83,7 +108,7 @@ func initCmd(stdout, stderr io.Writer, args []string) (code int) {
 		return 1
 	}
 
-	appDir := "app"
+	appDir := "app2"
 	if err := os.MkdirAll(appDir, 0o755); err != nil {
 		l.Error("Failed to create app directory", slog.String("error", err.Error()))
 		return 1
@@ -95,31 +120,31 @@ func initCmd(stdout, stderr io.Writer, args []string) (code int) {
 		return 1
 	}
 
-	copyDirs := []struct {
-		src, dst string
-	}{
-		{"library/static", filepath.Join(appDir, "static")},
-		{"library/components", filepath.Join(appDir, "components")},
+	if err := copyDirDirect(hgmx.LibraryFS, "library/static", filepath.Join(appDir, "static")); err != nil {
+		l.Error("Failed to copy static directory", slog.String("error", err.Error()))
+		return 1
 	}
-	for _, d := range copyDirs {
-		if err := copyEmbedDir(hgmx.LibraryFS, d.src, d.dst); err != nil {
-			l.Error("Failed to copy directory", slog.String("src", d.src), slog.String("error", err.Error()))
+
+	for _, c := range components {
+		dstDir := filepath.Join(appDir, "components", filepath.Base(c.Dir))
+		if err := addComponent(hgmx.LibraryFS, c.Dir, dstDir, c.Name, "components", cssDir); err != nil {
+			l.Error("Failed to copy component", slog.String("dir", c.Dir), slog.String("name", c.Name), slog.String("error", err.Error()))
 			return 1
 		}
 	}
 
-	targets := []copyTarget{
-		{"library/blocks/layouts", filepath.Join(appDir, "blocks", "layouts"), "base", "blocks"},
-		{"library/blocks/layouts", filepath.Join(appDir, "blocks", "layouts"), "auth", "blocks"},
-		{"library/blocks/forms", filepath.Join(appDir, "blocks", "forms"), "settings", "blocks"},
-		{"library/blocks/content", filepath.Join(appDir, "blocks", "content"), "hero", "blocks"},
-		{"library/blocks/navigation", filepath.Join(appDir, "blocks", "navigation"), "navbar", "blocks"},
-		{"library/blocks/partials", filepath.Join(appDir, "blocks", "partials"), "alert", "blocks"},
-		{"library/pages/home", filepath.Join(appDir, "pages", "home"), "home", "pages"},
+	for _, b := range blocks {
+		dstDir := filepath.Join(appDir, "blocks", filepath.Base(b.Dir))
+		if err := addComponent(hgmx.LibraryFS, b.Dir, dstDir, b.Name, "blocks", cssDir); err != nil {
+			l.Error("Failed to copy block", slog.String("dir", b.Dir), slog.String("name", b.Name), slog.String("error", err.Error()))
+			return 1
+		}
 	}
-	for _, t := range targets {
-		if err := copyTemplAndCSS(hgmx.LibraryFS, t.srcDir, t.dstDir, t.name, t.cssGroup, cssDir); err != nil {
-			l.Error("Failed to copy templ/css", slog.String("srcDir", t.srcDir), slog.String("name", t.name), slog.String("error", err.Error()))
+
+	for _, p := range pages {
+		dstDir := filepath.Join(appDir, "pages", filepath.Base(p.Dir))
+		if err := addComponent(hgmx.LibraryFS, p.Dir, dstDir, p.Name, "pages", cssDir); err != nil {
+			l.Error("Failed to copy page", slog.String("dir", p.Dir), slog.String("name", p.Name), slog.String("error", err.Error()))
 			return 1
 		}
 	}
