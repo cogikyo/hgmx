@@ -1,4 +1,4 @@
-package sloghandler
+package main
 
 import (
 	"context"
@@ -55,7 +55,7 @@ func NewHandler(w io.Writer, opts *slog.HandlerOptions) *Handler {
 	}
 }
 
-func NewLogger(logLevel string, stderr io.Writer) *slog.Logger {
+func newLogger(logLevel string, stderr io.Writer) *slog.Logger {
 	level := slog.LevelInfo
 	switch logLevel {
 	case "debug":

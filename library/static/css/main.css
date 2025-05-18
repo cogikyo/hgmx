@@ -6,27 +6,13 @@
 @import "./fonts.css";
 @import "./theme.css";
 
-@import "./base.css";
 @import "./components.css";
 @import "./blocks.css";
 @import "./pages.css";
 
+@import "./utilities.css";
+
+@import "./safelist.css";
+
 @source inline("{hover:,}{bg-,text-}{base,surface}-{50,{100..900..100},950}");
 @source inline("{hover:,}{bg-,text-}{rose,berry,cherry,ruby,red,coral,pumpkin,orange,sun,gold,honey,yellow,lemon,acid,lime,spring,green,emerald,jade,forest,leaf,teal,cyan,aqua,robin,azure,sky,blue,cobalt,sapphire,indigo,lavender,purple,violet,pink,magenta,brick,rust,beige,olive,moss,zinc,gray,slate,stone,ash,white,black}-{50,{100..900..100},950}");
-
-@plugin 'tailwind-scrollbar' {
-  nocompatible: true;
-  preferredstrategy: "pseudoelements";
-}
-
-@utility container {
-  margin-inline: auto;
-  padding-inline: 1rem;
-
-  @media (width >= 120rem) {
-    max-width: 120rem; /* 1920px */
-  }
-  @media (width >= 160rem) {
-    max-width: 160rem; /* 2560px */
-  }
-}

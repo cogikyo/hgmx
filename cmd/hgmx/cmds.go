@@ -11,7 +11,6 @@ import (
 
 	"github.com/nosvagor/hgmx"
 	"github.com/nosvagor/hgmx/internal/palette"
-	l "github.com/nosvagor/hgmx/internal/slog"
 )
 
 // --- info command ---
@@ -37,9 +36,9 @@ func infoCmd(stdout, stderr io.Writer, args []string) (code int) {
 		return 64
 	}
 
-	l := l.NewLogger(*logLevelFlag, stderr)
+	log := newLogger(*logLevelFlag, stderr)
 
-	l.Info("Environment:",
+	log.Info("Environment:",
 		slog.Group("versions",
 			slog.String("hgmx", hgmx.Version()),
 			slog.String("go", runtime.Version()),
@@ -101,34 +100,34 @@ func initCmd(stdout, stderr io.Writer, args []string) (code int) {
 		return 64
 	}
 
-	l := l.NewLogger(*logLevelFlag, stderr)
+	log := newLogger(*logLevelFlag, stderr)
 
 	if *baseFlag {
-		l.Info("Base/essentials-only mode is not yet implemented")
+		log.Info("Base/essentials-only mode is not yet implemented")
 		return 1
 	}
 
 	appDir := "app2"
 	if err := os.MkdirAll(appDir, 0o755); err != nil {
-		l.Error("Failed to create app directory", slog.String("error", err.Error()))
+		log.Error("Failed to create app directory", slog.String("error", err.Error()))
 		return 1
 	}
 
 	cssDir := filepath.Join(appDir, "static", "css")
 	if err := os.MkdirAll(cssDir, 0o755); err != nil {
-		l.Error("Failed to create css directory", slog.String("error", err.Error()))
+		log.Error("Failed to create css directory", slog.String("error", err.Error()))
 		return 1
 	}
 
 	if err := copyDirDirect(hgmx.LibraryFS, "library/static", filepath.Join(appDir, "static")); err != nil {
-		l.Error("Failed to copy static directory", slog.String("error", err.Error()))
+		log.Error("Failed to copy static directory", slog.String("error", err.Error()))
 		return 1
 	}
 
 	for _, c := range components {
 		dstDir := filepath.Join(appDir, "components", filepath.Base(c.Dir))
 		if err := addComponent(hgmx.LibraryFS, c.Dir, dstDir, c.Name, "components", cssDir); err != nil {
-			l.Error("Failed to copy component", slog.String("dir", c.Dir), slog.String("name", c.Name), slog.String("error", err.Error()))
+			log.Error("Failed to copy component", slog.String("dir", c.Dir), slog.String("name", c.Name), slog.String("error", err.Error()))
 			return 1
 		}
 	}
@@ -136,7 +135,7 @@ func initCmd(stdout, stderr io.Writer, args []string) (code int) {
 	for _, b := range blocks {
 		dstDir := filepath.Join(appDir, "blocks", filepath.Base(b.Dir))
 		if err := addComponent(hgmx.LibraryFS, b.Dir, dstDir, b.Name, "blocks", cssDir); err != nil {
-			l.Error("Failed to copy block", slog.String("dir", b.Dir), slog.String("name", b.Name), slog.String("error", err.Error()))
+			log.Error("Failed to copy block", slog.String("dir", b.Dir), slog.String("name", b.Name), slog.String("error", err.Error()))
 			return 1
 		}
 	}
@@ -144,12 +143,12 @@ func initCmd(stdout, stderr io.Writer, args []string) (code int) {
 	for _, p := range pages {
 		dstDir := filepath.Join(appDir, "pages", filepath.Base(p.Dir))
 		if err := addComponent(hgmx.LibraryFS, p.Dir, dstDir, p.Name, "pages", cssDir); err != nil {
-			l.Error("Failed to copy page", slog.String("dir", p.Dir), slog.String("name", p.Name), slog.String("error", err.Error()))
+			log.Error("Failed to copy page", slog.String("dir", p.Dir), slog.String("name", p.Name), slog.String("error", err.Error()))
 			return 1
 		}
 	}
 
-	l.Info("hgmx project initialized successfully in ./app")
+	log.Info("hgmx project initialized successfully in ./app")
 	return 0
 }
 
@@ -177,11 +176,11 @@ func paletteCmd(stdout, stderr io.Writer, args []string) (code int) {
 		return 64
 	}
 
-	lg := l.NewLogger(*logLevelFlag, stderr)
+	log := newLogger(*logLevelFlag, stderr)
 
 	remainingArgs := cmd.Args()
 	if len(remainingArgs) != 1 {
-		lg.Error("Missing or too many arguments: expected exactly one (hex) color argument.")
+		log.Error("Missing or too many arguments: expected exactly one (hex) color argument.")
 		fmt.Fprint(stderr, paletteUsageText)
 		return 64
 	}
@@ -190,23 +189,23 @@ func paletteCmd(stdout, stderr io.Writer, args []string) (code int) {
 
 	// TODO: more than hex
 	if len(hexColor) != 7 || hexColor[0] != '#' {
-		lg.Error("Invalid hex color format. Expected #RRGGBB.", slog.String("color", hexColor))
+		log.Error("Invalid hex color format. Expected #RRGGBB.", slog.String("color", hexColor))
 		return 1
 	}
 
-	lg.Info("Generating palette for color:", slog.String("hex", hexColor))
+	log.Info("Generating palette for color:", slog.String("hex", hexColor))
 
 	generatedPalette := palette.Generate(hexColor)
 
 	outputFile := "library/static/css/colors.css"
 	f, err := os.Create(outputFile)
 	if err != nil {
-		lg.Error("Failed to open output file for writing", slog.String("file", outputFile), slog.String("error", err.Error()))
+		log.Error("Failed to open output file for writing", slog.String("file", outputFile), slog.String("error", err.Error()))
 		return 1
 	}
 	defer f.Close()
 	generatedPalette.ToCSS(f)
 
-	lg.Info("Palette successfully generated and written", slog.String("file", outputFile))
+	log.Info("Palette successfully generated and written", slog.String("file", outputFile))
 	return 0
 }
