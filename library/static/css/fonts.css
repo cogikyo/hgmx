@@ -53,3 +53,11 @@
   font-display: swap;
   src: url("../fonts/IosevkaVagari-Italic.woff2") format("woff2");
 }
+
+@theme {
+  --font-sans: "Satoshi", sans-serif;
+  --font-serif: "Sentient", serif;
+  --font-display: "Chillax", sans-serif;
+  --font-mono: "Iosevka Vagari", monospace;
+  --font-script: "Architects Daughter", cursive;
+}

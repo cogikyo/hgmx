@@ -3,8 +3,8 @@ BINARY_NAME         := "hgmx"
 MAIN_PACKAGE_PATH   := "./cmd/hgmx"
 VERSION_VAR_PATH    := "main.Version"
 GIT_VERSION         := `git describe --tags --always || echo dev`
-CSS_INPUT           := "static/css/main.css"
-CSS_OUTPUT          := "static/css/main.min.css"
+CSS_INPUT           := "library/static/css/main.css"
+CSS_OUTPUT          := "library/static/css/main.min.css"
 
 default:
     @just --list

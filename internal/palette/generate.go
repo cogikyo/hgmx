@@ -192,7 +192,7 @@ func (c *ColorDetails) generateColor() {
 	}
 }
 
-func (c *ColorDetails) generateBW() {
+func (c *ColorDetails) generateBW(color Color) {
 	baseL := c.Base.L
 	const fixedChroma = 0.0
 	const fixedHue = 0.0
@@ -200,12 +200,12 @@ func (c *ColorDetails) generateBW() {
 	var baseShadeValue int
 	var lightestLTarget, darkestLTarget float64
 
-	switch c.Color.Name {
-	case "White":
+	switch color {
+	case White:
 		baseShadeValue = 500
 		lightestLTarget = 1.0
 		darkestLTarget = 0.75
-	case "Black":
+	case Black:
 		baseShadeValue = 600
 		lightestLTarget = 0.25
 		darkestLTarget = 0.04
@@ -216,10 +216,10 @@ func (c *ColorDetails) generateBW() {
 	c.Shades[baseShadeValue] = Details{Oklch: oklab.Oklch{L: baseL, C: fixedChroma, H: fixedHue}}
 
 	indexBase := float64(shadesMap[baseShadeValue])
-	indexMin := float64(shadesMap[shadeValues[0]])
-	indexMax := float64(shadesMap[shadeValues[len(shadeValues)-1]])
+	indexMin := float64(shadesMap[50])
+	indexMax := float64(shadesMap[950])
 
-	for _, shadeVal := range shadeValues {
+	for _, shadeVal := range shades {
 		if shadeVal == baseShadeValue {
 			continue
 		}
@@ -247,7 +247,7 @@ func (c *ColorDetails) generateGrey() {
 	const targetCLight = 0.002
 	const targetLDark = 0.20
 	const targetCDark = 0.005
-	for _, shadeValue := range shadeValues {
+	for _, shadeValue := range shades {
 		if shadeValue == 500 {
 			continue
 		} else if shadeValue < 500 {
