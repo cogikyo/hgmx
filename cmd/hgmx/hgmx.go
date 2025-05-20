@@ -1,58 +1,67 @@
 package main
 
 import (
-	_ "embed"
-	"fmt"
-	"io"
 	"os"
 
 	"github.com/nosvagor/hgmx"
+	"github.com/spf13/cobra"
 )
 
+var rootCmd = &cobra.Command{
+	Use:     "hgmx",
+	Short:   "A component management tool for Go Templ+HTMX projects.",
+	Version: hgmx.Version(),
+}
+
+var logLevel string
+var linkInput string
+var linkOutput string
+
 func main() {
-	code := run(os.Stdin, os.Stdout, os.Stderr, os.Args)
-	if code != 0 {
-		os.Exit(code)
+	if err := rootCmd.Execute(); err != nil {
+		os.Exit(1)
 	}
 }
 
-const usageText = `usage: hgmx <command> [<args>...]
+func init() {
+	rootCmd.PersistentFlags().StringVarP(&logLevel, "log-level", "l", "info", "Set log verbosity level [debug, info, warn, error]")
+	rootCmd.AddCommand(infoCobraCmd)
+	rootCmd.AddCommand(initCobraCmd)
+	rootCmd.AddCommand(paletteCobraCmd)
+	rootCmd.AddCommand(linkCobraCmd)
+	linkCobraCmd.Flags().StringVarP(&linkInput, "input", "i", "../hgmx/library/*", "Source directory to link from")
+	linkCobraCmd.Flags().StringVarP(&linkOutput, "output", "o", "app/*", "Transforms files in directory to symlinks")
+}
 
-hgmx - A component management tool for Go Templ and HTMX projects.
+var infoCobraCmd = &cobra.Command{
+	Use:   "info",
+	Short: "Displays information about the hgmx environment",
+	Run: func(cmd *cobra.Command, args []string) {
+		infoCmd()
+	},
+}
 
-commands:
-  info      	Displays information about the hgmx environment
-  init      	Initializes a new hgmx project
-  palette   	Generates a color palette based on the input hex color
-  link      	Symlinks files from a directory into the local app directory
-  version 	-v  Prints the versio
-`
+var initCobraCmd = &cobra.Command{
+	Use:   "init",
+	Short: "Initializes a new hgmx project",
+	Run: func(cmd *cobra.Command, args []string) {
+		initCmd(args)
+	},
+}
 
-func run(stdin io.Reader, stdout, stderr io.Writer, args []string) (code int) {
-	if len(args) < 2 {
-		fmt.Fprint(stderr, usageText)
-		return 64
-	}
+var paletteCobraCmd = &cobra.Command{
+	Use:   "palette <hex_color>",
+	Short: "Generates a color palette based on the input hex color",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		paletteCmd(args)
+	},
+}
 
-	switch args[1] {
-	case "info":
-		return infoCmd(stdout, stderr, args[2:])
-	case "init":
-		return initCmd(stdout, stderr, args[2:])
-	case "palette":
-		return paletteCmd(stdout, stderr, args[2:])
-	case "link":
-		return linkCmd(stdout, stderr, args[2:])
-	// TODO: Add 'add' command
-	case "version", "--version", "-v":
-		fmt.Fprintln(stdout, hgmx.Version())
-		return 0
-	case "help", "-help", "--help", "-h":
-		fmt.Fprint(stdout, usageText)
-		return 0
-	}
-
-	fmt.Fprintf(stderr, "Unknown command: %q\n", args[1])
-	fmt.Fprint(stderr, usageText)
-	return 64
+var linkCobraCmd = &cobra.Command{
+	Use:   "link",
+	Short: "Symlinks files in the output directory to the source directory",
+	Run: func(cmd *cobra.Command, args []string) {
+		linkCmd(linkInput, linkOutput)
+	},
 }

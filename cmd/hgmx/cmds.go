@@ -1,9 +1,6 @@
 package main
 
 import (
-	"flag"
-	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -15,28 +12,8 @@ import (
 
 // --- info command ---
 
-const infoUsageText = `usage: hgmx info [<args>]
-
-Displays information about the hgmx environment.
-
-Args:
-  -l	Set log verbosity level. (default "info", options: "debug", "info", "warn", "error")
-`
-
-func infoCmd(stdout, stderr io.Writer, args []string) (code int) {
-	cmd := flag.NewFlagSet("info", flag.ExitOnError)
-	logLevelFlag := cmd.String("l", "info", "")
-
-	cmd.Usage = func() {
-		fmt.Fprint(stderr, infoUsageText)
-	}
-
-	err := cmd.Parse(args)
-	if err != nil {
-		return 64
-	}
-
-	log := newLogger(*logLevelFlag, stderr)
+func infoCmd() (code int) {
+	log := newLogger(logLevel, os.Stderr)
 
 	log.Info("Environment:",
 		slog.Group("versions",
@@ -49,15 +26,6 @@ func infoCmd(stdout, stderr io.Writer, args []string) (code int) {
 }
 
 // --- init command ---
-
-const initUsageText = `usage: hgmx init [options]
-
-Initializes a new hgmx project in ./app.
-
-Options:
-  -b, --base   Only copy essential files (not yet implemented)
-  -l, --log    Set log verbosity level. (default "info", options: "debug", "info", "warn", "error")
-`
 
 type templateLocation struct {
 	Dir  string
@@ -84,28 +52,8 @@ var pages = map[string]templateLocation{
 	"home": {"library/pages/home", "home"},
 }
 
-func initCmd(stdout, stderr io.Writer, args []string) (code int) {
-	cmd := flag.NewFlagSet("init", flag.ExitOnError)
-	baseFlag := cmd.Bool("b", false, "only copy essentials")
-	cmd.BoolVar(baseFlag, "base", false, "only copy essentials")
-	logLevelFlag := cmd.String("l", "info", "")
-	cmd.StringVar(logLevelFlag, "log", "info", "set log verbosity level")
-
-	cmd.Usage = func() {
-		fmt.Fprint(stderr, initUsageText)
-	}
-
-	err := cmd.Parse(args)
-	if err != nil {
-		return 64
-	}
-
-	log := newLogger(*logLevelFlag, stderr)
-
-	if *baseFlag {
-		log.Info("Base/essentials-only mode is not yet implemented")
-		return 1
-	}
+func initCmd(args []string) (code int) {
+	log := newLogger(logLevel, os.Stderr)
 
 	appDir := "app"
 	if err := os.MkdirAll(appDir, 0o755); err != nil {
@@ -154,38 +102,15 @@ func initCmd(stdout, stderr io.Writer, args []string) (code int) {
 
 // --- palette command ---
 
-const paletteUsageText = `usage: hgmx palette <hex_color>
+func paletteCmd(args []string) (code int) {
+	log := newLogger(logLevel, os.Stderr)
 
-Generates a color palette based on the input hex color using OKLCH.
-
-Args:
-  color    The base background color in hex format (e.g., "#RRGGBB").
-  -l       Set log verbosity level. (default "info", options: "debug", "info", "warn", "error")
-`
-
-func paletteCmd(stdout, stderr io.Writer, args []string) (code int) {
-	cmd := flag.NewFlagSet("palette", flag.ExitOnError)
-	logLevelFlag := cmd.String("log-level", "info", "")
-
-	cmd.Usage = func() {
-		fmt.Fprint(stderr, paletteUsageText)
-	}
-
-	err := cmd.Parse(args)
-	if err != nil {
-		return 64
-	}
-
-	log := newLogger(*logLevelFlag, stderr)
-
-	remainingArgs := cmd.Args()
-	if len(remainingArgs) != 1 {
+	if len(args) != 1 {
 		log.Error("Missing or too many arguments: expected exactly one (hex) color argument.")
-		fmt.Fprint(stderr, paletteUsageText)
 		return 64
 	}
 
-	hexColor := remainingArgs[0]
+	hexColor := args[0]
 
 	// TODO: more than hex
 	if len(hexColor) != 7 || hexColor[0] != '#' {
@@ -212,85 +137,83 @@ func paletteCmd(stdout, stderr io.Writer, args []string) (code int) {
 
 // --- link command ---
 
-const linkUsageText = `usage: hgmx link <dir>
+func linkCmd(inputGlob, outputGlob string) (code int) {
+	l := newLogger(logLevel, os.Stderr)
 
-Symlinks files from the given directory into the local app directory, replacing any duplicate files with symlinks.
-
-Args:
-  dir   Path to the directory to link from (e.g., '.')
-  -l    Set log verbosity level. (default "info", options: "debug", "info", "warn", "error")
-`
-
-func linkCmd(stdout, stderr io.Writer, args []string) (code int) {
-	cmd := flag.NewFlagSet("link", flag.ExitOnError)
-	logLevelFlag := cmd.String("l", "info", "")
-
-	cmd.Usage = func() {
-		fmt.Fprint(stderr, linkUsageText)
+	inputDirs, err := filepath.Glob(inputGlob)
+	if err != nil || len(inputDirs) == 0 {
+		l.Error("No input directories found", slog.String("pattern", inputGlob))
+		return 1
 	}
-
-	err := cmd.Parse(args)
-	if err != nil {
-		return 64
-	}
-
-	log := newLogger(*logLevelFlag, stderr)
-	remainingArgs := cmd.Args()
-	if len(remainingArgs) != 1 {
-		log.Error("Missing or too many arguments: expected exactly one directory argument.")
-		fmt.Fprint(stderr, linkUsageText)
-		return 64
-	}
-
-	srcDir := remainingArgs[0]
-	appDir := "app"
-	if _, err := os.Stat(appDir); err != nil {
-		log.Error("Could not find 'app' directory in current project.", slog.String("error", err.Error()))
+	outputDirs, err := filepath.Glob(outputGlob)
+	if err != nil || len(outputDirs) == 0 {
+		l.Error("No output directories found", slog.String("pattern", outputGlob))
 		return 1
 	}
 
-	err = filepath.WalkDir(srcDir, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
+	l.Warn("\nDestination (output): ", slog.Any("searching in", inputDirs))
+	l.Warn("Source (input): ", slog.Any("linking to", outputDirs))
+
+	for i, srcDir := range inputDirs {
+		var dstDir string
+		if i < len(outputDirs) {
+			dstDir = outputDirs[i]
+		} else {
+			dstDir = outputDirs[len(outputDirs)-1]
 		}
-		if d.IsDir() {
-			return nil
+
+		if _, err := os.Stat(srcDir); err != nil {
+			l.Error("Input directory does not exist", slog.String("dir", srcDir), slog.String("error", err.Error()))
+			continue
 		}
-		rel, err := filepath.Rel(srcDir, path)
-		if err != nil {
-			return err
+		if _, err := os.Stat(dstDir); err != nil {
+			if err := os.MkdirAll(dstDir, 0o755); err != nil {
+				l.Error("Failed to create output directory", slog.String("dir", dstDir), slog.String("error", err.Error()))
+				continue
+			}
 		}
-		appPath := filepath.Join(appDir, rel)
-		if _, err := os.Stat(appPath); err == nil {
-			// Remove the file in appDir
-			if err := os.Remove(appPath); err != nil {
-				log.Error("Failed to remove file in appDir", slog.String("file", appPath), slog.String("error", err.Error()))
+
+		err := filepath.WalkDir(srcDir, func(path string, d os.DirEntry, err error) error {
+			if err != nil {
 				return err
 			}
-			// Ensure parent dir exists
-			if err := os.MkdirAll(filepath.Dir(appPath), 0o755); err != nil {
-				log.Error("Failed to create parent directory in appDir", slog.String("dir", filepath.Dir(appPath)), slog.String("error", err.Error()))
+			if d.IsDir() {
+				l.Debug("Skipping directory", slog.String("dir", path))
+				return nil
+			}
+			rel, err := filepath.Rel(srcDir, path)
+			if err != nil {
 				return err
 			}
-			// Create symlink
+			dstPath := filepath.Join(dstDir, rel)
+			if _, err := os.Stat(dstPath); err == nil {
+				if err := os.Remove(dstPath); err != nil {
+					l.Error("Failed to remove file in output dir", slog.String("file", dstPath), slog.String("error", err.Error()))
+					return err
+				}
+			}
+			if err := os.MkdirAll(filepath.Dir(dstPath), 0o755); err != nil {
+				l.Error("Failed to create parent directory in output dir", slog.String("dir", filepath.Dir(dstPath)), slog.String("error", err.Error()))
+				return err
+			}
 			absPath, absErr := filepath.Abs(path)
 			if absErr != nil {
-				log.Error("Failed to get absolute path", slog.String("src", path), slog.String("error", absErr.Error()))
+				l.Error("Failed to get absolute path", slog.String("src", path), slog.String("error", absErr.Error()))
 				return absErr
 			}
-			if err := os.Symlink(absPath, appPath); err != nil {
-				log.Error("Failed to create symlink", slog.String("src", absPath), slog.String("dst", appPath), slog.String("error", err.Error()))
+			if err := os.Symlink(absPath, dstPath); err != nil {
+				l.Error("Failed to create symlink", slog.String("src", absPath), slog.String("dst", dstPath), slog.String("error", err.Error()))
 				return err
 			}
-			log.Info("Symlinked", slog.String("src", path), slog.String("dst", appPath))
+			l.Info("Symlinked", slog.String("src", path), slog.String("dst", dstPath))
+			return nil
+		})
+		if err != nil {
+			l.Error("Error during linking", slog.String("input", srcDir), slog.String("output", dstDir), slog.String("error", err.Error()))
+			continue
 		}
-		return nil
-	})
-	if err != nil {
-		log.Error("Error during linking", slog.String("error", err.Error()))
-		return 1
 	}
 
-	log.Info("Linking complete.")
+	l.Info("Linking complete.")
 	return 0
 }
