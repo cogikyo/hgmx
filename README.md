@@ -24,3 +24,9 @@ Initialize a new project:
 ```bash
 hgmx init
 ```
+
+Symlink components to another project (useful for forking own version)
+
+```bash
+hgmx link .
+```
