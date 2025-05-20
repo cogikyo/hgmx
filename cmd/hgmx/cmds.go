@@ -107,7 +107,7 @@ func initCmd(stdout, stderr io.Writer, args []string) (code int) {
 		return 1
 	}
 
-	appDir := "app2"
+	appDir := "app"
 	if err := os.MkdirAll(appDir, 0o755); err != nil {
 		log.Error("Failed to create app directory", slog.String("error", err.Error()))
 		return 1
@@ -207,5 +207,90 @@ func paletteCmd(stdout, stderr io.Writer, args []string) (code int) {
 	generatedPalette.ToCSS(f)
 
 	log.Info("Palette successfully generated and written", slog.String("file", outputFile))
+	return 0
+}
+
+// --- link command ---
+
+const linkUsageText = `usage: hgmx link <dir>
+
+Symlinks files from the given directory into the local app directory, replacing any duplicate files with symlinks.
+
+Args:
+  dir   Path to the directory to link from (e.g., '.')
+  -l    Set log verbosity level. (default "info", options: "debug", "info", "warn", "error")
+`
+
+func linkCmd(stdout, stderr io.Writer, args []string) (code int) {
+	cmd := flag.NewFlagSet("link", flag.ExitOnError)
+	logLevelFlag := cmd.String("l", "info", "")
+
+	cmd.Usage = func() {
+		fmt.Fprint(stderr, linkUsageText)
+	}
+
+	err := cmd.Parse(args)
+	if err != nil {
+		return 64
+	}
+
+	log := newLogger(*logLevelFlag, stderr)
+	remainingArgs := cmd.Args()
+	if len(remainingArgs) != 1 {
+		log.Error("Missing or too many arguments: expected exactly one directory argument.")
+		fmt.Fprint(stderr, linkUsageText)
+		return 64
+	}
+
+	srcDir := remainingArgs[0]
+	appDir := "app"
+	if _, err := os.Stat(appDir); err != nil {
+		log.Error("Could not find 'app' directory in current project.", slog.String("error", err.Error()))
+		return 1
+	}
+
+	err = filepath.WalkDir(srcDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(srcDir, path)
+		if err != nil {
+			return err
+		}
+		appPath := filepath.Join(appDir, rel)
+		if _, err := os.Stat(appPath); err == nil {
+			// Remove the file in appDir
+			if err := os.Remove(appPath); err != nil {
+				log.Error("Failed to remove file in appDir", slog.String("file", appPath), slog.String("error", err.Error()))
+				return err
+			}
+			// Ensure parent dir exists
+			if err := os.MkdirAll(filepath.Dir(appPath), 0o755); err != nil {
+				log.Error("Failed to create parent directory in appDir", slog.String("dir", filepath.Dir(appPath)), slog.String("error", err.Error()))
+				return err
+			}
+			// Create symlink
+			absPath, absErr := filepath.Abs(path)
+			if absErr != nil {
+				log.Error("Failed to get absolute path", slog.String("src", path), slog.String("error", absErr.Error()))
+				return absErr
+			}
+			if err := os.Symlink(absPath, appPath); err != nil {
+				log.Error("Failed to create symlink", slog.String("src", absPath), slog.String("dst", appPath), slog.String("error", err.Error()))
+				return err
+			}
+			log.Info("Symlinked", slog.String("src", path), slog.String("dst", appPath))
+		}
+		return nil
+	})
+	if err != nil {
+		log.Error("Error during linking", slog.String("error", err.Error()))
+		return 1
+	}
+
+	log.Info("Linking complete.")
 	return 0
 }

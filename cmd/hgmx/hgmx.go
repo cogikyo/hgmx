@@ -24,6 +24,7 @@ commands:
   info      	Displays information about the hgmx environment
   init      	Initializes a new hgmx project
   palette   	Generates a color palette based on the input hex color
+  link      	Symlinks files from a directory into the local app directory
   version 	-v  Prints the versio
 `
 
@@ -40,6 +41,8 @@ func run(stdin io.Reader, stdout, stderr io.Writer, args []string) (code int) {
 		return initCmd(stdout, stderr, args[2:])
 	case "palette":
 		return paletteCmd(stdout, stderr, args[2:])
+	case "link":
+		return linkCmd(stdout, stderr, args[2:])
 	// TODO: Add 'add' command
 	case "version", "--version", "-v":
 		fmt.Fprintln(stdout, hgmx.Version())
