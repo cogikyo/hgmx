@@ -151,7 +151,7 @@ func linkCmd(inputGlob, outputGlob string) (code int) {
 		return 1
 	}
 
-	l.Warn("\nDestination (output): ", slog.Any("searching in", inputDirs))
+	l.Warn("Destination (output): ", slog.Any("searching in", inputDirs))
 	l.Warn("Source (input): ", slog.Any("linking to", outputDirs))
 
 	for i, srcDir := range inputDirs {

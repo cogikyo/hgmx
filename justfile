@@ -18,6 +18,9 @@ templ-update:
 build: gen
     @go build -ldflags="-X {{VERSION_VAR_PATH}}={{GIT_VERSION}}" -o {{BINARY_NAME}} {{MAIN_PACKAGE_PATH}}
 
+install:
+    @go install ./cmd/hgmx
+
 clean:
     @rm -f {{BINARY_NAME}}
 
