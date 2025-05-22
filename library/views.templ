@@ -1,0 +1,100 @@
+package layouts
+
+import (
+	"crypto/md5"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"sync"
+)
+
+templ Base(content templ.Component) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			@Favicon()
+			@Style("main.min.css")
+			@Script("vendor/htmx.min.js", false)
+			@Script("vendor/_hyperscript.min.js", false)
+		</head>
+		<body>
+			@Header()
+			@Main(content, "")
+			@Footer()
+		</body>
+	</html>
+}
+
+templ Title(title string) {
+    if len(title) > 0 {
+        <title>{ title }</title>
+    }
+}
+
+templ Main(content templ.Component, title string) {
+    @Title(title)
+	<main>
+		@content
+	</main>
+}
+
+templ Header() {
+	<header></header>
+}
+
+templ Footer() {
+	<footer></footer>
+}
+
+templ Favicon() {
+	<link rel="icon" type="image/png" href="/static/favicon/favicon-96x96.png" sizes="96x96"/>
+	<link rel="icon" type="image/svg+xml" href="/static/favicon/favicon.svg"/>
+	<link rel="shortcut icon" href="/static/favicon/favicon.ico"/>
+	<link rel="apple-touch-icon" sizes="180x180" href="/static/favicon/apple-touch-icon.png"/>
+	<link rel="manifest" href="/static/favicon/site.webmanifest"/>
+}
+
+templ Style(path string) {
+	<link rel="stylesheet" href={ path + getFileHash(filepath.Join("css", path)) }/>
+}
+
+templ Script(path string, def bool) {
+	<script src={  path + getFileHash(filepath.Join("scripts", path)) } defer={ def }></script>
+}
+
+var (
+	fileHashes      = make(map[string]string)
+	fileHashesMutex sync.RWMutex
+)
+
+func getFileHash(filePath string) string {
+	fileHashesMutex.RLock()
+	hash, exists := fileHashes[filePath]
+	fileHashesMutex.RUnlock()
+
+	if exists {
+		return hash
+	}
+
+	fullPath := filepath.Join("static", filePath)
+	file, err := os.Open(fullPath)
+	if err != nil {
+		hash = ""
+	} else {
+		defer file.Close()
+		hashMD5 := md5.New()
+		if _, err := io.Copy(hashMD5, file); err != nil {
+			hash = ""
+		} else {
+			hash = fmt.Sprintf("?v=%x", hashMD5.Sum(nil))
+		}
+	}
+
+	fileHashesMutex.Lock()
+	fileHashes[filePath] = hash
+	fileHashesMutex.Unlock()
+	return hash
+}
