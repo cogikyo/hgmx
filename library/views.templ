@@ -1,4 +1,4 @@
-package layouts
+package views
 
 import (
 	"crypto/md5"
@@ -9,18 +9,18 @@ import (
 	"sync"
 )
 
-templ Base(content templ.Component) {
+templ Full(content templ.Component) {
 	<!DOCTYPE html>
-	<html lang="en">
+	<html lang="en" class="cursor-default">
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 			@Favicon()
 			@Style("main.min.css")
 			@Script("vendor/htmx.min.js", false)
-			@Script("vendor/_hyperscript.min.js", false)
+			@Script("vendor/hyperscript.min.js", false)
 		</head>
-		<body>
+		<body class="font-sans bg-base-500 text-surface-400 h-svh">
 			@Header()
 			@Main(content, "")
 			@Footer()
@@ -36,7 +36,7 @@ templ Title(title string) {
 
 templ Main(content templ.Component, title string) {
     @Title(title)
-	<main>
+	<main class="w-[98%] md:w-[96%] h-full mx-auto">
 		@content
 	</main>
 }
@@ -50,19 +50,19 @@ templ Footer() {
 }
 
 templ Favicon() {
-	<link rel="icon" type="image/png" href="/static/favicon/favicon-96x96.png" sizes="96x96"/>
-	<link rel="icon" type="image/svg+xml" href="/static/favicon/favicon.svg"/>
-	<link rel="shortcut icon" href="/static/favicon/favicon.ico"/>
-	<link rel="apple-touch-icon" sizes="180x180" href="/static/favicon/apple-touch-icon.png"/>
+	<link rel="icon" type="image/png" href="static/favicon/favicon-96x96.png" sizes="96x96"/>
+	<link rel="icon" type="image/svg+xml" href="static/favicon/favicon.svg"/>
+	<link rel="shortcut icon" href="static/favicon/favicon.ico"/>
+	<link rel="apple-touch-icon" sizes="180x180" href="static/favicon/apple-touch-icon.png"/>
 	<link rel="manifest" href="/static/favicon/site.webmanifest"/>
 }
 
 templ Style(path string) {
-	<link rel="stylesheet" href={ path + getFileHash(filepath.Join("css", path)) }/>
+	<link rel="stylesheet" href={ "static/css/" + path + getFileHash(filepath.Join("css", path)) }/>
 }
 
 templ Script(path string, def bool) {
-	<script src={  path + getFileHash(filepath.Join("scripts", path)) } defer={ def }></script>
+	<script src={ "static/scripts/" + path + getFileHash(filepath.Join("scripts", path)) } defer={ def }></script>
 }
 
 var (
@@ -79,15 +79,15 @@ func getFileHash(filePath string) string {
 		return hash
 	}
 
-	fullPath := filepath.Join("static", filePath)
+	fullPath := filepath.Join("views/static", filePath)
 	file, err := os.Open(fullPath)
 	if err != nil {
-		hash = ""
+		panic(err)
 	} else {
 		defer file.Close()
 		hashMD5 := md5.New()
 		if _, err := io.Copy(hashMD5, file); err != nil {
-			hash = ""
+			panic(err)
 		} else {
 			hash = fmt.Sprintf("?v=%x", hashMD5.Sum(nil))
 		}
