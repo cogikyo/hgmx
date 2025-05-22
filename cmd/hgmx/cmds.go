@@ -28,28 +28,25 @@ func infoCmd() (code int) {
 
 // --- init command ---
 
-type templateLocation struct {
-	Dir  string
-	Name string
+var components = map[string]string{
+	"button": "action",
+	"avatar": "display",
+	"text":   "display",
+	"loader": "feedback",
+	"input":  "input",
 }
 
-var components = map[string]templateLocation{
-	"button": {"library/components/action", "button"},
-	"avatar": {"library/components/display", "avatar"},
-	"text":   {"library/components/display", "text"},
-	"loader": {"library/components/feedback", "loader"},
-	"input":  {"library/components/input", "input"},
+var blocks = map[string]string{
+	"settings": "forms",
+	"hero":     "content",
+	"navbar":   "navigation",
+	"alert":    "partials",
 }
 
-var blocks = map[string]templateLocation{
-	"settings": {"library/blocks/forms", "settings"},
-	"hero":     {"library/blocks/content", "hero"},
-	"navbar":   {"library/blocks/navigation", "navbar"},
-	"alert":    {"library/blocks/partials", "alert"},
-}
-
-var pages = map[string]templateLocation{
-	"home": {"library/pages/home", "home"},
+var pages = map[string]string{
+	"home":     "home",
+	"settings": "settings",
+	"notfound": "notfound",
 }
 
 func initCmd(args []string) (code int) {
@@ -61,47 +58,37 @@ func initCmd(args []string) (code int) {
 		return 1
 	}
 
-	cssDir := filepath.Join(viewsDir, "static", "css")
-	if err := os.MkdirAll(cssDir, 0o755); err != nil {
-		log.Error("Failed to create css directory", slog.String("error", err.Error()))
-		return 1
-	}
-
-	if err := copyDirDirect(hgmx.LibraryFS, "library/static", filepath.Join(viewsDir, "static")); err != nil {
+	if err := copyDir(location{fs: hgmx.LibraryFS, source: LIB_DIR + "/static", destination: filepath.Join(viewsDir, "static")}); err != nil {
 		log.Error("Failed to copy static directory", slog.String("error", err.Error()))
 		return 1
 	}
 
-	for _, c := range components {
-		dstDir := filepath.Join(viewsDir, "components", filepath.Base(c.Dir))
-		if err := addComponent(hgmx.LibraryFS, c.Dir, dstDir, c.Name, "components", cssDir); err != nil {
-			log.Error("Failed to copy component", slog.String("dir", c.Dir), slog.String("name", c.Name), slog.String("error", err.Error()))
+	for file, dir := range components {
+		dir := filepath.Join("components", dir)
+		if err := addComponent(location{fs: hgmx.LibraryFS, source: dir, destination: filepath.Join(viewsDir, dir), file: file}); err != nil {
+			log.Error("Failed to copy component", slog.String("src", dir), slog.String("file", file), slog.String("error", err.Error()))
 			return 1
 		}
 	}
 
-	for _, b := range blocks {
-		dstDir := filepath.Join(viewsDir, "blocks", filepath.Base(b.Dir))
-		if err := addComponent(hgmx.LibraryFS, b.Dir, dstDir, b.Name, "blocks", cssDir); err != nil {
-			log.Error("Failed to copy block", slog.String("dir", b.Dir), slog.String("name", b.Name), slog.String("error", err.Error()))
+	for file, dir := range blocks {
+		dir := filepath.Join("blocks", dir)
+		if err := addComponent(location{fs: hgmx.LibraryFS, source: dir, destination: filepath.Join(viewsDir, dir), file: file}); err != nil {
+			log.Error("Failed to copy block", slog.String("src", dir), slog.String("file", file), slog.String("error", err.Error()))
 			return 1
 		}
 	}
 
-	for _, p := range pages {
-		dstDir := filepath.Join(viewsDir, "pages", filepath.Base(p.Dir))
-		if err := addComponent(hgmx.LibraryFS, p.Dir, dstDir, p.Name, "pages", cssDir); err != nil {
-			log.Error("Failed to copy page", slog.String("dir", p.Dir), slog.String("name", p.Name), slog.String("error", err.Error()))
+	for file, dir := range pages {
+		dir := filepath.Join("pages", dir)
+		if err := addComponent(location{fs: hgmx.LibraryFS, source: dir, destination: filepath.Join(viewsDir, dir), file: file}); err != nil {
+			log.Error("Failed to copy page", slog.String("src", dir), slog.String("file", file), slog.String("error", err.Error()))
 			return 1
 		}
 	}
 
-	if err := copyFileDirect(hgmx.LibraryFS, "library/views.templ", filepath.Join(viewsDir, "views.templ")); err != nil {
+	if err := copyEmbedFile(location{fs: hgmx.LibraryFS, source: LIB_DIR + "/views.templ", destination: filepath.Join(viewsDir, "views.templ")}); err != nil {
 		log.Error("Failed to copy views.templ", slog.String("error", err.Error()))
-		return 1
-	}
-	if err := copyFileDirect(hgmx.LibraryFS, "library/views.css", filepath.Join(viewsDir, "views.css")); err != nil {
-		log.Error("Failed to copy views.css", slog.String("error", err.Error()))
 		return 1
 	}
 
@@ -187,8 +174,10 @@ func linkCmd(inputGlob, outputGlob string) (code int) {
 				return err
 			}
 			if d.IsDir() {
-				l.Debug("Skipping directory", slog.String("dir", path))
-				return nil
+				sub := location{fs: hgmx.LibraryFS, source: path, destination: filepath.Join(dstDir, strings.TrimPrefix(path, srcDir))}
+				if err := copyDir(sub); err != nil {
+					return err
+				}
 			}
 			if strings.HasSuffix(path, "_templ.go") {
 				l.Debug("Skipping generated file", slog.String("file", path))
