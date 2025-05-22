@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"embed"
 	"fmt"
+	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 )
@@ -88,4 +90,25 @@ func copyDirDirect(efs embed.FS, src, dst string) error {
 		}
 	}
 	return nil
+}
+
+func copyFileDirect(fsys fs.FS, src, dst string) error {
+	in, err := fsys.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return err
+	}
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	return err
 }

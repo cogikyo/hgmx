@@ -30,7 +30,7 @@ func init() {
 	rootCmd.AddCommand(paletteCobraCmd)
 	rootCmd.AddCommand(linkCobraCmd)
 	linkCobraCmd.Flags().StringVarP(&linkInput, "input", "i", "../hgmx/library/*", "Source directory to link from")
-	linkCobraCmd.Flags().StringVarP(&linkOutput, "output", "o", "app/*", "Transforms files in directory to symlinks")
+	linkCobraCmd.Flags().StringVarP(&linkOutput, "output", "o", "views/*", "Transforms files in directory to symlinks")
 }
 
 var infoCobraCmd = &cobra.Command{
