@@ -11,7 +11,7 @@ import (
 
 templ Full(content templ.Component) {
 	<!DOCTYPE html>
-	<html lang="en" class="cursor-default">
+	<html lang="en">
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -20,11 +20,10 @@ templ Full(content templ.Component) {
 			@Script("vendor/htmx.min.js", false)
 			@Script("vendor/hyperscript.min.js", false)
 		</head>
-		<body class="font-sans bg-base-500 text-surface-400 h-svh">
-			@Header()
-			@Main(content, "")
-			@Footer()
+		<body>
+			@content
 		</body>
+		@Footer()
 	</html>
 }
 
@@ -36,13 +35,9 @@ templ Title(title string) {
 
 templ Main(content templ.Component, title string) {
     @Title(title)
-	<main class="w-[98%] md:w-[96%] h-full mx-auto">
+	<main>
 		@content
 	</main>
-}
-
-templ Header() {
-	<header></header>
 }
 
 templ Footer() {

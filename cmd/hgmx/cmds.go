@@ -174,10 +174,7 @@ func linkCmd(inputGlob, outputGlob string) (code int) {
 				return err
 			}
 			if d.IsDir() {
-				sub := location{fs: hgmx.LibraryFS, source: path, destination: filepath.Join(dstDir, strings.TrimPrefix(path, srcDir))}
-				if err := copyDir(sub); err != nil {
-					return err
-				}
+				return nil
 			}
 			if strings.HasSuffix(path, "_templ.go") {
 				l.Debug("Skipping generated file", slog.String("file", path))
