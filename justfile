@@ -1,7 +1,6 @@
 # Variables
 BINARY_NAME         := "hgmx"
 MAIN_PACKAGE_PATH   := "./cmd/hgmx"
-VERSION_VAR_PATH    := "main.Version"
 GIT_VERSION         := `git describe --tags --always || echo dev`
 CSS_INPUT           := "library/static/css/main.css"
 CSS_OUTPUT          := "library/static/css/main.min.css"
@@ -16,7 +15,7 @@ templ-update:
     go install github.com/a-h/templ/cmd/templ@latest
 
 build: gen
-    @go build -ldflags="-X {{VERSION_VAR_PATH}}={{GIT_VERSION}}" -o {{BINARY_NAME}} {{MAIN_PACKAGE_PATH}}
+    @go build -o {{BINARY_NAME}} {{MAIN_PACKAGE_PATH}}
 
 install:
     @go install ./cmd/hgmx
@@ -30,9 +29,6 @@ run *ARGS:
 
 tw:
     @tailwindcss -i {{CSS_INPUT}} -o {{CSS_OUTPUT}} --minify --watch
-
-builder:
-    @air -c .air.toml
 
 describe:
     @echo "{{GIT_VERSION}}"

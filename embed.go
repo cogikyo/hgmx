@@ -13,7 +13,3 @@ func Version() string {
 
 //go:embed library/**
 var LibraryFS embed.FS
-
-func Library() embed.FS {
-	return LibraryFS
-}
