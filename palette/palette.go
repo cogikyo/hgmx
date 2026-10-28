@@ -3,7 +3,6 @@ package palette
 import (
 	"fmt"
 	"io"
-	"log"
 
 	"github.com/alltom/oklab"
 )
@@ -129,9 +128,9 @@ type Mappings map[Motif]Pair
 // === Globals =================================================================
 
 var shadesMap = map[int]int{50: 0, 100: 1, 200: 2, 300: 3, 400: 4, 500: 5, 600: 6, 700: 7, 800: 8, 900: 9, 950: 10}
-var shades = []int{50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950}
+var Shades = []int{50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950}
 
-var orderedColors = []Color{
+var Order = []Color{
 	Base, Surface,
 	Rose, Berry, Cherry, Ruby, Red, Coral,
 	Pumpkin, Orange, Sun, Gold,
@@ -223,19 +222,19 @@ var mappings = Mappings{
 
 // === Handlers ================================================================
 
-func Generate(seed string) Palette {
+func Generate(seed string) (Palette, error) {
+	seedOklch, err := HexToOklch(seed)
+	if err != nil {
+		return nil, err
+	}
+
 	p := make(Palette)
-	for _, Color := range orderedColors {
-		color, ok := colors[Color]
-		if !ok {
-			log.Println("[WARN]", Color, "not found in palette for seeding.")
-			continue
+	for _, Color := range Order {
+		oklch := seedOklch
+		if Color != Base && Color != Surface {
+			oklch = *colors[Color].toOklch()
 		}
-		if Color == Base || Color == Surface {
-			color = Hex(seed)
-		}
-		oklch := color.toOklch()
-		details := &ColorDetails{Color: Color, Base: *oklch, Shades: make(map[int]Details, len(shades))}
+		details := &ColorDetails{Color: Color, Base: oklch, Shades: make(map[int]Details, len(Shades))}
 		p[Color] = details
 
 		switch Color {
@@ -251,12 +250,35 @@ func Generate(seed string) Palette {
 			details.generateColor()
 		}
 	}
-	return p
+	return p, nil
+}
+
+func (p *Palette) ToLua(w io.Writer) {
+	bgColor := (*p)[Base].Shades[600].Oklch
+
+	fmt.Fprintln(w, "return {")
+	for _, code := range Order {
+		colorDetails, ok := (*p)[code]
+		if !ok {
+			continue
+		}
+		fmt.Fprintf(w, "\n\t-- %s\n", string(code))
+		for _, shadeKey := range Shades {
+			shade, ok := colorDetails.Shades[shadeKey]
+			if !ok {
+				continue
+			}
+			hex := OklchToHex(&shade.Oklch)
+			cr := ContrastRatio(bgColor, shade.Oklch)
+			fmt.Fprintf(w, "\t%s_%d = \"%s\", -- CR: %.2f\n", string(code), shadeKey, hex, cr)
+		}
+	}
+	fmt.Fprintln(w, "}")
 }
 
 func (p *Palette) ToCSS(w io.Writer) {
 	fmt.Fprintln(w, ":root {")
-	for _, code := range orderedColors {
+	for _, code := range Order {
 		colorDetails, ok := (*p)[code]
 		if ok {
 			colorDetails.ToCSS(w, code)
@@ -265,7 +287,7 @@ func (p *Palette) ToCSS(w io.Writer) {
 	fmt.Fprintln(w, "}")
 	fmt.Fprintln(w, "")
 	fmt.Fprintln(w, "@theme {")
-	for _, code := range orderedColors {
+	for _, code := range Order {
 		colorDetails, ok := (*p)[code]
 		if ok {
 			colorDetails.ToTheme(w, code)
@@ -277,7 +299,7 @@ func (p *Palette) ToCSS(w io.Writer) {
 }
 
 func (c ColorDetails) ToCSS(w io.Writer, color Color) {
-	for _, shadeKey := range shades {
+	for _, shadeKey := range Shades {
 		shade, ok := c.Shades[shadeKey]
 		if !ok {
 			continue
@@ -289,7 +311,7 @@ func (c ColorDetails) ToCSS(w io.Writer, color Color) {
 }
 
 func (c ColorDetails) ToTheme(w io.Writer, color Color) {
-	for _, shadeKey := range shades {
+	for _, shadeKey := range Shades {
 		_, ok := c.Shades[shadeKey]
 		if !ok {
 			continue
@@ -302,79 +324,15 @@ func (c ColorDetails) ToTheme(w io.Writer, color Color) {
 
 func (m Mappings) ToMotifs(w io.Writer) {
 	for motif, pair := range m {
-		for _, shadeKey := range shades {
+		for _, shadeKey := range Shades {
 			rootVar := fmt.Sprintf("var(--%s-%d)", pair.Alpha, shadeKey)
 			fmt.Fprintf(w, "  --color-%s-%d: %s;\n", motif, shadeKey, rootVar)
 		}
 		fmt.Fprintln(w, "")
-		for _, shadeKey := range shades {
+		for _, shadeKey := range Shades {
 			rootVar := fmt.Sprintf("var(--%s-%d)", pair.Beta, shadeKey)
 			fmt.Fprintf(w, "  --color-%s-%d: %s;\n", motif, shadeKey+1, rootVar)
 		}
 		fmt.Fprintln(w, "")
 	}
 }
-
-// func (p Palette) ToView() []colorsPage.ColorScaleView {
-// 	var views []colorsPage.ColorScaleView
-
-// 	bgcDetails, ok := p[Base]
-// 	if !ok {
-// 		return views
-// 	}
-// 	seed := bgcDetails.Base
-
-// 	convertScale := func(clor Color, scale *ColorDetails) colorsPage.ColorScaleView {
-// 		view := colorsPage.ColorScaleView{
-// 			Name:   string(scale.Color),
-// 			Code:   string(clor),
-// 			Value:  scale.Shades[600].Oklch,
-// 			Shades: make([]colorsPage.Shade, len(shades)),
-// 		}
-
-// 		for i, shadeVal := range shades {
-// 			colorDetails, ok := scale.Shades[shadeVal]
-// 			if !ok {
-// 				continue
-// 			}
-
-// 			color := colorDetails.Oklch
-// 			rl, cr := OklchCompare(seed, color)
-// 			hue := toDegree(color.H)
-
-// 			radius := 37.0
-
-// 			scaledRadiusC := radius * math.Tanh(6.0*color.C)
-// 			totalDistanceC := scaledRadiusC
-
-// 			scaledRadiusL := radius * math.Pow(color.L, 1.5)
-// 			totalDistanceL := scaledRadiusL
-
-// 			angle := -color.H
-// 			view.Shades[i] = colorsPage.Shade{
-// 				Code:  string(clor),
-// 				Value: shadeVal,
-// 				RL:    rl,
-// 				CR:    cr,
-// 				L:     fmt.Sprintf("%0.1f%%", color.L*100),
-// 				C:     fmt.Sprintf("%0.3f", color.C),
-// 				H:     fmt.Sprintf("%0.1f", hue),
-// 				Hex:   OklchToHex(&color),
-// 				Cx:    50.0 + totalDistanceC*math.Cos(angle),
-// 				Cy:    50.0 + totalDistanceC*math.Sin(angle),
-// 				Clx:   50.0 + totalDistanceL*math.Cos(angle),
-// 				Cly:   50.0 + totalDistanceL*math.Sin(angle),
-// 			}
-// 		}
-// 		return view
-// 	}
-
-// 	for _, code := range orderedColors {
-// 		details, ok := p[code]
-// 		if ok {
-// 			views = append(views, convertScale(code, details))
-// 		}
-// 	}
-
-// 	return views
-// }

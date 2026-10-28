@@ -219,7 +219,7 @@ func (c *ColorDetails) generateBW(color Color) {
 	indexMin := float64(shadesMap[50])
 	indexMax := float64(shadesMap[950])
 
-	for _, shadeVal := range shades {
+	for _, shadeVal := range Shades {
 		if shadeVal == baseShadeValue {
 			continue
 		}
@@ -247,7 +247,7 @@ func (c *ColorDetails) generateGrey() {
 	const targetCLight = 0.002
 	const targetLDark = 0.20
 	const targetCDark = 0.005
-	for _, shadeValue := range shades {
+	for _, shadeValue := range Shades {
 		if shadeValue == 500 {
 			continue
 		} else if shadeValue < 500 {

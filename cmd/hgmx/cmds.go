@@ -7,8 +7,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/nosvagor/hgmx"
-	"github.com/nosvagor/hgmx/internal/palette"
+	"github.com/cogikyo/hgmx"
+	"github.com/cogikyo/hgmx/palette"
 )
 
 // --- info command ---
@@ -108,15 +108,18 @@ func paletteCmd(args []string) (code int) {
 
 	hexColor := args[0]
 
-	// TODO: more than hex
-	if len(hexColor) != 7 || hexColor[0] != '#' {
-		log.Error("Invalid hex color format. Expected #RRGGBB.", slog.String("color", hexColor))
+	log.Info("Generating palette for color:", slog.String("hex", hexColor))
+
+	generatedPalette, err := palette.Generate(hexColor)
+	if err != nil {
+		log.Error("Invalid color", slog.String("error", err.Error()))
 		return 1
 	}
 
-	log.Info("Generating palette for color:", slog.String("hex", hexColor))
-
-	generatedPalette := palette.Generate(hexColor)
+	if paletteLua {
+		generatedPalette.ToLua(os.Stdout)
+		return 0
+	}
 
 	outputFile := "library/static/css/colors.css"
 	f, err := os.Create(outputFile)

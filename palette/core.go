@@ -11,8 +11,9 @@ import (
 
 // HexToOklch converts a hex color string (e.g., "#RRGGBB") to its OKLCH representation.
 func HexToOklch(hexColor string) (oklchColor oklab.Oklch, err error) {
+	invalid := fmt.Errorf("invalid hex color format: expected #RRGGBB, got %s", hexColor)
 	if len(hexColor) != 7 || hexColor[0] != '#' {
-		return oklchColor, fmt.Errorf("invalid hex color format: expected #RRGGBB, got %s", hexColor)
+		return oklchColor, invalid
 	}
 
 	r, errR := strconv.ParseUint(hexColor[1:3], 16, 8)
@@ -20,7 +21,7 @@ func HexToOklch(hexColor string) (oklchColor oklab.Oklch, err error) {
 	b, errB := strconv.ParseUint(hexColor[5:7], 16, 8)
 
 	if errR != nil || errG != nil || errB != nil {
-		return
+		return oklchColor, invalid
 	}
 
 	rgbaColor := color.RGBA{R: uint8(r), G: uint8(g), B: uint8(b), A: 255}
@@ -31,7 +32,7 @@ func HexToOklch(hexColor string) (oklchColor oklab.Oklch, err error) {
 
 // OklchToString converts an OKLCH color to a css string.
 func OklchToString(oklchColor *oklab.Oklch) string {
-	return fmt.Sprintf("oklch(%.2f %.3f %06.2f)", oklchColor.L, oklchColor.C, toDegree(oklchColor.H))
+	return fmt.Sprintf("oklch(%.2f %.3f %06.2f)", oklchColor.L, oklchColor.C, Degrees(oklchColor.H))
 }
 
 func OklchToHex(oklchColor *oklab.Oklch) string {
@@ -47,7 +48,7 @@ func OklchToHex(oklchColor *oklab.Oklch) string {
 	return fmt.Sprintf("#%02x%02x%02x", r8, g8, b8)
 }
 
-func toDegree(hue float64) float64 {
+func Degrees(hue float64) float64 {
 	hueDegrees := hue * 180 / math.Pi
 	if hueDegrees < 0 {
 		hueDegrees += 360

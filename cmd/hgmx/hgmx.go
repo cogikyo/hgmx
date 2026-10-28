@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/nosvagor/hgmx"
+	"github.com/cogikyo/hgmx"
 	"github.com/spf13/cobra"
 )
 
@@ -16,6 +16,7 @@ var rootCmd = &cobra.Command{
 var logLevel string
 var linkInput string
 var linkOutput string
+var paletteLua bool
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
@@ -29,6 +30,7 @@ func init() {
 	rootCmd.AddCommand(initCobraCmd)
 	rootCmd.AddCommand(paletteCobraCmd)
 	rootCmd.AddCommand(linkCobraCmd)
+	paletteCobraCmd.Flags().BoolVar(&paletteLua, "lua", false, "Write a Lua table of hex shades to stdout instead of CSS")
 	linkCobraCmd.Flags().StringVarP(&linkInput, "input", "i", "../hgmx/library/*", "Source directory to link from")
 	linkCobraCmd.Flags().StringVarP(&linkOutput, "output", "o", "views/*", "Transforms files in directory to symlinks")
 }
@@ -54,7 +56,9 @@ var paletteCobraCmd = &cobra.Command{
 	Short: "Generates a color palette based on the input hex color",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		paletteCmd(args)
+		if code := paletteCmd(args); code != 0 {
+			os.Exit(code)
+		}
 	},
 }
 
