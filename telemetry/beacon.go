@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	Path      = "/_v/"
+	Path      = "/_v/" // Path is the beacon and asset mount prefix.
 	maxBeacon = 2 << 10
 	beaconsPS = 50
 )
@@ -31,6 +31,8 @@ const (
 //go:embed vitals.js
 var vitals []byte
 
+// Beacon serves browser page-view and web-vitals collection and its script.
+// Mount with root.Handle(telemetry.Path, beacon), without a method or StripPrefix.
 type Beacon struct {
 	*static.Server
 	head  template.HTML
@@ -42,6 +44,7 @@ type Beacon struct {
 	salt [32]byte
 }
 
+// Beacon prepares the browser collector, including when the pipeline is nil.
 func (p *Pipeline) Beacon() (*Beacon, error) {
 	b := &Beacon{Server: static.Map(Path, map[string][]byte{"vitals.js": vitals}), p: p, limit: newBucket(beaconsPS)}
 	if p == nil {
@@ -55,6 +58,8 @@ func (p *Pipeline) Beacon() (*Beacon, error) {
 	return b, nil
 }
 
+// Head returns the layout's script tag, or empty HTML for a nil pipeline.
+// The CSP must allow script-src 'self' and connect-src 'self'.
 func (b *Beacon) Head() template.HTML {
 	return b.head
 }

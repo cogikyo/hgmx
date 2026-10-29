@@ -1,3 +1,24 @@
+// Package telemetry exports OTLP traces, logs, and metrics for HTTP sites.
+// FromEnv may return a nil pipeline; all Pipeline methods accept it.
+// Given an application mux and a health handler, mount them separately:
+//
+//	p, err := telemetry.FromEnv()
+//	if err != nil {
+//		return err
+//	}
+//	beacon, err := p.Beacon()
+//	if err != nil {
+//		return err
+//	}
+//	local := slog.NewJSONHandler(os.Stderr, nil)
+//	log := slog.New(p.Logs(local))
+//	root := http.NewServeMux()
+//	root.Handle("GET /healthz", health)
+//	root.Handle(telemetry.Path, beacon)
+//	root.Handle("/", p.Handler(local, mux))
+//
+// Caller-supplied span/log strings are cut to 1 KiB of valid UTF-8.
+// Local log output is not cut; resource strings are not length-limited.
 package telemetry
 
 import (
@@ -67,6 +88,7 @@ type pending struct {
 	due  time.Time
 }
 
+// Pipeline owns the exporter; a nil pipeline disables telemetry.
 type Pipeline struct {
 	urls   [3]string
 	res    []byte
@@ -133,6 +155,8 @@ func (b *buffer[T]) take() []T {
 	return items
 }
 
+// FromEnv starts an OTLP HTTP/protobuf exporter from OTEL environment variables.
+// It returns (nil, nil) if the endpoint is unset or OTEL_SDK_DISABLED is true.
 func FromEnv() (*Pipeline, error) {
 	if strings.EqualFold(strings.TrimSpace(os.Getenv("OTEL_SDK_DISABLED")), "true") {
 		return nil, nil
@@ -387,6 +411,9 @@ func retryAfter(h string) time.Duration {
 	return 0
 }
 
+// Shutdown stops recording and flushes pending telemetry within ctx's deadline.
+// Shut down the HTTP server first, then the pipeline on the same deadline.
+// Repeated calls are safe; later recording is ignored.
 func (p *Pipeline) Shutdown(ctx context.Context) error {
 	if p == nil {
 		return nil

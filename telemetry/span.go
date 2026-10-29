@@ -32,6 +32,8 @@ type link struct {
 	flags byte
 }
 
+// Span records one operation and must be used by only one goroutine at a time.
+// Nil spans are safe to use.
 type Span struct {
 	p       *Pipeline
 	trace   traceID
@@ -50,6 +52,7 @@ type Span struct {
 
 type spanKey struct{}
 
+// SpanFrom returns the context's span, or nil.
 func SpanFrom(ctx context.Context) *Span {
 	s, _ := ctx.Value(spanKey{}).(*Span)
 	return s
@@ -57,6 +60,8 @@ func SpanFrom(ctx context.Context) *Span {
 
 func (s *Span) recording() bool { return s != nil && s.p != nil }
 
+// Start creates a child of the context's span, or returns (ctx, nil).
+// Use [Pipeline.Start] to start a background root.
 func Start(ctx context.Context, name string, attrs ...slog.Attr) (context.Context, *Span) {
 	parent := SpanFrom(ctx)
 	if !parent.recording() {
@@ -65,6 +70,8 @@ func Start(ctx context.Context, name string, attrs ...slog.Attr) (context.Contex
 	return parent.p.Start(ctx, name, attrs...)
 }
 
+// Start creates a child span, or a rate-limited root if ctx has no span.
+// It returns (ctx, nil) when recording is disabled or the root limit is reached.
 func (p *Pipeline) Start(ctx context.Context, name string, attrs ...slog.Attr) (context.Context, *Span) {
 	s := p.begin(ctx, name, internal)
 	if !s.recording() {
@@ -104,6 +111,7 @@ func (p *Pipeline) root(name string, kind spanKind) *Span {
 	return s
 }
 
+// Set snapshots attributes, replacing values with the same key.
 func (s *Span) Set(attrs ...slog.Attr) {
 	if !s.recording() || s.end != 0 {
 		return
@@ -133,6 +141,7 @@ func (s *Span) index(key string) int {
 	return -1
 }
 
+// Fail marks the span as failed; a nil error has no effect.
 func (s *Span) Fail(err error) {
 	if !s.recording() || s.end != 0 || err == nil {
 		return
@@ -140,6 +149,7 @@ func (s *Span) Fail(err error) {
 	s.code, s.msg = 2, clip(err.Error())
 }
 
+// End submits the span; later Set, Fail, and End calls have no effect.
 func (s *Span) End() {
 	if !s.recording() || s.end != 0 {
 		return
@@ -148,6 +158,7 @@ func (s *Span) End() {
 	s.p.spans.add(s)
 }
 
+// TraceID returns the hexadecimal trace ID, or "" for a non-recording span.
 func (s *Span) TraceID() string {
 	if !s.recording() {
 		return ""

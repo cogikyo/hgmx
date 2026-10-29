@@ -43,6 +43,13 @@ func (r *recorder) Flush() {
 
 func (r *recorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }
 
+// Handler records requests and writes access logs to the raw local handler.
+// A handler from [Pipeline.Logs] is unwrapped to avoid exporting access logs.
+// The first local handler given to Logs or Handler gets export-failure warnings.
+//
+// Wrap the mux directly, or only middleware passing the same *http.Request.
+// An intervening r.WithContext loses http.route.
+// Keep /healthz and [Beacon] outside this handler.
 func (p *Pipeline) Handler(local slog.Handler, next http.Handler) http.Handler {
 	local = p.local(local)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -160,6 +167,12 @@ type transport struct {
 	base http.RoundTripper
 }
 
+// Transport wraps base with client spans; nil base means http.DefaultTransport.
+// Build one http.Client with it and pass the parent span's request context.
+// Without a span in the context it starts a rate-limited root client span.
+// Spans end on response headers, before the body is read.
+// The wrapper removes traceparent and tracestate before sending upstream.
+// A nil pipeline returns base unchanged after applying the default.
 func (p *Pipeline) Transport(base http.RoundTripper) http.RoundTripper {
 	if base == nil {
 		base = http.DefaultTransport
