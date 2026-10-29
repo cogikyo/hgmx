@@ -1,6 +1,9 @@
-import { animate, stagger } from "../motion.js";
+import { animate, τmax } from "../motion.js";
 
 export default function (el) {
-  const bars = el.querySelectorAll("path");
-  animate(bars, { scaleX: [0, 1.25, 1], opacity: [0, 1] }, { duration: 0.3, delay: stagger(0.06) });
+  const top = el.querySelector('path[d="M4 5h16"]');
+  animate(top, { translateY: [0, 4, -1, 0] }, { duration: τmax });
+
+  const bottom = el.querySelector('path[d="M4 19h16"]');
+  animate(bottom, { translateY: [0, -4, 1, 0] }, { duration: τmax });
 }

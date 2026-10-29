@@ -1,9 +1,9 @@
-import { animate, stagger, τmid, τmin } from "../motion.js";
+import { animate, stagger, τmax, τmid, τmin } from "../motion.js";
 
 export default function (el) {
-  const beam = el.querySelector("path");
-  animate(beam, { pathLength: [0, 1], opacity: [0.5, 1] }, { duration: τmid });
+  const notes = el.querySelector("g");
+  animate(notes, { rotate: [0, -12, 8, 0] }, { duration: τmax });
 
-  const heads = el.querySelectorAll("circle");
-  animate(heads, { scale: [0, 1.25, 1], opacity: [0, 1] }, { duration: 0.3, delay: stagger(0.09, { startDelay: τmin }) });
+  const heads = [el.querySelector('circle[cx="6"]'), el.querySelector('circle[cx="18"]')];
+  animate(heads, { scale: [1, 1.25, 1] }, { duration: τmin, delay: stagger(0.06, { startDelay: τmid }) });
 }

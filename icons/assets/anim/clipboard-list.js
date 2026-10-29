@@ -9,7 +9,4 @@ export default function (el) {
 
   const bullets = el.querySelectorAll('path[d$="h.01"]');
   animate(bullets, { scale: [0, 1.75, 1] }, { duration: 0.3, delay: stagger(0.06, { startDelay: τmin }) });
-
-  const clip = el.querySelector("rect");
-  animate(clip, { translateY: [-3, 1, 0] }, { duration: τmin, delay: τmid });
 }

@@ -1,6 +1,6 @@
-import { animate, stagger } from "../motion.js";
+import { animate, τmid } from "../motion.js";
 
 export default function (el) {
-  const bars = [...el.querySelectorAll("rect")].reverse();
-  animate(bars, { scaleY: [1, 0.6, 1.1, 1] }, { duration: 0.3, delay: stagger(0.06) });
+  const bars = el.querySelectorAll("rect");
+  animate(bars, { scaleY: [0, 1.15, 1] }, { duration: τmid });
 }
