@@ -33,17 +33,6 @@ func (c Color) Hex() string {
 
 func (c Color) String() string { return c.Hex() }
 
-func (c Color) MarshalText() ([]byte, error) { return []byte(c.Hex()), nil }
-
-func (c *Color) UnmarshalText(b []byte) error {
-	v, err := ParseHex(string(b))
-	if err != nil {
-		return err
-	}
-	*c = v
-	return nil
-}
-
 func (c Color) Lab() Lab {
 	r, g, b := linear(c.R), linear(c.G), linear(c.B)
 	l := math.Cbrt(dot(0.4122214708, 0.5363325363, 0.0514459929, r, g, b))
