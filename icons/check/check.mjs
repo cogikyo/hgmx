@@ -22,12 +22,15 @@ const executables = {
   firefox: { browser: "firefox", executablePath: "/usr/bin/firefox-developer-edition" },
 };
 const drift = new Set(["orbit"]);
+const snap = 16;
 const viewport = { width: 1600, height: 1000 };
 
 const probe = () => {
   const calls = [];
   const pending = [];
   let run = null;
+  let gate = Promise.resolve();
+  let release = () => {};
   const wrap = (animate) =>
     function (targets, ...rest) {
       const list = typeof targets === "string" ? [...document.querySelectorAll(targets)] : targets instanceof Element ? [targets] : targets?.[Symbol.iterator] ? [...targets] : [];
@@ -38,7 +41,10 @@ const probe = () => {
       const icon = list[0]?.closest?.("svg[data-icon]")?.dataset.icon ?? "?";
       calls.push({ icon, run: run.id, n: list.length });
       const controls = animate.call(this, targets, ...rest);
-      pending.push(controls.finished ?? Promise.resolve(controls));
+      const finished = controls.finished ?? Promise.resolve();
+      pending.push(finished);
+      const held = gate;
+      Object.defineProperty(controls, "finished", { configurable: true, value: finished.then(() => held) });
       return controls;
     };
   let real;
@@ -56,7 +62,10 @@ const probe = () => {
       real = obj;
     },
   });
-  globalThis.__icons = { calls, pending };
+  const hold = () => {
+    gate = new Promise((resolve) => (release = resolve));
+  };
+  globalThis.__icons = { calls, pending, hold, release: () => release() };
 };
 
 const snapshot = (names) => {
@@ -141,10 +150,13 @@ const pixels = async (a, b) => {
   const p = read(x);
   const q = read(y);
   let changed = 0;
+  let jumped = 0;
   for (let i = 0; i < p.length; i += 4) {
-    if (p[i] !== q[i] || p[i + 1] !== q[i + 1] || p[i + 2] !== q[i + 2]) changed++;
+    const delta = Math.max(Math.abs(p[i] - q[i]), Math.abs(p[i + 1] - q[i + 1]), Math.abs(p[i + 2] - q[i + 2]));
+    if (delta) changed++;
+    if (delta > 128) jumped++;
   }
-  return { changed, total: p.length / 4 };
+  return { changed, jumped, total: p.length / 4 };
 };
 
 async function hoverAll(page, names) {
@@ -203,6 +215,7 @@ async function check(name, url, wanted) {
     const helper = await browser.newPage();
     await page.bringToFront();
     let worst = 0;
+    const jumps = new Map();
     const names = await page.evaluate(() => [...document.querySelectorAll("svg[data-icon]")].map((s) => s.dataset.icon));
     for (const n of wanted ?? []) if (!names.includes(n)) fail(n, "not animated (no data-icon)");
 
@@ -219,15 +232,25 @@ async function check(name, url, wanted) {
       const label = pass ? `after ${args.swaps} swaps` : "first load";
       const before = await page.evaluate(snapshot, names);
       const look = await shots(page, names);
+      await page.evaluate(() => globalThis.__icons.hold());
       const { settled, calls } = await hoverAll(page, names);
       if (!settled) fail("*", `${label}: animations did not finish within 4s`);
       const quiet = await page.evaluate(() => globalThis.__icons.calls.length);
+      const end = await shots(page, names);
+      await page.evaluate(async () => {
+        globalThis.__icons.release();
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      });
       const after = await page.evaluate(snapshot, names);
       const relook = await shots(page, names);
       const stray = await page.evaluate((m) => globalThis.__icons.calls.slice(m).map((c) => c.icon), quiet);
       for (const icon of new Set(stray)) fail(icon, `${label}: animated while the checker took rest screenshots`);
       for (const n of names) {
         if (drift.has(n)) continue;
+        const { jumped, changed: blurred } = await helper.evaluate(pixels, look[n], end[n]);
+        const [j, b] = jumps.get(n) ?? [0, 0];
+        jumps.set(n, [Math.max(j, jumped), Math.max(b, blurred)]);
+        if (jumped > snap) fail(n, `${label}: snaps back after the animation ends: ${jumped} pixels jump`);
         const { changed, total } = await helper.evaluate(pixels, look[n], relook[n]);
         worst = Math.max(worst, changed);
         if (changed) {
@@ -249,6 +272,8 @@ async function check(name, url, wanted) {
       for (const icon of by.keys()) if (!names.includes(icon)) fail(icon, `${label}: animate() outside a known icon`);
     }
     console.log(`${name}: ${names.length} icons hovered twice around ${args.swaps} boosted swaps; worst rest diff ${worst} pixels`);
+    const top = [...jumps].sort((a, b) => b[1][0] - a[1][0] || b[1][1] - a[1][1]).slice(0, 5).map(([n, [j, b]]) => `${n} ${j} (${b} differ)`);
+    console.log(`${name}: largest end-frame jumps (bound ${snap}): ${top.join(", ")}`);
   } finally {
     await browser.close();
     rmSync(dir, { recursive: true, force: true });
