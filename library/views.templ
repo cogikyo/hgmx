@@ -1,9 +1,6 @@
 package views
 
-import (
-	"github.com/cogikyo/hgmx/server"
-	"net/http"
-)
+import "github.com/cogikyo/hgmx/server"
 
 templ full(s *site, path, title string, content templ.Component) {
 	<!DOCTYPE html>
@@ -20,6 +17,7 @@ templ full(s *site, path, title string, content templ.Component) {
 		<body
 			hx-boost:inherited="target:#main select:#main swap:'innerHTML strip show:top showTarget:body' transition:true"
 			hx-select-oob:inherited="#nav-links:outerMorph"
+			hx-sync:inherited="body:replace"
 			hx-config:inherited={ server.VersionConfig(s.version) }
 		>
 			<nav id="nav">
@@ -56,14 +54,7 @@ templ about() {
 	<p>The current nav link is marked on the server with <code>aria-current</code>.</p>
 }
 
-templ failure(status int) {
-	<h1>{ http.StatusText(status) }</h1>
-	switch status {
-		case http.StatusNotFound:
-			<p>No page lives at this address. <a href="/">Go home</a>.</p>
-		case http.StatusUnprocessableEntity:
-			<p>The request could not be processed. Check it and try again.</p>
-		default:
-			<p>Something went wrong on our side. <a href="/">Go home</a>.</p>
-	}
+templ notFound() {
+	<h1>Not Found</h1>
+	<p>No page lives at this address. <a href="/">Go home</a>.</p>
 }

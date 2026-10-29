@@ -23,7 +23,6 @@ func main() {
 	flag.Parse()
 
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	slog.SetDefault(log)
 	if err := run(log, *addr, *dir); err != nil {
 		log.Error("exit", "err", err)
 		os.Exit(1)
@@ -32,17 +31,17 @@ func main() {
 
 func run(log *slog.Logger, addr, dir string) error {
 	site := http.NewServeMux()
-	fallback, err := views.Mount(site, version, dir)
-	if err != nil {
+	if err := views.Mount(site, version, dir); err != nil {
 		return err
 	}
 
 	root := http.NewServeMux()
 	root.Handle("GET /healthz", server.Health(version))
-	root.Handle("/", server.Log(log, server.Security(csp, server.Recover(log, fallback, http.NewCrossOriginProtection().Handler(site)))))
+	root.Handle("/", server.Log(log, server.Security(csp, server.Recover(log, http.HandlerFunc(views.InternalError), http.NewCrossOriginProtection().Handler(site)))))
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	context.AfterFunc(ctx, stop)
 	log.Info("listening", "addr", addr, "version", version)
 	return server.Run(ctx, server.New(addr, root, log))
 }

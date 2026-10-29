@@ -3,10 +3,11 @@ package views
 
 import (
 	"embed"
+	"io"
 	"io/fs"
-	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/a-h/templ"
 	"github.com/cogikyo/hgmx/render"
@@ -26,49 +27,59 @@ type site struct {
 	version string
 }
 
-func Mount(mux *http.ServeMux, version, dir string) (fallback http.Handler, err error) {
+func Mount(mux *http.ServeMux, version, dir string) error {
 	s := &site{scripts: scripts.New(scripts.Navigation), version: version}
 	if dir != "" {
 		s.static = static.Dev(assets, os.DirFS(dir))
 	} else {
 		sub, err := fs.Sub(files, "static")
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if s.static, err = static.New(assets, sub); err != nil {
-			return nil, err
+			return err
 		}
 	}
 
 	mux.Handle("GET "+assets, s.static)
 	mux.Handle("GET "+scripts.Path, s.scripts)
-	mux.Handle("GET /{$}", s.page("/", "Home", home()))
-	mux.Handle("GET /about", s.page("/about", "About", about()))
-	mux.Handle("GET /", server.PageVersion(version, s.failure(http.StatusNotFound)))
-	return s.failure(http.StatusInternalServerError), nil
+	mux.Handle("GET /{$}", s.page(http.StatusOK, "Home", home()))
+	mux.Handle("GET /about", s.page(http.StatusOK, "About", about()))
+	mux.Handle("GET /", s.page(http.StatusNotFound, "Not Found", notFound()))
+	return nil
 }
 
-func (s *site) page(path, title string, content templ.Component) http.Handler {
+func (s *site) page(status int, title string, content templ.Component) http.Handler {
 	return server.PageVersion(s.version, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		s.render(w, r, http.StatusOK, full(s, path, title, content))
+		if err := render.HTML(w, r, status, full(s, r.URL.Path, title, content)); err != nil {
+			panic(err)
+		}
 	}))
 }
 
-func (s *site) failure(status int) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		s.render(w, r, status, full(s, "", http.StatusText(status), failure(status)))
-	})
-}
+const internalError = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Internal Server Error</title>
+</head>
+<body>
+<main id="main">
+<h1>Internal Server Error</h1>
+<p>Something went wrong on our side. <a href="/">Go home</a>.</p>
+</main>
+</body>
+</html>
+`
 
-func (s *site) render(w http.ResponseWriter, r *http.Request, status int, c templ.Component) {
-	err := render.HTML(w, r, status, c)
-	if err == nil {
-		return
+func InternalError(w http.ResponseWriter, r *http.Request) {
+	h := w.Header()
+	h.Set("Content-Type", "text/html; charset=utf-8")
+	h.Set("Cache-Control", "no-store")
+	h.Set("Content-Length", strconv.Itoa(len(internalError)))
+	w.WriteHeader(http.StatusInternalServerError)
+	if r.Method != http.MethodHead {
+		io.WriteString(w, internalError)
 	}
-	slog.ErrorContext(r.Context(), "render", "path", r.URL.Path, "err", err)
-	if status == http.StatusInternalServerError {
-		http.Error(w, http.StatusText(status), status)
-		return
-	}
-	s.failure(http.StatusInternalServerError).ServeHTTP(w, r)
 }
