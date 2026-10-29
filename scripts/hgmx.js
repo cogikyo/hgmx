@@ -1,5 +1,5 @@
 htmx.registerExtension("stale", {
-  htmx_after_request: (elt) => elt.isConnected,
+  htmx_after_request: (elt, { ctx }) => elt.isConnected && !ctx.request.signal?.aborted,
 });
 
 {
