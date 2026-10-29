@@ -7,6 +7,7 @@ require (
 	github.com/alltom/oklab v1.0.0
 	github.com/fatih/color v1.19.0
 	github.com/spf13/cobra v1.9.1
+	golang.org/x/image v0.46.0
 )
 
 require (
