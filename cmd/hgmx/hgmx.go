@@ -14,8 +14,6 @@ var rootCmd = &cobra.Command{
 }
 
 var logLevel string
-var linkInput string
-var linkOutput string
 var paletteLua bool
 
 func main() {
@@ -29,10 +27,7 @@ func init() {
 	rootCmd.AddCommand(infoCobraCmd)
 	rootCmd.AddCommand(initCobraCmd)
 	rootCmd.AddCommand(paletteCobraCmd)
-	rootCmd.AddCommand(linkCobraCmd)
 	paletteCobraCmd.Flags().BoolVar(&paletteLua, "lua", false, "Write a Lua table of hex shades to stdout instead of CSS")
-	linkCobraCmd.Flags().StringVarP(&linkInput, "input", "i", "../hgmx/library/*", "Source directory to link from")
-	linkCobraCmd.Flags().StringVarP(&linkOutput, "output", "o", "views/*", "Transforms files in directory to symlinks")
 }
 
 var infoCobraCmd = &cobra.Command{
@@ -47,7 +42,9 @@ var initCobraCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initializes a new hgmx project",
 	Run: func(cmd *cobra.Command, args []string) {
-		initCmd(args)
+		if code := initCmd(args); code != 0 {
+			os.Exit(code)
+		}
 	},
 }
 
@@ -59,13 +56,5 @@ var paletteCobraCmd = &cobra.Command{
 		if code := paletteCmd(args); code != 0 {
 			os.Exit(code)
 		}
-	},
-}
-
-var linkCobraCmd = &cobra.Command{
-	Use:   "link",
-	Short: "Symlinks files in the output directory to the source directory",
-	Run: func(cmd *cobra.Command, args []string) {
-		linkCmd(linkInput, linkOutput)
 	},
 }
