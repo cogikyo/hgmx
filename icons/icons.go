@@ -1,3 +1,12 @@
+// Package icons provides SVG templ components and hover animations.
+// Render a name directly in templ, for example @icons.Check.
+// To enable animations, mount the assets and include [Handler.Head] in the layout:
+//
+//	h, err := icons.New()
+//	if err != nil {
+//		return err
+//	}
+//	root.Handle(icons.Path, h)
 package icons
 
 import (
@@ -22,6 +31,7 @@ import (
 
 //go:generate go run ./fetch
 
+// Path is the animation asset prefix; mount without StripPrefix.
 const Path = "/icons/"
 
 //go:embed svg
@@ -33,10 +43,15 @@ var assets embed.FS
 //go:embed tags.json
 var tagsJSON []byte
 
+// Hover is spread onto a hover target to animate its first SVG descendant.
+// It requires _hyperscript and also handles mouse presses and touch starts.
 var Hover = templ.Attributes{
 	"_": "on mouseenter or mousedown or touchstart queue none send hovered to first <svg/> in me then wait 420ms",
 }
 
+// Name is a 1em SVG templ component; the generated constants name bundled icons.
+// An unknown name returns a render error without writing anything.
+// Only icons with animations emit data-icon; static icons need no scripts.
 type Name string
 
 type glyph struct {
@@ -128,18 +143,23 @@ func (n Name) Render(ctx context.Context, w io.Writer) error {
 	return err
 }
 
+// Animated reports whether n has a bundled hover animation.
 func (n Name) Animated() bool {
 	return glyphs[n].animated
 }
 
+// Tags returns a copy of n's search tags.
 func (n Name) Tags() []string {
 	return slices.Clone(glyphs[n].tags)
 }
 
+// All returns a copy of the bundled names for browsing or selection controls.
 func All() []Name {
 	return slices.Clone(names)
 }
 
+// Match finds case-insensitive substrings in names and tags.
+// An empty or whitespace-only query returns all icons.
 func Match(q string) []Name {
 	q = strings.ToLower(strings.TrimSpace(q))
 	var found []Name
@@ -153,6 +173,7 @@ func Match(q string) []Name {
 	return found
 }
 
+// Handler serves the styles and per-icon animation modules.
 type Handler struct {
 	*static.Server
 	head template.HTML
@@ -183,6 +204,8 @@ func New() (*Handler, error) {
 	return h, nil
 }
 
+// Head returns layout tags; place them after the script defining global Motion.
+// Animations load per icon on first hover; reduced motion disables all playback.
 func (h *Handler) Head() template.HTML {
 	return h.head
 }

@@ -1,5 +1,7 @@
 package icons
 
+// Gallery renders a searchable icon list, with htmx updates when available.
+// Path must be a trusted search-page URL whose handler passes query q here.
 templ Gallery(path, q string) {
 	<form action={ templ.SafeURL(path) } role="search">
 		<input
@@ -24,6 +26,7 @@ templ Gallery(path, q string) {
 	</section>
 }
 
+// Specimen renders a labelled icon list with Hover targets for previews.
 templ Specimen(names []Name) {
 	<ul>
 		for _, n := range names {
