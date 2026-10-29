@@ -47,6 +47,8 @@ func (w *response) Unwrap() http.ResponseWriter {
 	return w.ResponseWriter
 }
 
+// Log records requests, including panics, without swallowing them.
+// Nothing between Log and the mux may clone r or call r.WithContext.
 func Log(log *slog.Logger, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -81,6 +83,10 @@ func Log(log *slog.Logger, h http.Handler) http.Handler {
 	})
 }
 
+// Recover logs panics and serves fallback if no response has been written.
+// It first restores headers to their state on entry.
+// After a write or flush it aborts with http.ErrAbortHandler instead.
+// An existing http.ErrAbortHandler panic passes through without logging.
 func Recover(log *slog.Logger, fallback, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		header := w.Header().Clone()
@@ -112,6 +118,8 @@ var headers = map[string]string{
 	"Cross-Origin-Opener-Policy": "same-origin",
 }
 
+// Security sets default headers that h may override; the caller owns the CSP.
+// An empty csp leaves Content-Security-Policy unset by this middleware.
 func Security(csp string, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		header := w.Header()

@@ -1,3 +1,9 @@
+// Package render writes buffered templ pages with HTTP cache validation.
+// A page handler can pass its render error to the site's error handler:
+//
+//	if err := render.HTML(w, r, http.StatusOK, page); err != nil {
+//		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+//	}
 package render
 
 import (
@@ -11,6 +17,10 @@ import (
 	"github.com/a-h/templ"
 )
 
+// HTML buffers c completely; a render error leaves the response untouched.
+// A 200 GET or HEAD gets an ETag and standard conditional request handling.
+// Other statuses and methods never return 304.
+// The caller's Cache-Control is kept; otherwise it defaults to no-cache.
 func HTML(w http.ResponseWriter, r *http.Request, status int, c templ.Component) error {
 	var buf bytes.Buffer
 	if err := c.Render(r.Context(), &buf); err != nil {
