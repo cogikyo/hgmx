@@ -42,7 +42,7 @@ func New(addr string, h http.Handler, log *slog.Logger) *http.Server {
 // On cancellation it drains for up to 10 seconds, then closes on drain failure.
 // Close does not wait for handlers, so they may outlive Run after the deadline.
 // Closing their resources after Run returns can race those handlers.
-func Run(ctx context.Context, srv *http.Server) error {
+func Run(ctx context.Context, srv *http.Server, after ...func(context.Context) error) error {
 	ln, err := net.Listen("tcp", cmp.Or(srv.Addr, ":http"))
 	if err != nil {
 		return err
@@ -51,22 +51,24 @@ func Run(ctx context.Context, srv *http.Server) error {
 	go func() { served <- srv.Serve(ln) }()
 
 	select {
-	case err := <-served:
-		if errors.Is(err, http.ErrServerClosed) {
-			return nil
-		}
-		return err
+	case err = <-served:
 	case <-ctx.Done():
 	}
 
 	drain, cancel := context.WithTimeout(context.WithoutCancel(ctx), drainTimeout)
 	defer cancel()
-	err = srv.Shutdown(drain)
-	if err != nil {
-		err = errors.Join(err, srv.Close())
+	if err == nil {
+		if err = srv.Shutdown(drain); err != nil {
+			err = errors.Join(err, srv.Close())
+		}
+		if served := <-served; !errors.Is(served, http.ErrServerClosed) {
+			err = errors.Join(err, served)
+		}
+	} else if errors.Is(err, http.ErrServerClosed) {
+		err = nil
 	}
-	if served := <-served; !errors.Is(served, http.ErrServerClosed) {
-		err = errors.Join(err, served)
+	for _, f := range after {
+		err = errors.Join(err, f(drain))
 	}
 	return err
 }
