@@ -5,6 +5,7 @@ import (
 	"cmp"
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -314,16 +315,24 @@ type outcome struct {
 	why       string
 }
 
+func bare(err error) string {
+	var ue *url.Error
+	if errors.As(err, &ue) {
+		err = ue.Err
+	}
+	return err.Error()
+}
+
 func (p *Pipeline) send(s signal, body []byte) outcome {
 	req, err := http.NewRequestWithContext(p.ctx, http.MethodPost, p.urls[s], bytes.NewReader(body))
 	if err != nil {
-		return p.note(s, outcome{why: err.Error()})
+		return p.note(s, outcome{why: bare(err)})
 	}
 	req.Header.Set("Content-Type", "application/x-protobuf")
 	req.Header.Set("Content-Encoding", "gzip")
 	resp, err := p.client.Do(req)
 	if err != nil {
-		return p.note(s, outcome{retry: p.ctx.Err() == nil, why: err.Error()})
+		return p.note(s, outcome{retry: p.ctx.Err() == nil, why: bare(err)})
 	}
 	io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
 	resp.Body.Close()

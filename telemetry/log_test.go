@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 	"testing/slogtest"
+	"unicode/utf8"
 )
 
 func tree(attrs []slog.Attr) map[string]any {
@@ -51,5 +52,15 @@ func TestHandlerUnwrapsLogs(t *testing.T) {
 	}
 	if recs := p.recs.take(); len(recs) != 0 {
 		t.Errorf("access line exported as %d log records", len(recs))
+	}
+}
+
+func TestClipRepairsUTF8(t *testing.T) {
+	got := clip(strings.Repeat("\xffa", 1000))
+	if len(got) > maxString || !utf8.ValidString(got) {
+		t.Fatalf("clip len=%d valid=%v", len(got), utf8.ValidString(got))
+	}
+	if got := clip(strings.Repeat("\x80", 2000)); got != "\uFFFD" {
+		t.Fatalf("clip continuation bytes = %q", got)
 	}
 }

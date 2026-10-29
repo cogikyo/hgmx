@@ -9,6 +9,9 @@ import (
 const maxString = 1 << 10
 
 func clip(s string) string {
+	if !utf8.ValidString(s) {
+		s = strings.ToValidUTF8(s, "\uFFFD")
+	}
 	if len(s) > maxString {
 		i := maxString
 		for i > 0 && !utf8.RuneStart(s[i]) {
