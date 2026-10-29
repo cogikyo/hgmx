@@ -1,0 +1,26 @@
+[
+	{
+		"file": "htmx.min.js",
+		"version": "4.0.0",
+		"url": "https://cdn.jsdelivr.net/npm/htmx.org@4.0.0/dist/htmx.min.js",
+		"sha256": "e484d9171a9db30a39c8f16e3d709d4137f3211c659f8e6125816635033d593f"
+	},
+	{
+		"file": "hx-preload.js",
+		"version": "4.0.0",
+		"url": "https://cdn.jsdelivr.net/npm/htmx.org@4.0.0/dist/ext/hx-preload.js",
+		"sha256": "3132c13910d5a65dd9200fb95844196cb571cad8a081be134e7d26036f49d855"
+	},
+	{
+		"file": "hyperscript.min.js",
+		"version": "0.9.94",
+		"url": "https://cdn.jsdelivr.net/npm/hyperscript.org@0.9.94/dist/_hyperscript.min.js",
+		"sha256": "4f48d7379281c7271f0a3d14907d68f9814280d757c12bf1e99d49a103b9b86a"
+	},
+	{
+		"file": "motion.min.js",
+		"version": "14.7.1",
+		"url": "https://cdn.jsdelivr.net/npm/motion@14.7.1/dist/motion.js",
+		"sha256": "9d626ab329c703b3fa824651166973900fd425a84b752f2f53411ad85b3e923e"
+	}
+]

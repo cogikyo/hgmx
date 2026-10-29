@@ -27,6 +27,9 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Verify Vendored Scripts
+        run: go run ./scripts/fetch -check scripts
+
       - name: Set up Cosign
         uses: sigstore/cosign-installer@v3.7.0
 
