@@ -13,6 +13,7 @@ templ full(s *site, path, title string, content templ.Component) {
 			<link rel="shortcut icon" href={ s.static.URL("favicon/favicon.ico") }/>
 			<link rel="stylesheet" href={ s.static.URL("css/main.min.css") }/>
 			@templ.Raw(s.scripts.Head())
+			@templ.Raw(s.beacon)
 		</head>
 		<body
 			hx-boost:inherited="target:#main select:#main swap:'innerHTML strip show:top showTarget:body' transition:true"

@@ -88,6 +88,10 @@ func full(s *site, path, title string, content templ.Component) templ.Component 
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
+		templ_7745c5c3_Err = templ.Raw(s.beacon).Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</head><body hx-boost:inherited=\"target:#main select:#main swap:'innerHTML strip show:top showTarget:body' transition:true\" hx-select-oob:inherited=\"#nav-links:outerMorph\" hx-config:inherited=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -95,7 +99,7 @@ func full(s *site, path, title string, content templ.Component) templ.Component 
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templruntime.NewAttributeExpression(server.VersionConfig(s.version)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `library/views.templ`, Line: 20, Col: 56}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `library/views.templ`, Line: 21, Col: 56}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 		if templ_7745c5c3_Err != nil {
@@ -153,7 +157,7 @@ func navLink(current, href, label string) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.SafeURL(href)).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `library/views.templ`, Line: 38, Col: 29}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `library/views.templ`, Line: 39, Col: 29}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 		if templ_7745c5c3_Err != nil {
@@ -176,7 +180,7 @@ func navLink(current, href, label string) templ.Component {
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `library/views.templ`, Line: 42, Col: 10}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `library/views.templ`, Line: 43, Col: 10}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {

@@ -3,6 +3,7 @@ package views
 
 import (
 	"embed"
+	"html/template"
 	"io"
 	"io/fs"
 	"net/http"
@@ -24,11 +25,12 @@ const assets = "/static/"
 type site struct {
 	static  *static.Server
 	scripts *scripts.Handler
+	beacon  template.HTML
 	version string
 }
 
-func Mount(mux *http.ServeMux, version, dir string) error {
-	s := &site{scripts: scripts.New(scripts.Navigation), version: version}
+func Mount(mux *http.ServeMux, version, dir string, beacon template.HTML) error {
+	s := &site{scripts: scripts.New(scripts.Navigation), beacon: beacon, version: version}
 	if dir != "" {
 		s.static = static.Dev(assets, os.DirFS(dir))
 	} else {
