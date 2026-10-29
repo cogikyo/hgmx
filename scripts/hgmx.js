@@ -1,9 +1,15 @@
-htmx.registerExtension("stale", {
-  htmx_after_request: (elt, { ctx }) => elt.isConnected && !ctx.request.signal?.aborted,
-});
-
 {
-  let api;
+  let api, latest;
+  const navigation = ({ headers }) => headers["HX-Boosted"] || headers["HX-History-Restore-Request"];
+
+  htmx.registerExtension("stale", {
+    htmx_before_request: (elt, { ctx }) => {
+      if (navigation(ctx.request)) latest = ctx;
+    },
+    htmx_after_request: (elt, { ctx }) =>
+      elt.isConnected && !ctx.request.signal?.aborted && (!navigation(ctx.request) || ctx === latest),
+  });
+
   htmx.registerExtension("navigation", {
     init: (internal) => (api = internal),
     htmx_config_request: (elt, { ctx }) => {
@@ -13,8 +19,7 @@ htmx.registerExtension("stale", {
       }
     },
     htmx_after_swap: (elt, { ctx }) => {
-      let { headers } = ctx.request;
-      if (!headers["HX-Boosted"] && !headers["HX-History-Restore-Request"]) return;
+      if (!navigation(ctx.request)) return;
       let main = document.querySelector("main");
       if (!main || main.contains(document.activeElement)) return;
       let target = main.querySelector("h1") ?? main;
