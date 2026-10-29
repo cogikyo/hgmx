@@ -31,17 +31,20 @@ type Site struct {
 }
 
 // Handler serves /healthz and the telemetry beacon outside the middleware, and mux behind
-// telemetry, [Security], [Recover], and cross-origin protection, in that order.
-// A nil Telemetry uses a disabled pipeline logging to [slog.Default].
+// telemetry, security headers, panic recovery, and cross-origin protection, in that order.
+// It panics if Fallback or Telemetry is nil.
 func (s Site) Handler(mux http.Handler) http.Handler {
-	p := s.Telemetry
-	if p == nil {
-		p = telemetry.Disabled(slog.Default().Handler())
+	if s.Fallback == nil {
+		panic("server: Site.Fallback is nil")
 	}
+	if s.Telemetry == nil {
+		panic("server: Site.Telemetry is nil; use telemetry.Disabled for a site without telemetry")
+	}
+	p := s.Telemetry
 	root := http.NewServeMux()
-	root.Handle("GET /healthz", Health(s.Version))
+	root.Handle("GET /healthz", health(s.Version))
 	root.Handle(telemetry.Path, p.Beacon())
-	root.Handle("/", p.Handler(Security(s.CSP, Recover(p.Logger(), s.Fallback, http.NewCrossOriginProtection().Handler(mux)))))
+	root.Handle("/", p.Handler(security(s.CSP, recovery(p.Logger(), s.Fallback, http.NewCrossOriginProtection().Handler(mux)))))
 	return root
 }
 
@@ -101,8 +104,8 @@ func serve(ctx context.Context, srv *http.Server) error {
 	return err
 }
 
-// Health serves an uncached health response; mount it outside the middleware.
-func Health(version string) http.Handler {
+// health serves an uncached health response; mount it outside the middleware.
+func health(version string) http.Handler {
 	body := "ok " + version
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")

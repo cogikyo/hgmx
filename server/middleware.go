@@ -41,11 +41,11 @@ func (w *response) Unwrap() http.ResponseWriter {
 	return w.ResponseWriter
 }
 
-// Recover logs panics and serves fallback if no response has been written.
+// recovery logs panics and serves fallback if no response has been written.
 // It first restores headers to their state on entry.
 // After a write or flush it aborts with http.ErrAbortHandler instead.
 // An existing http.ErrAbortHandler panic passes through without logging.
-func Recover(log *slog.Logger, fallback, h http.Handler) http.Handler {
+func recovery(log *slog.Logger, fallback, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		header := w.Header().Clone()
 		rw := &response{ResponseWriter: w}
@@ -76,9 +76,9 @@ var headers = map[string]string{
 	"Cross-Origin-Opener-Policy": "same-origin",
 }
 
-// Security sets default headers that h may override; the caller owns the CSP.
+// security sets default headers that h may override; the caller owns the CSP.
 // An empty csp leaves Content-Security-Policy unset by this middleware.
-func Security(csp string, h http.Handler) http.Handler {
+func security(csp string, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		header := w.Header()
 		if csp != "" {

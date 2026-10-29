@@ -178,7 +178,7 @@ type failing struct{ *httptest.ResponseRecorder }
 
 func (failing) FlushError() error { return errGone }
 
-func TestRecoverFlush(t *testing.T) {
+func TestRecoveryFlush(t *testing.T) {
 	for _, tc := range []struct {
 		w    http.ResponseWriter
 		want error
@@ -187,7 +187,7 @@ func TestRecoverFlush(t *testing.T) {
 		{struct{ http.ResponseWriter }{httptest.NewRecorder()}, http.ErrNotSupported},
 	} {
 		var got error
-		Recover(discard, http.NotFoundHandler(), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		recovery(discard, http.NotFoundHandler(), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			got = http.NewResponseController(w).Flush()
 		})).ServeHTTP(tc.w, httptest.NewRequest("GET", "/", nil))
 		if !errors.Is(got, tc.want) {

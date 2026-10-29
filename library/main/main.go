@@ -40,11 +40,17 @@ func run(p *telemetry.Pipeline, addr, dir string) error {
 	if err != nil {
 		return err
 	}
-	h := server.Site{Version: version, CSP: csp, Fallback: http.HandlerFunc(views.InternalError), Telemetry: p}.Handler(site)
+	h := server.Site{
+		Version:   version,
+		CSP:       csp,
+		Fallback:  http.HandlerFunc(views.InternalError),
+		Telemetry: p,
+	}.Handler(site)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	context.AfterFunc(ctx, stop)
-	p.Logger().Info("listening", "addr", addr, "version", version)
-	return server.Run(ctx, server.New(addr, h, p.Logger()), p.Shutdown)
+	log := p.Logger()
+	log.Info("listening", "addr", addr, "version", version)
+	return server.Run(ctx, server.New(addr, h, log), p.Shutdown)
 }

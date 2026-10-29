@@ -17,6 +17,7 @@ import (
 	"github.com/cogikyo/hgmx/scripts"
 	"github.com/cogikyo/hgmx/server"
 	"github.com/cogikyo/hgmx/static"
+	"github.com/cogikyo/hgmx/telemetry"
 )
 
 func TestRenderFailure(t *testing.T) {
@@ -32,7 +33,11 @@ func TestRenderFailure(t *testing.T) {
 	broken := templ.ComponentFunc(func(context.Context, io.Writer) error { return errors.New("broken") })
 	page := s.page(http.StatusOK, "Broken", broken)
 	var logged bytes.Buffer
-	h := server.Recover(slog.New(slog.NewTextHandler(&logged, nil)), http.HandlerFunc(InternalError), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := server.Site{
+		Version:   "v1",
+		Fallback:  http.HandlerFunc(InternalError),
+		Telemetry: telemetry.Disabled(slog.NewTextHandler(&logged, &slog.HandlerOptions{Level: slog.LevelWarn})),
+	}.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "public, max-age=600")
 		w.Header().Set("ETag", `"v1"`)
 		page.ServeHTTP(w, r)
