@@ -29,8 +29,14 @@ func serve(t *testing.T, h http.Handler) (addr string, cancel context.CancelFunc
 	addr = freeAddr(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	errc := make(chan error, 1)
+	t.Cleanup(cancel)
 	go func() { errc <- Run(ctx, New(addr, h, discard)) }()
 	for range 100 {
+		select {
+		case err := <-errc:
+			t.Fatalf("Run returned before serving: %v", err)
+		default:
+		}
 		if c, err := net.Dial("tcp", addr); err == nil {
 			c.Close()
 			return addr, cancel, errc
@@ -87,7 +93,14 @@ func TestRun(t *testing.T) {
 			close(entered)
 			<-stuck
 		}))
-		go http.Get("http://" + addr)
+		client := make(chan error, 1)
+		go func() {
+			res, err := http.Get("http://" + addr)
+			if err == nil {
+				res.Body.Close()
+			}
+			client <- err
+		}()
 		<-entered
 		cancel()
 		select {
@@ -97,6 +110,14 @@ func TestRun(t *testing.T) {
 			}
 		case <-time.After(5 * time.Second):
 			t.Fatal("Run did not return after the drain deadline")
+		}
+		select {
+		case err := <-client:
+			if err == nil {
+				t.Fatal("request succeeded, want its connection closed at the deadline")
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("request still open after the drain deadline")
 		}
 	})
 
@@ -170,7 +191,37 @@ func TestLog(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("flush error", func(t *testing.T) {
+		wrappers := map[string]func(http.Handler) http.Handler{
+			"Log":     func(h http.Handler) http.Handler { return Log(discard, h) },
+			"Recover": func(h http.Handler) http.Handler { return Recover(discard, http.NotFoundHandler(), h) },
+		}
+		for name, wrap := range wrappers {
+			for _, tc := range []struct {
+				w    http.ResponseWriter
+				want error
+			}{
+				{failing{httptest.NewRecorder()}, errGone},
+				{struct{ http.ResponseWriter }{httptest.NewRecorder()}, http.ErrNotSupported},
+			} {
+				var got error
+				wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					got = http.NewResponseController(w).Flush()
+				})).ServeHTTP(tc.w, httptest.NewRequest("GET", "/", nil))
+				if !errors.Is(got, tc.want) {
+					t.Errorf("%s: Flush = %v, want %v", name, got, tc.want)
+				}
+			}
+		}
+	})
 }
+
+var errGone = errors.New("client gone")
+
+type failing struct{ *httptest.ResponseRecorder }
+
+func (failing) FlushError() error { return errGone }
 
 func TestChain(t *testing.T) {
 	const csp = "default-src 'self'"

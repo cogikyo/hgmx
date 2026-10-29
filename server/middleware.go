@@ -1,6 +1,7 @@
 package server
 
 import (
+	"errors"
 	"log/slog"
 	"maps"
 	"net/http"
@@ -30,11 +31,16 @@ func (w *response) Write(b []byte) (int, error) {
 	return n, err
 }
 
-func (w *response) Flush() {
-	if w.status == 0 {
+func (w *response) FlushError() error {
+	err := http.NewResponseController(w.ResponseWriter).Flush()
+	if w.status == 0 && !errors.Is(err, http.ErrNotSupported) {
 		w.status = http.StatusOK
 	}
-	http.NewResponseController(w.ResponseWriter).Flush()
+	return err
+}
+
+func (w *response) Flush() {
+	w.FlushError()
 }
 
 func (w *response) Unwrap() http.ResponseWriter {
