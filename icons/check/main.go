@@ -28,10 +28,7 @@ func main() {
 	addr := flag.String("addr", "127.0.0.1:18493", "listen address")
 	flag.Parse()
 
-	js, err := scripts.New(scripts.HTMX, scripts.Hyperscript, scripts.Motion)
-	if err != nil {
-		log.Fatal(err)
-	}
+	js := scripts.New(scripts.HTMX, scripts.Hyperscript, scripts.Motion)
 	ic, err := icons.New()
 	if err != nil {
 		log.Fatal(err)
