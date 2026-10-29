@@ -1,6 +1,7 @@
 // Package render writes buffered templ pages with HTTP cache validation.
 // Return on request cancellation; otherwise panic on render failure.
-// Let server.Recover restore entry headers and serve the site's fixed fallback:
+// The [github.com/cogikyo/hgmx/server.Site] handler restores entry headers.
+// It then serves the site's fixed fallback:
 //
 //	err := render.HTML(w, r, http.StatusOK, page)
 //	if err == nil || r.Context().Err() != nil {

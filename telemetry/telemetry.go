@@ -1,16 +1,5 @@
 // Package telemetry exports OTLP traces, logs, and metrics for HTTP sites.
-// FromEnv always returns a usable pipeline; it is disabled when telemetry is off.
-// Given an application mux and a health handler, mount them separately:
-//
-//	p, err := telemetry.FromEnv(slog.NewJSONHandler(os.Stderr, nil))
-//	log := p.Logger()
-//	if err != nil {
-//		log.Error("telemetry disabled", "err", err)
-//	}
-//	root := http.NewServeMux()
-//	root.Handle("GET /healthz", health)
-//	root.Handle(telemetry.Path, p.Beacon())
-//	root.Handle("/", p.Handler(mux))
+// Use [github.com/cogikyo/hgmx/server.Site] to assemble the root handler.
 //
 // Caller-supplied span/log strings are cut to 1 KiB of valid UTF-8.
 // Local log output is not cut; resource strings are not length-limited.
@@ -154,9 +143,9 @@ func (b *buffer[T]) take() []T {
 }
 
 // FromEnv starts an OTLP HTTP/protobuf exporter from OTEL environment variables.
-// It returns a disabled pipeline if the endpoint is unset or OTEL_SDK_DISABLED is true,
-// and a disabled pipeline with an error saying why if the configuration is invalid.
-// The pipeline writes logs and access lines to local.
+// It always returns a pipeline with local logging and access lines.
+// An unset endpoint or OTEL_SDK_DISABLED=true disables export without an error.
+// Invalid configuration disables export and returns an error.
 func FromEnv(local slog.Handler) (*Pipeline, error) {
 	u, res, err := config()
 	if u == nil {
@@ -192,7 +181,7 @@ func config() (*url.URL, []slog.Attr, error) {
 	return u, res, nil
 }
 
-// Disabled returns a pipeline that records nothing and writes logs and access lines to local.
+// Disabled keeps local logging and access lines without exporting telemetry.
 func Disabled(local slog.Handler) *Pipeline {
 	p := &Pipeline{local: local, log: slog.New(local), done: make(chan struct{})}
 	p.closed.Store(true)
@@ -230,8 +219,8 @@ func newPipeline(u *url.URL, res []slog.Attr, rt http.RoundTripper, local slog.H
 	return p
 }
 
-// Logger writes to the local handler and, when enabled, exports records at Info or above.
-// Context-aware calls attach trace_id and span_id; locally they follow any open WithGroup.
+// Logger writes locally and, when enabled, exports records at Info or above.
+// Context-aware calls add recorded span IDs locally within any open WithGroup.
 func (p *Pipeline) Logger() *slog.Logger { return p.log }
 
 func resource(name, env string) ([]slog.Attr, error) {
@@ -425,7 +414,7 @@ func retryAfter(h string) time.Duration {
 }
 
 // Shutdown stops recording and flushes pending telemetry within ctx's deadline.
-// Shut down the HTTP server first, then the pipeline on the same deadline.
+// Pass it as an after hook to [github.com/cogikyo/hgmx/server.Run].
 // Repeated calls are safe; later recording is ignored.
 func (p *Pipeline) Shutdown(ctx context.Context) error {
 	if p.closed.CompareAndSwap(false, true) {

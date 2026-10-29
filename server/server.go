@@ -1,4 +1,4 @@
-// Package server runs HTTP sites behind Cloudflare with explicit middleware.
+// Package server assembles and runs HTTP sites behind Cloudflare.
 // Given an application mux, a fallback handler, and a telemetry pipeline:
 //
 //	h := server.Site{Version: version, CSP: csp, Fallback: fallback, Telemetry: p}.Handler(mux)
@@ -20,9 +20,9 @@ import (
 
 var drainTimeout = 10 * time.Second
 
-const afterTimeout = 5 * time.Second
+const afterTimeout = 5 * time.Second // Fresh cleanup budget after the HTTP drain.
 
-// Site composes a site's root handler.
+// Site configures the root handler around an application mux.
 type Site struct {
 	Version   string
 	CSP       string
@@ -30,9 +30,10 @@ type Site struct {
 	Telemetry *telemetry.Pipeline
 }
 
-// Handler serves /healthz and the telemetry beacon outside the middleware, and mux behind
-// telemetry, security headers, panic recovery, and cross-origin protection, in that order.
-// It panics if Fallback or Telemetry is nil.
+// Handler wraps mux with telemetry, security headers, and panic recovery.
+// Cross-origin protection runs last, before mux.
+// It serves /healthz and the telemetry beacon outside that chain.
+// It panics if Fallback or Telemetry is nil; use [telemetry.Disabled] to opt out.
 func (s Site) Handler(mux http.Handler) http.Handler {
 	if s.Fallback == nil {
 		panic("server: Site.Fallback is nil")
@@ -61,10 +62,10 @@ func New(addr string, h http.Handler, log *slog.Logger) *http.Server {
 }
 
 // Run binds synchronously, then serves until failure, shutdown, or ctx cancellation.
-// It then drains for up to 10 seconds, and closes on drain failure.
-// Close does not wait for handlers, so they may outlive Run after the deadline.
+// After a successful bind, it drains for up to 10 seconds before the hooks.
+// On drain failure it closes connections; handlers may still outlive Run.
 // Closing their resources after Run returns can race those handlers.
-// Each after hook then runs, even if binding failed, with a fresh 5-second context;
+// The after hooks share a fresh 5-second context and run even if binding fails.
 // Run returns all errors joined.
 func Run(ctx context.Context, srv *http.Server, after ...func(context.Context) error) error {
 	err := serve(ctx, srv)

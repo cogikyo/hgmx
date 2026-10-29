@@ -27,6 +27,7 @@ func main() {
 	log := p.Logger()
 	slog.SetDefault(log)
 	if err != nil {
+		// Invalid exporter configuration leaves the site and local logs usable.
 		log.Error("telemetry disabled", "err", err)
 	}
 	if err := run(p, *addr, *dir); err != nil {
@@ -40,6 +41,7 @@ func run(p *telemetry.Pipeline, addr, dir string) error {
 	if err != nil {
 		return err
 	}
+	// Site owns health, the beacon, and the application middleware chain.
 	h := server.Site{
 		Version:   version,
 		CSP:       csp,

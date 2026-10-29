@@ -32,8 +32,8 @@ const (
 var vitals []byte
 
 // Beacon serves browser page-view and web-vitals collection and its script.
-// Mount with root.Handle(telemetry.Path, p.Beacon()), without a method or StripPrefix.
-// It rejects cross-origin requests itself.
+// Mount at [Path] without a method pattern or http.StripPrefix.
+// It applies [http.CrossOriginProtection] itself.
 type Beacon struct {
 	*static.Server
 	head  template.HTML

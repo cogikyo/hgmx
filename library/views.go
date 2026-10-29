@@ -31,10 +31,11 @@ type site struct {
 
 type Config struct {
 	Version string
-	Static  string
-	Head    template.HTML
+	Static  string        // Development directory; empty uses embedded assets.
+	Head    template.HTML // Trusted HTML appended to the document head.
 }
 
+// New builds the application handler; wrap it with [server.Site.Handler].
 func New(c Config) (http.Handler, error) {
 	s := &site{scripts: scripts.New(scripts.Navigation), head: c.Head, version: c.Version}
 	if c.Static != "" {

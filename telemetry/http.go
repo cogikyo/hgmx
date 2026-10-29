@@ -48,11 +48,11 @@ func (r *recorder) Flush() { r.FlushError() }
 func (r *recorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }
 
 // Handler records requests and writes access lines to the local handler only.
-// A panic after the response is committed keeps the committed status and is logged as aborted;
-// one before it counts as 500.
+// An escaping panic marks the access line aborted without changing a sent status.
+// Without a committed status, it records 500 for that panic.
 //
 // Wrap the mux directly, or only middleware passing the same *http.Request.
-// An intervening r.WithContext loses http.route.
+// An intervening r.WithContext hides its pattern from telemetry.
 // Keep /healthz and [Beacon] outside this handler.
 func (p *Pipeline) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -71,6 +71,7 @@ func (p *Pipeline) Handler(next http.Handler) http.Handler {
 			p.meters.active.add(1)
 		}
 		r = r.WithContext(ctx)
+		// Clear the outer mux's pattern so early rejections have no app route.
 		r.Pattern = ""
 		served := false
 		defer func() {
