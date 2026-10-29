@@ -6,12 +6,16 @@ import (
 	"strconv"
 )
 
+// Color is an 8-bit sRGB colour.
 type Color struct{ R, G, B uint8 }
 
+// Lab is an OKLab colour, with lightness L in [0, 1].
 type Lab struct{ L, A, B float64 }
 
+// LCh is an OKLCH colour, with lightness L in [0, 1] and hue H in degrees.
 type LCh struct{ L, C, H float64 }
 
+// ParseHex accepts only #RRGGBB, including the leading #.
 func ParseHex(s string) (Color, error) {
 	if len(s) != 7 || s[0] != '#' {
 		return Color{}, fmt.Errorf("palette: %q is not a #RRGGBB colour", s)

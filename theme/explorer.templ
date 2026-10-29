@@ -5,6 +5,8 @@ import (
 	"github.com/cogikyo/hgmx/palette"
 )
 
+// Explorer renders the palette editor and preview; serve it with v.Status().
+// Include Handler.Head in the layout to enable the live-theme controls.
 templ Explorer(v View) {
 	<link rel="stylesheet" href={ v.assets.css }/>
 	<script type="module" src={ v.assets.js }></script>

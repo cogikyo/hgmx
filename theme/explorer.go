@@ -21,6 +21,7 @@ var Default = palette.Seed{Base: palette.Color{R: 0x22, G: 0x25, B: 0x36}, Prima
 
 const exportName = "custom"
 
+// View holds an explorer's seed, solved palette, and input error.
 type View struct {
 	Seed    palette.Seed
 	Palette palette.Palette
@@ -30,6 +31,9 @@ type View struct {
 	assets  assetURLs
 }
 
+// View prepares [Explorer] using Default unless base or primary is present.
+// Invalid seed input sets Err; use v.Status() for the HTTP response status.
+// Action is the explorer page's URL, used for forms and preset links.
 func (h *Handler) View(action string, q url.Values, presets ...Preset) View {
 	v := View{Seed: Default, Action: action, Presets: presets, assets: h.explorer}
 	if q.Has("base") || q.Has("primary") {
@@ -43,6 +47,7 @@ func (h *Handler) View(action string, q url.Values, presets ...Preset) View {
 	return v
 }
 
+// Status returns 422 for invalid seed input, otherwise 200.
 func (v View) Status() int {
 	if v.Err != nil {
 		return http.StatusUnprocessableEntity
@@ -65,6 +70,7 @@ func (v View) Accent() string {
 	return v.Seed.Accent.Hex()
 }
 
+// Live returns the seed query for a data-theme-live attribute.
 func (v View) Live() string {
 	return strings.TrimPrefix(Sheet("live", v.Seed), sheet+"?")
 }

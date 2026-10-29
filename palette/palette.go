@@ -1,3 +1,23 @@
+// Package palette builds contrast-tier colour scales and semantic CSS tokens.
+// Steps move away from the base by WCAG ratio; dark bases also use OKLab lightness.
+// Contrast never decreases between steps, but steps can be equal.
+// Coloured scales end at 900; neutral continues to 950.
+//
+// Generate a palette, inspect [Palette.Clashes], then write its CSS:
+//
+//	seed, err := palette.ParseSeed("#222536", "#0184fe", "")
+//	if err != nil {
+//		return err
+//	}
+//	p := palette.Generate(seed)
+//	for _, clash := range p.Clashes() {
+//		log.Print(clash)
+//	}
+//	selector, err := palette.Selector("night")
+//	if err != nil {
+//		return err
+//	}
+//	return p.CSS(w, selector)
 package palette
 
 import (
@@ -6,6 +26,7 @@ import (
 	"strings"
 )
 
+// Steps maps scale indexes to contrast-tier labels, not fixed lightness values.
 var Steps = [...]int{50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950}
 
 type target struct {
@@ -16,8 +37,8 @@ type target struct {
 }
 
 const (
-	FillStep = 5
-	TextStep = 6
+	FillStep = 5 // FillStep is the index of the 500 tier.
+	TextStep = 6 // TextStep is the index of the 600 tier.
 	hueSteps = len(Steps) - 1
 )
 
@@ -70,12 +91,15 @@ var status = []struct{ name, hue string }{
 	{"error", "red"},
 }
 
+// Seed sets the base and brand colours; a nil Accent derives one from Primary.
 type Seed struct {
 	Base    Color
 	Primary Color
 	Accent  *Color
 }
 
+// Palette contains solved scales and roles, including any unreachable tiers.
+// Use [Palette.Clashes] before relying on their contrast targets.
 type Palette struct {
 	Seed   Seed
 	Dark   bool
@@ -83,18 +107,20 @@ type Palette struct {
 	Roles  []Token
 }
 
+// Scale holds one colour family; step indexes correspond to [Steps].
 type Scale struct {
 	Name   string
-	Alias  string
+	Alias  string // Another scale's name, for semantic aliases such as error.
 	Hue    float64
 	Steps  []Color
-	Beta   []Color
-	Fill   Color
-	Seeded bool
-	On     Color
-	Reach  int
+	Beta   []Color // Alternate hue for hover states, with tier labels one higher.
+	Fill   Color   // The seed if it meets 3:1 on every ground; otherwise step 500.
+	Seeded bool    // Fill uses the supplied seed colour.
+	On     Color   // Text on Fill; prefers a theme tone that meets 4.5:1.
+	Reach  int     // Index of the first unreachable tier, or the scale length.
 }
 
+// ParseSeed reads #RRGGBB colours; an empty accent requests a derived colour.
 func ParseSeed(base, primary, accent string) (Seed, error) {
 	var s Seed
 	var err error
@@ -114,6 +140,11 @@ func ParseSeed(base, primary, accent string) (Seed, error) {
 	return s, nil
 }
 
+// Generate solves scales against s.Base and assigns semantic roles.
+// Tiers 500 through 900 target WCAG floors on base, inset, and surface.
+// Floors are 3:1 at 500 and 4.5:1 from 600 on all three grounds.
+// Clashes reports unreachable main tiers; their colours remain in the output.
+// Raised is not a contrast ground; use fg or stronger text on it.
 func Generate(s Seed) Palette {
 	g := newGen(s.Base)
 	draft := g.ramp(g.lch.H, len(Steps), g.tone)
@@ -159,8 +190,10 @@ func Generate(s Seed) Palette {
 	return p
 }
 
+// Token returns the CSS token name for a step index, not a tier label.
 func (s Scale) Token(i int) string { return fmt.Sprintf("%s-%d", s.Name, Steps[i]) }
 
+// BetaToken returns the alternate hue's CSS token name for a step index.
 func (s Scale) BetaToken(i int) string { return fmt.Sprintf("%s-%d", s.Name, Steps[i]+1) }
 
 func (p Palette) Scale(name string) (Scale, bool) {
@@ -300,6 +333,7 @@ func (g gen) on(fill Color) Color {
 	return black
 }
 
+// Clash reports a brand/status hue collision or an unreachable contrast tier.
 type Clash struct {
 	Role    string
 	Status  string
@@ -315,6 +349,7 @@ func (c Clash) String() string {
 	return fmt.Sprintf("the base leaves too little room: %s from %d up cannot reach their targets (best %.2f:1)", c.Role, c.Step, c.Best)
 }
 
+// Clashes reports status hues needing labels and tiers the base cannot reach.
 func (p Palette) Clashes() []Clash {
 	var out []Clash
 	for _, role := range []string{"primary", "accent"} {

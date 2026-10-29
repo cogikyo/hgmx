@@ -1,3 +1,13 @@
+// Package theme serves palette stylesheets, theme switching, and an explorer.
+// Mount the handler with its full prefix:
+//
+//	h, err := theme.New()
+//	if err != nil {
+//		return err
+//	}
+//	root.Handle(theme.Path, h)
+//
+// Include h.Head() in the layout and link a stylesheet from [Sheet].
 package theme
 
 import (
@@ -19,10 +29,14 @@ import (
 //go:embed assets
 var assets embed.FS
 
+// Path is the asset and palette endpoint prefix; mount without StripPrefix.
 const Path = "/theme/"
 
 const sheet = Path + "palette.css"
 
+// Handler serves theme assets and /theme/palette.css.
+// The query requires name, base, and primary; accent is optional.
+// Colours use #RRGGBB, and download=css or download=tailwind exports a file.
 type Handler struct {
 	*static.Server
 	head     template.HTML
@@ -55,6 +69,11 @@ func New() (*Handler, error) {
 	return h, nil
 }
 
+// Head returns the layout's theme-switching module tag.
+// Click data-theme-set="name" to select a loaded theme on the document root.
+// A select or input with data-theme-set selects its value on change.
+// Click data-theme-live="query" to load a palette.css seed query as theme live.
+// A form with data-theme-live previews its base, primary, and accent on input.
 func (h *Handler) Head() template.HTML { return h.head }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -99,6 +118,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	http.ServeContent(w, r, "palette.css", time.Time{}, bytes.NewReader(buf.Bytes()))
 }
 
+// Sheet returns a palette.css URL; the endpoint validates the name and seed.
 func Sheet(name string, s palette.Seed) string {
 	q := url.Values{"name": {name}, "base": {s.Base.Hex()}, "primary": {s.Primary.Hex()}}
 	if s.Accent != nil {

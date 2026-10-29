@@ -7,10 +7,11 @@ import (
 	"strings"
 )
 
+// Token names a CSS custom property without the -- prefix.
 type Token struct {
 	Name  string
 	Color Color
-	Ref   string
+	Ref   string // Referenced token name, or empty for a literal colour.
 }
 
 func (p Palette) Tokens() []Token {
@@ -49,6 +50,8 @@ func validName(s string) bool {
 	return true
 }
 
+// Selector validates name before building a data-theme CSS selector.
+// Names must contain 1 to 64 characters from a-z, 0-9, and -.
 func Selector(name string) (string, error) {
 	if !validName(name) {
 		return "", fmt.Errorf("palette: theme name %q must be 1 to 64 characters of a-z, 0-9 and -", name)
@@ -63,6 +66,8 @@ func (p Palette) Scheme() string {
 	return "light"
 }
 
+// CSS writes custom properties under selector, which is used verbatim.
+// Use [Selector] to validate an untrusted theme name.
 func (p Palette) CSS(w io.Writer, selector string) error {
 	b := bufio.NewWriter(w)
 	fmt.Fprintf(b, "%s {\n\tcolor-scheme: %s;\n", selector, p.Scheme())
@@ -77,6 +82,8 @@ func (p Palette) CSS(w io.Writer, selector string) error {
 	return b.Flush()
 }
 
+// Theme writes Tailwind's @theme inline mapping to the palette's CSS variables.
+// Load the output of [Palette.CSS] too; Theme does not define their values.
 func (p Palette) Theme(w io.Writer) error {
 	b := bufio.NewWriter(w)
 	b.WriteString("@theme inline {\n\t--color-*: initial;\n")
@@ -87,6 +94,7 @@ func (p Palette) Theme(w io.Writer) error {
 	return b.Flush()
 }
 
+// Lua writes a Lua table of literal token colours and the colour scheme.
 func (p Palette) Lua(w io.Writer) error {
 	b := bufio.NewWriter(w)
 	fmt.Fprintf(b, "return {\n\tscheme = %q,\n", p.Scheme())
