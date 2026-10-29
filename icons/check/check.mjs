@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -10,6 +10,7 @@ const { values: args } = parseArgs({
     only: { type: "string", default: "" },
     browsers: { type: "string", default: "chromium,firefox" },
     swaps: { type: "string", default: "5" },
+    shots: { type: "string", default: "" },
     modules: { type: "string", default: process.env.NODE_MODULES ?? "node_modules" },
   },
 });
@@ -88,7 +89,7 @@ const centers = (names) =>
     const host = document.querySelector(`svg[data-icon="${name}"]`)?.parentElement;
     if (!host) return null;
     const r = host.getBoundingClientRect();
-    return [r.x + r.width / 2, r.y + window.scrollY + r.height / 2];
+    return [r.x + r.width / 2, r.y + r.height / 2];
   });
 
 const settle = async () => {
@@ -120,14 +121,11 @@ async function shots(page, names) {
   const out = {};
   for (const name of names) {
     const clip = await page.evaluate((name) => {
-      const svg = document.querySelector(`svg[data-icon="${name}"]`);
-      svg.scrollIntoView({ block: "center" });
-      const r = svg.getBoundingClientRect();
+      const r = document.querySelector(`svg[data-icon="${name}"]`).getBoundingClientRect();
       return { x: Math.floor(r.x) - 4, y: Math.floor(r.y) - 4, width: Math.ceil(r.width) + 8, height: Math.ceil(r.height) + 8 };
     }, name);
     out[name] = await page.screenshot({ clip, encoding: "base64" });
   }
-  await page.evaluate(() => window.scrollTo(0, 0));
   return out;
 }
 
@@ -144,7 +142,7 @@ const pixels = async (a, b) => {
   const q = read(y);
   let changed = 0;
   for (let i = 0; i < p.length; i += 4) {
-    if (Math.max(Math.abs(p[i] - q[i]), Math.abs(p[i + 1] - q[i + 1]), Math.abs(p[i + 2] - q[i + 2])) > 64) changed++;
+    if (p[i] !== q[i] || p[i + 1] !== q[i + 1] || p[i + 2] !== q[i + 2]) changed++;
   }
   return { changed, total: p.length / 4 };
 };
@@ -152,18 +150,11 @@ const pixels = async (a, b) => {
 async function hoverAll(page, names) {
   const points = await page.evaluate(centers, names);
   const mark = await page.evaluate(() => globalThis.__icons.calls.length);
-  let top = 0;
-  for (let i = 0; i < names.length; i++) {
-    const [x, y] = points[i];
-    if (y < top + 60 || y > top + viewport.height - 60) {
-      await page.mouse.move(1, 1);
-      top = await page.evaluate((t) => (window.scrollTo(0, t), window.scrollY), Math.max(0, y - 80));
-    }
-    await page.mouse.move(x, y - top);
+  for (const [x, y] of points) {
+    await page.mouse.move(x, y);
     await new Promise((r) => setTimeout(r, 15));
   }
   await page.mouse.move(1, 1);
-  await page.evaluate((t) => window.scrollTo(0, t), 0);
   const settled = await page.evaluate(settle);
   const calls = await page.evaluate((m) => globalThis.__icons.calls.slice(m), mark);
   return { settled, calls };
@@ -196,6 +187,8 @@ async function open(browser, url, errors) {
   await page.evaluateOnNewDocument(probe);
   await page.goto(url, { waitUntil: "load" });
   await page.waitForFunction(() => globalThis.Motion?.animate && globalThis._hyperscript);
+  const height = await page.evaluate(() => document.documentElement.scrollHeight);
+  await page.setViewport({ ...viewport, height: Math.max(viewport.height, height) });
   return page;
 }
 
@@ -228,13 +221,24 @@ async function check(name, url, wanted) {
       const look = await shots(page, names);
       const { settled, calls } = await hoverAll(page, names);
       if (!settled) fail("*", `${label}: animations did not finish within 4s`);
+      const quiet = await page.evaluate(() => globalThis.__icons.calls.length);
       const after = await page.evaluate(snapshot, names);
       const relook = await shots(page, names);
+      const stray = await page.evaluate((m) => globalThis.__icons.calls.slice(m).map((c) => c.icon), quiet);
+      for (const icon of new Set(stray)) fail(icon, `${label}: animated while the checker took rest screenshots`);
       for (const n of names) {
         if (drift.has(n)) continue;
         const { changed, total } = await helper.evaluate(pixels, look[n], relook[n]);
         worst = Math.max(worst, changed);
-        if (changed > Math.max(4, total * 0.002)) fail(n, `${label}: not at rest: ${changed} of ${total} pixels differ`);
+        if (changed) {
+          fail(n, `${label}: not at rest: ${changed} of ${total} pixels differ`);
+          if (args.shots) {
+            mkdirSync(args.shots, { recursive: true });
+            const stem = join(args.shots, `${name}-${n}-pass${pass + 1}`);
+            writeFileSync(`${stem}-rest.png`, Buffer.from(look[n], "base64"));
+            writeFileSync(`${stem}-after.png`, Buffer.from(relook[n], "base64"));
+          }
+        }
       }
       const by = runs(calls);
       for (const n of names) {
