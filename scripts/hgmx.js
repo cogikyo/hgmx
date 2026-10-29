@@ -1,10 +1,13 @@
 {
-  let api, latest;
+  let api, latest, seq = 0;
   const navigation = ({ headers }) => headers["HX-Boosted"] || headers["HX-History-Restore-Request"];
 
   htmx.registerExtension("stale", {
+    htmx_config_request: (elt, { ctx }) => {
+      if (navigation(ctx.request)) ctx.seq = ++seq;
+    },
     htmx_before_request: (elt, { ctx }) => {
-      if (navigation(ctx.request)) latest = ctx;
+      if (navigation(ctx.request) && ctx.seq > (latest?.seq ?? 0)) latest = ctx;
     },
     htmx_after_request: (elt, { ctx }) =>
       elt.isConnected && !ctx.request.signal?.aborted && (!navigation(ctx.request) || ctx === latest),
