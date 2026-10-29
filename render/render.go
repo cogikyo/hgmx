@@ -1,9 +1,12 @@
 // Package render writes buffered templ pages with HTTP cache validation.
-// A page handler can pass its render error to the site's error handler:
+// Return on request cancellation; otherwise panic on render failure.
+// Let server.Recover restore entry headers and serve the site's fixed fallback:
 //
-//	if err := render.HTML(w, r, http.StatusOK, page); err != nil {
-//		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+//	err := render.HTML(w, r, http.StatusOK, page)
+//	if err == nil || r.Context().Err() != nil {
+//		return
 //	}
+//	panic(err)
 package render
 
 import (

@@ -37,6 +37,13 @@ const (
 	HTMX Library = iota
 	// Preload selects hx-preload and includes [HTMX] automatically.
 	Preload
+	// Navigation includes [HTMX] and [Preload] with newest-navigation-wins swaps.
+	// Late responses from removed elements or aborted requests are dropped.
+	// A newer boosted navigation or history restore drops older navigation responses.
+	// Other requests are unaffected by newer navigations.
+	// History restores re-send the element's hx-config headers.
+	// After either swap, focus moves to main's h1 or main unless already inside main.
+	// Do not add hx-sync to body when loading Navigation.
 	Navigation
 	// Hyperscript selects the _hyperscript runtime.
 	Hyperscript
