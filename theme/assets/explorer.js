@@ -49,8 +49,7 @@ const gamut = edges.map(([a, b]) => {
 function setup(canvas) {
   const data = JSON.parse(canvas.dataset.oklab);
   const points = data.points.map((p) => ({ ...p, lab: oklab(...parse(p.hex).map(linear)) }));
-  const caption = canvas.closest("figure")?.querySelector(".tx-pick");
-  const scene = { canvas, points, base: data.base, ink: data.ink, caption, idle: caption?.textContent };
+  const scene = { canvas, points, base: data.base, ink: data.ink };
   scenes.set(canvas, scene);
   new ResizeObserver(() => draw(scene)).observe(canvas);
   let drag = null;
@@ -61,7 +60,7 @@ function setup(canvas) {
   canvas.addEventListener("pointerup", () => (drag = null));
   canvas.addEventListener("pointercancel", () => (drag = null));
   canvas.addEventListener("pointermove", (e) => {
-    if (!drag) return hover(scene, e);
+    if (!drag) return;
     rotate((e.clientX - drag.x) * 0.01, (e.clientY - drag.y) * 0.01);
     drag = { x: e.clientX, y: e.clientY };
     draw(scene);
@@ -136,8 +135,8 @@ function draw(scene) {
     ctx.fillText(`+${label}`, end.x + 4, end.y + 4);
   }
 
-  scene.screen = scene.points.map((p) => ({ p, s: project(scene, p.lab) })).sort((a, b) => a.s.z - b.s.z);
-  for (const { p, s } of scene.screen) {
+  const screen = scene.points.map((p) => ({ p, s: project(scene, p.lab) })).sort((a, b) => a.s.z - b.s.z);
+  for (const { p, s } of screen) {
     const lit = !focus || p.families.includes(focus);
     ctx.globalAlpha = lit ? 1 : 0.2;
     ctx.beginPath();
@@ -149,18 +148,6 @@ function draw(scene) {
     ctx.stroke();
   }
   ctx.globalAlpha = 1;
-}
-
-function hover(scene, e) {
-  if (!scene.screen || !scene.caption) return;
-  const box = scene.canvas.getBoundingClientRect();
-  const x = e.clientX - box.left, y = e.clientY - box.top;
-  let best = null, dist = 64;
-  for (const item of scene.screen) {
-    const d = (item.s.x - x) ** 2 + (item.s.y - y) ** 2;
-    if (d <= dist) [best, dist] = [item, d];
-  }
-  scene.caption.textContent = best ? best.p.title : scene.idle;
 }
 
 function select(swatch) {

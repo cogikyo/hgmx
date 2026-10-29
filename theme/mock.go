@@ -25,6 +25,8 @@ type pair struct {
 	Label  string
 	Fg, Bg palette.Color
 	Min    float64
+	Scale  string
+	Step   int
 }
 
 var (
@@ -58,26 +60,26 @@ func (v View) mock() mock {
 
 func (m mock) pairs() []pair {
 	out := []pair{
-		{"title on inset", m.Strong, m.Inset, 4.5},
-		{"title on surface", m.Strong, m.Surface, 4.5},
-		{"body on surface", m.Fg, m.Surface, 4.5},
-		{"muted on surface", m.Muted, m.Surface, 4.5},
-		{"placeholder on base", m.Muted, m.Base, 4.5},
-		{"rest on surface", m.Fg, m.Surface, 4.5},
-		{"hover", m.Fg, m.Hover, 4.5},
-		{"pressed", m.Fg, m.Pressed, 4.5},
-		{"selected", m.OnSelected, m.Selected, 4.5},
-		{"focus ring on surface", m.Focus, m.Surface, 3},
-		{"link on surface", m.Link, m.Surface, 4.5},
-		{"link hover on surface", m.LinkHover, m.Surface, 4.5},
-		{"body on raised", m.Fg, m.Raised, 4.5},
-		{"primary button", m.OnPrimary, m.Primary, 4.5},
-		{"interface fill", m.White, m.Interface, 4.5},
-		{"secondary button", m.OnSecondary, m.Secondary, 4.5},
-		{"destructive button", m.OnError, m.Error, 4.5},
+		{"title on inset", m.Strong, m.Inset, 4.5, "neutral", 9},
+		{"title on surface", m.Strong, m.Surface, 4.5, "neutral", 9},
+		{"body on surface", m.Fg, m.Surface, 4.5, "neutral", 8},
+		{"muted on surface", m.Muted, m.Surface, 4.5, "neutral", palette.TextStep},
+		{"placeholder on base", m.Muted, m.Base, 4.5, "neutral", palette.TextStep},
+		{"rest on surface", m.Fg, m.Surface, 4.5, "neutral", 8},
+		{"hover", m.Fg, m.Hover, 4.5, "neutral", 8},
+		{"pressed", m.Fg, m.Pressed, 4.5, "neutral", 8},
+		{"selected", m.OnSelected, m.Selected, 4.5, "accent", 7},
+		{"focus ring on surface", m.Focus, m.Surface, 3, "accent", palette.FillStep},
+		{"link on surface", m.Link, m.Surface, 4.5, "primary", palette.TextStep},
+		{"link hover on surface", m.LinkHover, m.Surface, 4.5, "primary", palette.TextStep},
+		{"body on raised", m.Fg, m.Raised, 4.5, "neutral", 8},
+		{"primary button", m.OnPrimary, m.Primary, 4.5, "", 0},
+		{"interface fill", m.White, m.Interface, 4.5, "", 0},
+		{"secondary button", m.OnSecondary, m.Secondary, 4.5, "", 0},
+		{"destructive button", m.OnError, m.Error, 4.5, "", 0},
 	}
 	for _, c := range m.Chips {
-		out = append(out, pair{c.Name + " chip", c.Text, c.Bg, 4.5})
+		out = append(out, pair{c.Name + " chip", c.Text, c.Bg, 4.5, c.Name, 7})
 	}
 	return out
 }

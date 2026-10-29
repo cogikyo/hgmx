@@ -44,7 +44,6 @@ const (
 	toneGain   = 2
 	clashTurn  = 25
 	clashRel   = 0.2
-	distinct   = 0.02
 )
 
 var spectrum = []struct {
@@ -240,9 +239,6 @@ func (g gen) ramp(h float64, n int, chroma func(l float64, t target) float64) []
 		t.dl, t.ratio = max(t.dl, floor.dl), max(t.ratio, floor.ratio)
 		ok := func(c Color) bool { return g.meets(c, t) }
 		out[i] = g.solve(h, func(l float64) float64 { return chroma(l, t) }, true, ok)
-		if i == hueSteps-1 && n == hueSteps && i > 0 && deltaE(out[i], out[i-1]) < distinct {
-			out[i] = g.solve(h, func(l float64) float64 { return maxChroma(l, h) }, true, ok)
-		}
 		floor = target{dl: g.dl(out[i]), ratio: Ratio(out[i], g.base)}
 	}
 	return out
@@ -250,7 +246,8 @@ func (g gen) ramp(h float64, n int, chroma func(l float64, t target) float64) []
 
 func (g gen) reach(steps []Color) int {
 	for i, c := range steps {
-		if !math.IsInf(targets[i].ratio, 1) && !g.meets(c, targets[i]) {
+		pole := math.IsInf(targets[i].ratio, 1)
+		if pole && c == steps[i-1] || !pole && !g.meets(c, targets[i]) {
 			return i
 		}
 	}
@@ -280,7 +277,7 @@ func vivid(h, rel float64) func(l float64, t target) float64 {
 func (g gen) finish(sc Scale, seed *Color) Scale {
 	sc.Reach = g.reach(sc.Steps)
 	sc.Fill = sc.Steps[FillStep]
-	if seed != nil && Ratio(*seed, g.base) >= targets[FillStep].ratio {
+	if seed != nil && Ratio(*seed, g.base) >= targets[FillStep].ratio && g.grounded(*seed, targets[FillStep].floor) {
 		sc.Fill, sc.Seeded = *seed, true
 	}
 	sc.On = g.on(sc.Fill)
@@ -301,11 +298,6 @@ func (g gen) on(fill Color) Color {
 		return white
 	}
 	return black
-}
-
-func deltaE(a, b Color) float64 {
-	x, y := a.Lab(), b.Lab()
-	return math.Sqrt(dot(x.L-y.L, x.A-y.A, x.B-y.B, x.L-y.L, x.A-y.A, x.B-y.B))
 }
 
 type Clash struct {

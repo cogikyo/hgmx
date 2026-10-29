@@ -8,7 +8,7 @@ import (
 
 func TestMockPairsPass(t *testing.T) {
 	levels := []uint8{0x00, 0x22, 0x55, 0xcc, 0xf8, 0xff}
-	checked := 0
+	checked, skipped := 0, 0
 	primaries := []string{"#0184fe", "#71324b", "#e0a030", "#3fb950"}
 	for _, r := range levels {
 		for _, g := range levels {
@@ -20,15 +20,12 @@ func TestMockPairsPass(t *testing.T) {
 						t.Fatal(err)
 					}
 					v := View{Seed: seed, Palette: palette.Generate(seed)}
-					short := false
-					for _, c := range v.Palette.Clashes() {
-						short = short || c.Status == ""
-					}
-					if short {
-						continue
-					}
-					checked++
 					for _, p := range v.mock().pairs() {
+						if p.Scale != "" && p.Step >= v.scale(p.Scale).Reach {
+							skipped++
+							continue
+						}
+						checked++
 						if r := palette.Ratio(p.Fg, p.Bg); r < p.Min {
 							t.Fatalf("%s %s: %s on %s is %.2f:1, below %.1f:1", base, p.Label, p.Fg, p.Bg, r, p.Min)
 						}
@@ -37,7 +34,8 @@ func TestMockPairsPass(t *testing.T) {
 			}
 		}
 	}
-	if checked < 300 {
-		t.Fatalf("only %d palettes had room for every pair", checked)
+	t.Logf("%d pairs checked, %d skipped because the base leaves their step out of reach", checked, skipped)
+	if checked < 12000 {
+		t.Fatalf("only %d pairs had room on their base", checked)
 	}
 }

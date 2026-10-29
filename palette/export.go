@@ -37,7 +37,7 @@ func (p Palette) Tokens() []Token {
 	return out
 }
 
-func ValidName(s string) bool {
+func validName(s string) bool {
 	if s == "" || len(s) > 64 {
 		return false
 	}
@@ -49,8 +49,11 @@ func ValidName(s string) bool {
 	return true
 }
 
-func Selector(name string) string {
-	return `[data-theme="` + name + `"]`
+func Selector(name string) (string, error) {
+	if !validName(name) {
+		return "", fmt.Errorf("palette: theme name %q must be 1 to 64 characters of a-z, 0-9 and -", name)
+	}
+	return `[data-theme="` + name + `"]`, nil
 }
 
 func (p Palette) Scheme() string {

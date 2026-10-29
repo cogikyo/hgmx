@@ -69,7 +69,7 @@ document.addEventListener("click", (e) => {
   const el = e.target.closest("[data-theme-set], [data-theme-live]");
   if (!el || el.matches("form, select, input")) return;
   if ("themeSet" in el.dataset) set(el.dataset.themeSet);
-  else live(el.dataset.themeLive);
+  else live(el.dataset.themeLive).catch(console.warn);
 });
 
 document.addEventListener("change", (e) => {
@@ -81,5 +81,5 @@ document.addEventListener("input", (e) => {
   const form = e.target.closest("form[data-theme-live]");
   if (!form) return;
   clearTimeout(debounce);
-  debounce = setTimeout(() => live(seed(form)), 120);
+  debounce = setTimeout(() => live(seed(form)).catch(console.warn), 120);
 });

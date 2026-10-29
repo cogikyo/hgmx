@@ -13,14 +13,17 @@ var update = flag.Bool("update", false, "rewrite testdata golden files")
 func TestGuarantees(t *testing.T) {
 	levels := []uint8{0x00, 0x22, 0x55, 0x80, 0x99, 0xcc, 0xff}
 	primaries := []Color{{0x01, 0x84, 0xfe}, {0x71, 0x32, 0x4b}, {0xe0, 0xa0, 0x30}, {0x80, 0x80, 0x80}, {0x00, 0xff, 0x00}}
+	bases := []Color{{0x00, 0x11, 0x88}}
 	for _, r := range levels {
 		for _, g := range levels {
 			for _, b := range levels {
-				base := Color{r, g, b}
-				for _, pri := range primaries {
-					check(t, Generate(Seed{Base: base, Primary: pri}))
-				}
+				bases = append(bases, Color{r, g, b})
 			}
+		}
+	}
+	for _, base := range bases {
+		for _, pri := range primaries {
+			check(t, Generate(Seed{Base: base, Primary: pri}))
 		}
 	}
 }
@@ -29,11 +32,23 @@ func check(t *testing.T, p Palette) {
 	t.Helper()
 	base := p.Seed.Base
 	grounds := []Color{base, role(p, "inset"), role(p, "surface")}
-	reported := false
-	for _, c := range p.Clashes() {
-		reported = reported || c.Status == ""
-	}
 	dark := Ratio(white, base) >= Ratio(black, base)
+	worst := func(c Color) float64 {
+		w := Ratio(c, base)
+		for _, g := range grounds {
+			w = min(w, Ratio(c, g))
+		}
+		return w
+	}
+	dl := func(c Color) float64 { return math.Abs(c.Lab().L - base.Lab().L) }
+	meets := func(c Color, want target) bool {
+		return Ratio(c, base) >= want.ratio && worst(c) >= want.floor && (!dark || want.dl == 0 || dl(c) >= want.dl)
+	}
+	pole := black
+	if dark {
+		pole = white
+	}
+	unreachable := func(want target) bool { return !meets(pole, want) }
 	for _, s := range p.Scales {
 		ramps := [][]Color{s.Steps}
 		if s.Beta != nil {
@@ -45,22 +60,20 @@ func check(t *testing.T, p Palette) {
 			}
 			for i, c := range ramp {
 				want := targets[i]
-				worst := Ratio(c, base)
-				for _, g := range grounds {
-					worst = min(worst, Ratio(c, g))
-				}
-				dl := math.Abs(c.Lab().L - base.Lab().L)
-				met := Ratio(c, base) >= want.ratio && worst >= want.floor && (!dark || want.dl == 0 || dl >= want.dl)
-				if !met && !math.IsInf(want.ratio, 1) && (i < s.Reach || !reported) {
-					t.Fatalf("%s %s-%d %s: %.3f:1 (tier %.2f:1), worst ground %.3f:1 (floor %.1f:1), ΔL %.3f (tier %.2f), not reported", base, s.Name, Steps[i], c, Ratio(c, base), want.ratio, worst, want.floor, dl, want.dl)
+				if math.IsInf(want.ratio, 1) {
+					if c == ramp[i-1] && i < s.Reach {
+						t.Fatalf("%s %s-%d %s repeats the step before it, not reported", base, s.Name, Steps[i], c)
+					}
+				} else if !meets(c, want) && (!unreachable(want) || i < s.Reach) {
+					t.Fatalf("%s %s-%d %s: %.3f:1 (tier %.2f:1), worst ground %.3f:1 (floor %.1f:1), ΔL %.3f (tier %.2f); reachable or not reported", base, s.Name, Steps[i], c, Ratio(c, base), want.ratio, worst(c), want.floor, dl(c), want.dl)
 				}
 				if i > 0 && Ratio(c, base) < Ratio(ramp[i-1], base) {
 					t.Fatalf("%s %s-%d %s: %.4f:1 after %.4f:1, steps must not lose contrast", base, s.Name, Steps[i], c, Ratio(c, base), Ratio(ramp[i-1], base))
 				}
 			}
-			if last := len(ramp) - 1; s.Name != "neutral" && s.Reach == len(ramp) && deltaE(ramp[last], ramp[last-1]) < distinct {
-				t.Fatalf("%s %s-900 %s sits %.4f from 800", base, s.Name, ramp[last], deltaE(ramp[last], ramp[last-1]))
-			}
+		}
+		if w := worst(s.Fill); w < targets[FillStep].floor && !unreachable(targets[FillStep]) {
+			t.Fatalf("%s %s fill %s: %.3f:1 on its worst ground, below %.1f:1", base, s.Name, s.Fill, w, targets[FillStep].floor)
 		}
 		if r := Ratio(s.On, s.Fill); r < onRatio {
 			t.Fatalf("%s on-%s %s over %s: %.3f:1 below %.1f:1", base, s.Name, s.On, s.Fill, r, onRatio)
@@ -92,7 +105,11 @@ func TestGolden(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := Generate(s).CSS(&buf, Selector(th.name)); err != nil {
+		sel, err := Selector(th.name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := Generate(s).CSS(&buf, sel); err != nil {
 			t.Fatal(err)
 		}
 	}

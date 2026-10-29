@@ -404,7 +404,7 @@ func Explorer(v View) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "\" tabindex=\"0\" role=\"img\" aria-label=\"Palette in OKLab space with the sRGB gamut; drag or use the arrow keys to rotate\"></canvas><figcaption><span class=\"tx-pick\">OKLab, a and b doubled · drag to rotate</span></figcaption></figure></div></div></div></section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "\" tabindex=\"0\" role=\"img\" aria-label=\"Palette in OKLab space with the sRGB gamut; drag or use the arrow keys to rotate\"></canvas><figcaption>OKLab, a and b doubled · drag or use the arrow keys to rotate</figcaption></figure></div></div></div></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

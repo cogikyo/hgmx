@@ -207,7 +207,7 @@ func (v View) selected() swatch {
 type point struct {
 	Hex      string   `json:"hex"`
 	Families []string `json:"families"`
-	Title    string   `json:"title"`
+	Title    string   `json:"-"`
 }
 
 func (v View) cloud() []point {

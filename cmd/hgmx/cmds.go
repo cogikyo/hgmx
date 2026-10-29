@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/cogikyo/hgmx"
@@ -73,12 +74,17 @@ func paletteCmd(args []string) (code int) {
 	log := newLogger(logLevel, os.Stderr)
 
 	themes := make([]theme, 0, len(args))
+	seen := map[string]bool{}
 	for _, arg := range args {
 		t, err := parseTheme(arg)
+		if err == nil && seen[t.name] {
+			err = errors.New("theme name used twice")
+		}
 		if err != nil {
 			log.Error("Invalid theme", slog.String("theme", arg), slog.String("error", err.Error()))
 			return 64
 		}
+		seen[t.name] = true
 		themes = append(themes, t)
 		for _, c := range t.palette.Clashes() {
 			log.Warn(c.String(), slog.String("theme", t.name))
@@ -89,7 +95,7 @@ func paletteCmd(args []string) (code int) {
 	switch paletteFormat {
 	case "tailwind", "css":
 		for i, t := range themes {
-			sel := palette.Selector(t.name)
+			sel := t.selector
 			if i == 0 {
 				sel = ":root, " + sel
 			} else {
@@ -128,17 +134,22 @@ func paletteCmd(args []string) (code int) {
 }
 
 type theme struct {
-	name    string
-	palette palette.Palette
+	name     string
+	selector string
+	palette  palette.Palette
 }
 
 func parseTheme(arg string) (theme, error) {
 	name, spec, ok := strings.Cut(arg, "=")
-	if !ok || !palette.ValidName(name) {
-		return theme{}, errors.New("expected <name>=<base>,<primary>[,<accent>] with a name of a-z, 0-9 and -")
+	if !ok {
+		return theme{}, errors.New("expected <name>=<base>,<primary>[,<accent>]")
+	}
+	sel, err := palette.Selector(name)
+	if err != nil {
+		return theme{}, err
 	}
 	hexes := strings.Split(spec, ",")
-	if len(hexes) < 2 || len(hexes) > 3 {
+	if len(hexes) < 2 || len(hexes) > 3 || slices.Contains(hexes, "") {
 		return theme{}, errors.New("expected <name>=<base>,<primary>[,<accent>]")
 	}
 	hexes = append(hexes, "")
@@ -146,7 +157,7 @@ func parseTheme(arg string) (theme, error) {
 	if err != nil {
 		return theme{}, err
 	}
-	return theme{name, palette.Generate(seed)}, nil
+	return theme{name, sel, palette.Generate(seed)}, nil
 }
 
 func writeAtomic(path string, data []byte) error {

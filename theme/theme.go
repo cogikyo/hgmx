@@ -64,8 +64,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	q := r.URL.Query()
 	name := q.Get("name")
-	if !palette.ValidName(name) {
-		http.Error(w, "theme: name must be a-z, 0-9 and -", http.StatusBadRequest)
+	sel, err := palette.Selector(name)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	seed, err := palette.ParseSeed(q.Get("base"), q.Get("primary"), q.Get("accent"))
@@ -77,9 +78,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	p := palette.Generate(seed)
 	switch q.Get("download") {
 	case "":
-		p.CSS(&buf, palette.Selector(name))
+		p.CSS(&buf, sel)
 	case "css", "tailwind":
-		p.CSS(&buf, ":root, "+palette.Selector(name))
+		p.CSS(&buf, ":root, "+sel)
 		file := name + ".css"
 		if q.Get("download") == "tailwind" {
 			buf.WriteByte('\n')
