@@ -29,10 +29,7 @@ func main() {
 	flag.Parse()
 
 	js := scripts.New(scripts.HTMX, scripts.Hyperscript, scripts.Motion)
-	ic, err := icons.New()
-	if err != nil {
-		log.Fatal(err)
-	}
+	ic := icons.New()
 	head := js.Head() + "\n" + ic.Head()
 
 	mux := http.NewServeMux()

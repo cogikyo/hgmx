@@ -2,6 +2,7 @@ package icons
 
 import (
 	"context"
+	"io/fs"
 	"strings"
 	"testing"
 )
@@ -17,10 +18,11 @@ func TestRender(t *testing.T) {
 		if !strings.HasPrefix(html, "<svg") || !strings.HasSuffix(html, "</svg>") {
 			t.Errorf("%s: not one svg element: %.60q", n, html)
 		}
-		if got := strings.Contains(html, ` data-icon="`+string(n)+`"`); got != n.Animated() {
-			t.Errorf("%s: data-icon present %v, animated %v", n, got, n.Animated())
+		_, err := fs.Stat(assets, "assets/anim/"+string(n)+".js")
+		if got, animated := strings.Contains(html, ` data-icon="`+string(n)+`"`), err == nil; got != animated {
+			t.Errorf("%s: data-icon present %v, animated %v", n, got, animated)
 		}
-		if n.Tags() == nil {
+		if glyphs[n].tags == nil {
 			t.Errorf("%s: no tags", n)
 		}
 	}

@@ -2,10 +2,7 @@
 // Render a name directly in templ, for example @icons.Check.
 // To enable animations, mount the assets and include [Handler.Head] in the layout:
 //
-//	h, err := icons.New()
-//	if err != nil {
-//		return err
-//	}
+//	h := icons.New()
 //	root.Handle(icons.Path, h)
 package icons
 
@@ -55,9 +52,8 @@ var Hover = templ.Attributes{
 type Name string
 
 type glyph struct {
-	markup   string
-	tags     []string
-	animated bool
+	markup string
+	tags   []string
 }
 
 var (
@@ -86,7 +82,7 @@ func init() {
 		if err != nil {
 			panic(fmt.Errorf("icons: %s: %w", file, err))
 		}
-		glyphs[name] = glyph{markup: markup, tags: tags[name], animated: animated}
+		glyphs[name] = glyph{markup: markup, tags: tags[name]}
 		names = append(names, name)
 	}
 }
@@ -143,16 +139,6 @@ func (n Name) Render(ctx context.Context, w io.Writer) error {
 	return err
 }
 
-// Animated reports whether n has a bundled hover animation.
-func (n Name) Animated() bool {
-	return glyphs[n].animated
-}
-
-// Tags returns a copy of n's search tags.
-func (n Name) Tags() []string {
-	return slices.Clone(glyphs[n].tags)
-}
-
 // All returns a copy of the bundled names for browsing or selection controls.
 func All() []Name {
 	return slices.Clone(names)
@@ -179,29 +165,20 @@ type Handler struct {
 	head template.HTML
 }
 
-func New() (*Handler, error) {
-	sub, err := fs.Sub(assets, "assets")
-	if err != nil {
-		return nil, err
-	}
+func New() *Handler {
+	sub, _ := fs.Sub(assets, "assets")
 	s, err := static.New(Path, sub)
 	if err != nil {
-		return nil, fmt.Errorf("icons: %w", err)
+		panic(fmt.Errorf("icons: %w", err))
 	}
 	h := &Handler{Server: s}
-	css, err := h.URL("icons.css")
-	if err != nil {
-		return nil, err
-	}
-	js, err := h.URL("icons.js")
-	if err != nil {
-		return nil, err
-	}
+	css, _ := h.URL("icons.css")
+	js, _ := h.URL("icons.js")
 	h.head = template.HTML(fmt.Sprintf(
 		"<link rel=\"stylesheet\" href=\"%s\">\n<script type=\"module\" src=\"%s\"></script>",
 		css, js,
 	))
-	return h, nil
+	return h
 }
 
 // Head returns layout tags; place them after the script defining global Motion.
