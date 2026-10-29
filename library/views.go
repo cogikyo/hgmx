@@ -4,70 +4,71 @@ package views
 import (
 	"embed"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"os"
 
 	"github.com/a-h/templ"
+	"github.com/cogikyo/hgmx/render"
 	"github.com/cogikyo/hgmx/scripts"
+	"github.com/cogikyo/hgmx/server"
 	"github.com/cogikyo/hgmx/static"
-	"github.com/cogikyo/hgmx/webapp"
 )
 
 //go:embed static
 var files embed.FS
 
-//go:embed icon.png
-var icon []byte
-
 const assets = "/static/"
 
-// Site groups the scaffold's static, script and app handlers.
-type Site struct {
-	// Static serves site assets, not vendored scripts or app icons.
-	Static  *static.Server
-	Scripts *scripts.Handler
-	// App is initialized from the embedded icon.png by [New].
-	App *webapp.Handler
+type site struct {
+	static  *static.Server
+	scripts *scripts.Handler
+	version string
 }
 
-// New serves embedded assets, or views/static from disk in dev mode.
-// Scripts and the app icon still come from embedded files.
-func New(dev bool) (*Site, error) {
-	var site Site
-	var err error
-	if dev {
-		site.Static = static.Dev(assets, os.DirFS("views/static"))
+func Mount(mux *http.ServeMux, version, dir string) (fallback http.Handler, err error) {
+	s := &site{scripts: scripts.New(scripts.Navigation), version: version}
+	if dir != "" {
+		s.static = static.Dev(assets, os.DirFS(dir))
 	} else {
 		sub, err := fs.Sub(files, "static")
 		if err != nil {
 			return nil, err
 		}
-		if site.Static, err = static.New(assets, sub); err != nil {
+		if s.static, err = static.New(assets, sub); err != nil {
 			return nil, err
 		}
 	}
-	if site.Scripts, err = scripts.New(scripts.Preload, scripts.Hyperscript); err != nil {
-		return nil, err
-	}
-	site.App, err = webapp.New(webapp.App{
-		Name:       "hgmx",
-		ShortName:  "hgmx",
-		Theme:      "#010a05",
-		Background: "#010a05",
-		Icon:       icon,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &site, nil
+
+	mux.Handle("GET "+assets, s.static)
+	mux.Handle("GET "+scripts.Path, s.scripts)
+	mux.Handle("GET /{$}", s.page("/", "Home", home()))
+	mux.Handle("GET /about", s.page("/about", "About", about()))
+	mux.Handle("GET /", server.PageVersion(version, s.failure(http.StatusNotFound)))
+	return s.failure(http.StatusInternalServerError), nil
 }
 
-// Mount claims GET /; register caller routes with a method.
-func (s *Site) Mount(mux *http.ServeMux) {
-	mux.Handle("GET "+assets, s.Static)
-	mux.Handle("GET "+scripts.Path, s.Scripts)
-	mux.Handle("GET "+webapp.Path, s.App)
-	mux.Handle("GET /{$}", templ.Handler(Full(s, "/", "Home", Home())))
-	mux.Handle("GET /about", templ.Handler(Full(s, "/about", "About", About())))
-	mux.Handle("GET /", templ.Handler(Full(s, "", "Not Found", NotFound()), templ.WithStatus(http.StatusNotFound)))
+func (s *site) page(path, title string, content templ.Component) http.Handler {
+	return server.PageVersion(s.version, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s.render(w, r, http.StatusOK, full(s, path, title, content))
+	}))
+}
+
+func (s *site) failure(status int) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s.render(w, r, status, full(s, "", http.StatusText(status), failure(status)))
+	})
+}
+
+func (s *site) render(w http.ResponseWriter, r *http.Request, status int, c templ.Component) {
+	err := render.HTML(w, r, status, c)
+	if err == nil {
+		return
+	}
+	slog.ErrorContext(r.Context(), "render", "path", r.URL.Path, "err", err)
+	if status == http.StatusInternalServerError {
+		http.Error(w, http.StatusText(status), status)
+		return
+	}
+	s.failure(http.StatusInternalServerError).ServeHTTP(w, r)
 }

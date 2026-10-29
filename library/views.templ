@@ -1,21 +1,26 @@
 package views
 
-templ Full(site *Site, path, title string, content templ.Component) {
+import (
+	"github.com/cogikyo/hgmx/server"
+	"net/http"
+)
+
+templ full(s *site, path, title string, content templ.Component) {
 	<!DOCTYPE html>
 	<html lang="en">
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 			<title>{ title }</title>
-			<link rel="icon" type="image/svg+xml" href={ site.Static.URL("favicon/favicon.svg") }/>
-			<link rel="shortcut icon" href={ site.Static.URL("favicon/favicon.ico") }/>
-			<link rel="stylesheet" href={ site.Static.URL("css/main.min.css") }/>
-			@templ.Raw(site.App.Head())
-			@templ.Raw(site.Scripts.Head())
+			<link rel="icon" type="image/svg+xml" href={ s.static.URL("favicon/favicon.svg") }/>
+			<link rel="shortcut icon" href={ s.static.URL("favicon/favicon.ico") }/>
+			<link rel="stylesheet" href={ s.static.URL("css/main.min.css") }/>
+			@templ.Raw(s.scripts.Head())
 		</head>
 		<body
 			hx-boost:inherited="target:#main select:#main swap:'innerHTML strip show:top showTarget:body' transition:true"
 			hx-select-oob:inherited="#nav-links:outerMorph"
+			hx-config:inherited={ server.VersionConfig(s.version) }
 		>
 			<nav id="nav">
 				<ul id="nav-links">
@@ -41,17 +46,24 @@ templ navLink(current, href, label string) {
 	</li>
 }
 
-templ Home() {
+templ home() {
 	<h1>Home</h1>
 	<p>Every route returns the full page; htmx swaps only <code>#main</code> and the nav links.</p>
 }
 
-templ About() {
+templ about() {
 	<h1>About</h1>
 	<p>The current nav link is marked on the server with <code>aria-current</code>.</p>
 }
 
-templ NotFound() {
-	<h1>Not Found</h1>
-	<p>No page lives at this address. <a href="/">Go home</a>.</p>
+templ failure(status int) {
+	<h1>{ http.StatusText(status) }</h1>
+	switch status {
+		case http.StatusNotFound:
+			<p>No page lives at this address. <a href="/">Go home</a>.</p>
+		case http.StatusUnprocessableEntity:
+			<p>The request could not be processed. Check it and try again.</p>
+		default:
+			<p>Something went wrong on our side. <a href="/">Go home</a>.</p>
+	}
 }
