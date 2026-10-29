@@ -1,10 +1,7 @@
 // Package theme serves palette stylesheets, theme switching, and an explorer.
 // Mount the handler with its full prefix:
 //
-//	h, err := theme.New()
-//	if err != nil {
-//		return err
-//	}
+//	h := theme.New()
 //	root.Handle(theme.Path, h)
 //
 // Include h.Head() in the layout and link a stylesheet from [Sheet].
@@ -45,35 +42,24 @@ type Handler struct {
 
 type assetURLs struct{ css, js string }
 
-func New() (*Handler, error) {
-	sub, err := fs.Sub(assets, "assets")
-	if err != nil {
-		return nil, err
-	}
+func New() *Handler {
+	sub, _ := fs.Sub(assets, "assets")
 	srv, err := static.New(Path, sub)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 	h := &Handler{Server: srv}
-	switcher, err := h.URL("theme.js")
-	if err != nil {
-		return nil, err
-	}
-	if h.explorer.css, err = h.URL("explorer.css"); err != nil {
-		return nil, err
-	}
-	if h.explorer.js, err = h.URL("explorer.js"); err != nil {
-		return nil, err
-	}
+	switcher, _ := h.URL("theme.js")
+	h.explorer.css, _ = h.URL("explorer.css")
+	h.explorer.js, _ = h.URL("explorer.js")
 	h.head = template.HTML(fmt.Sprintf("<script type=\"module\" src=\"%s\"></script>", switcher))
-	return h, nil
+	return h
 }
 
 // Head returns the layout's theme-switching module tag.
 // Click data-theme-set="name" to select a loaded theme on the document root.
 // A select or input with data-theme-set selects its value on change.
 // Click data-theme-live="query" to load a palette.css seed query as theme live.
-// A form with data-theme-live previews its base, primary, and accent on input.
 func (h *Handler) Head() template.HTML { return h.head }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
