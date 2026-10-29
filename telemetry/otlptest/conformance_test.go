@@ -167,14 +167,12 @@ func TestConformance(t *testing.T) {
 	t.Setenv("OTEL_SERVICE_NAME", "hgmx.dev")
 	t.Setenv("OTEL_RESOURCE_ATTRIBUTES", "service.version=8ed2b22,host.name=apps,deployment.environment=production")
 	lo := time.Now()
-	p, err := telemetry.FromEnv()
-	if err != nil || p == nil {
-		t.Fatal(p, err)
-	}
-
 	var journal bytes.Buffer
-	local := slog.NewTextHandler(&journal, nil)
-	logger := slog.New(p.Logs(local))
+	p, err := telemetry.FromEnv(slog.NewTextHandler(&journal, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	logger := p.Logger()
 	client := &http.Client{Transport: p.Transport(nil)}
 
 	mux := http.NewServeMux()
@@ -195,13 +193,9 @@ func TestConformance(t *testing.T) {
 	mux.HandleFunc("GET /boom", func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "boom", http.StatusInternalServerError)
 	})
-	beacon, err := p.Beacon()
-	if err != nil {
-		t.Fatal(err)
-	}
 	root := http.NewServeMux()
-	root.Handle(telemetry.Path, beacon)
-	root.Handle("/", p.Handler(local, mux))
+	root.Handle(telemetry.Path, p.Beacon())
+	root.Handle("/", p.Handler(mux))
 
 	inbound := "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
 	r := httptest.NewRequest("GET", "/icons/user", nil)

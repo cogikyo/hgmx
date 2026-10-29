@@ -32,7 +32,8 @@ const (
 var vitals []byte
 
 // Beacon serves browser page-view and web-vitals collection and its script.
-// Mount with root.Handle(telemetry.Path, beacon), without a method or StripPrefix.
+// Mount with root.Handle(telemetry.Path, p.Beacon()), without a method or StripPrefix.
+// It rejects cross-origin requests itself.
 type Beacon struct {
 	*static.Server
 	head  template.HTML
@@ -44,27 +45,31 @@ type Beacon struct {
 	salt [32]byte
 }
 
-// Beacon prepares the browser collector, including when the pipeline is nil.
-func (p *Pipeline) Beacon() (*Beacon, error) {
+var cop = http.NewCrossOriginProtection()
+
+func newBeacon(p *Pipeline) *Beacon {
 	b := &Beacon{Server: static.Map(Path, map[string][]byte{"vitals.js": vitals}), p: p, limit: newBucket(beaconsPS)}
-	if p == nil {
-		return b, nil
+	if !p.off() {
+		src, _ := b.URL("vitals.js")
+		b.head = template.HTML(fmt.Sprintf(`<script type="module" src="%s"></script>`, src))
 	}
-	src, err := b.URL("vitals.js")
-	if err != nil {
-		return nil, err
-	}
-	b.head = template.HTML(fmt.Sprintf(`<script type="module" src="%s"></script>`, src))
-	return b, nil
+	return b
 }
 
-// Head returns the layout's script tag, or empty HTML for a nil pipeline.
+// Beacon returns the pipeline's browser collector.
+func (p *Pipeline) Beacon() *Beacon { return p.beacon }
+
+// Head returns the layout's script tag, or empty HTML for a disabled pipeline.
 // The CSP must allow script-src 'self' and connect-src 'self'.
 func (b *Beacon) Head() template.HTML {
 	return b.head
 }
 
 func (b *Beacon) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if err := cop.Check(r); err != nil {
+		http.Error(w, err.Error(), http.StatusForbidden)
+		return
+	}
 	if r.Method != http.MethodPost {
 		b.Server.ServeHTTP(w, r)
 		return

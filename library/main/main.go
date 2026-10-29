@@ -23,38 +23,28 @@ func main() {
 	dir := flag.String("static", "", "serve /static/ from this directory instead of the embedded files")
 	flag.Parse()
 
-	local := slog.NewTextHandler(os.Stderr, nil)
-	if err := run(local, *addr, *dir); err != nil {
-		slog.New(local).Error("exit", "err", err)
-		os.Exit(1)
-	}
-}
-
-func run(local slog.Handler, addr, dir string) error {
-	p, err := telemetry.FromEnv()
-	log := slog.New(p.Logs(local))
+	p, err := telemetry.FromEnv(slog.NewTextHandler(os.Stderr, nil))
+	log := p.Logger()
 	slog.SetDefault(log)
 	if err != nil {
 		log.Error("telemetry disabled", "err", err)
 	}
-	beacon, err := p.Beacon()
+	if err := run(p, *addr, *dir); err != nil {
+		log.Error("exit", "err", err)
+		os.Exit(1)
+	}
+}
+
+func run(p *telemetry.Pipeline, addr, dir string) error {
+	site, err := views.New(views.Config{Version: version, Static: dir, Head: p.Beacon().Head()})
 	if err != nil {
 		return err
 	}
-
-	site := http.NewServeMux()
-	if err := views.Mount(site, version, dir, beacon.Head()); err != nil {
-		return err
-	}
-
-	root := http.NewServeMux()
-	root.Handle("GET /healthz", server.Health(version))
-	root.Handle(telemetry.Path, http.NewCrossOriginProtection().Handler(beacon))
-	root.Handle("/", p.Handler(local, server.Security(csp, server.Recover(log, http.HandlerFunc(views.InternalError), http.NewCrossOriginProtection().Handler(site)))))
+	h := server.Site{Version: version, CSP: csp, Fallback: http.HandlerFunc(views.InternalError), Telemetry: p}.Handler(site)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	context.AfterFunc(ctx, stop)
-	log.Info("listening", "addr", addr, "version", version)
-	return server.Run(ctx, server.New(addr, root, log), p.Shutdown)
+	p.Logger().Info("listening", "addr", addr, "version", version)
+	return server.Run(ctx, server.New(addr, h, p.Logger()), p.Shutdown)
 }

@@ -3,6 +3,7 @@ package telemetry
 import (
 	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -19,7 +20,7 @@ type recorder struct {
 }
 
 func (r *recorder) WriteHeader(status int) {
-	if r.status == 0 && status >= 200 {
+	if r.status == 0 && (status >= 200 || status == http.StatusSwitchingProtocols) {
 		r.status = status
 	}
 	r.ResponseWriter.WriteHeader(status)
@@ -34,24 +35,26 @@ func (r *recorder) Write(b []byte) (int, error) {
 	return n, err
 }
 
-func (r *recorder) Flush() {
-	if r.status == 0 {
+func (r *recorder) FlushError() error {
+	err := http.NewResponseController(r.ResponseWriter).Flush()
+	if r.status == 0 && !errors.Is(err, http.ErrNotSupported) {
 		r.status = http.StatusOK
 	}
-	http.NewResponseController(r.ResponseWriter).Flush()
+	return err
 }
+
+func (r *recorder) Flush() { r.FlushError() }
 
 func (r *recorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }
 
-// Handler records requests and writes access logs to the raw local handler.
-// A handler from [Pipeline.Logs] is unwrapped to avoid exporting access logs.
-// The first local handler given to Logs or Handler gets export-failure warnings.
+// Handler records requests and writes access lines to the local handler only.
+// A panic after the response is committed keeps the committed status and is logged as aborted;
+// one before it counts as 500.
 //
 // Wrap the mux directly, or only middleware passing the same *http.Request.
 // An intervening r.WithContext loses http.route.
 // Keep /healthz and [Beacon] outside this handler.
-func (p *Pipeline) Handler(local slog.Handler, next http.Handler) http.Handler {
-	local = p.local(local)
+func (p *Pipeline) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		rec := &recorder{ResponseWriter: w}
@@ -62,32 +65,36 @@ func (p *Pipeline) Handler(local slog.Handler, next http.Handler) http.Handler {
 			}
 			w.Header().Add("Server-Timing", `traceparent;desc="`+s.traceparent()+`"`)
 		}
+		ctx := r.Context()
 		if s != nil {
-			r = r.WithContext(context.WithValue(r.Context(), spanKey{}, s))
+			ctx = context.WithValue(ctx, spanKey{}, s)
 			p.meters.active.add(1)
 		}
+		r = r.WithContext(ctx)
+		r.Pattern = ""
 		served := false
 		defer func() {
+			aborted := !served
 			status := rec.status
-			switch {
-			case !served:
-				status = http.StatusInternalServerError
-			case status == 0:
+			if status == 0 {
 				status = http.StatusOK
+				if aborted {
+					status = http.StatusInternalServerError
+				}
 			}
 			d := time.Since(start)
 			if s != nil {
 				p.meters.active.add(-1)
-				p.observe(s, r, status, rec.size, d)
+				p.observe(s, r, status, aborted, rec.size, d)
 			}
-			access(local, r, s, status, d)
+			p.access(r, s, status, aborted, rec.size, d)
 		}()
 		next.ServeHTTP(rec, r)
 		served = true
 	})
 }
 
-func (p *Pipeline) observe(s *Span, r *http.Request, status int, size int64, d time.Duration) {
+func (p *Pipeline) observe(s *Span, r *http.Request, status int, aborted bool, size int64, d time.Duration) {
 	method := normalize(r.Method)
 	route := route(r.Pattern)
 	attrs := make([]slog.Attr, 0, 6)
@@ -111,32 +118,37 @@ func (p *Pipeline) observe(s *Span, r *http.Request, status int, size int64, d t
 		attrs = append(attrs, slog.String("http.request.method_original", r.Method))
 	}
 	s.Set(attrs...)
-	if status >= 500 {
+	if status >= 500 || aborted {
 		s.code = 2
 	}
 	s.End()
 }
 
-func access(local slog.Handler, r *http.Request, s *Span, status int, d time.Duration) {
+func (p *Pipeline) access(r *http.Request, s *Span, status int, aborted bool, size int64, d time.Duration) {
 	level := slog.LevelInfo
-	if status >= 500 {
+	if status >= 500 || aborted {
 		level = slog.LevelError
 	}
-	if local == nil || !local.Enabled(r.Context(), level) {
+	if !p.local.Enabled(r.Context(), level) {
 		return
 	}
 	rec := slog.NewRecord(time.Now(), level, "request", 0)
 	rec.AddAttrs(
 		slog.String("method", r.Method),
-		slog.Int("status", status),
+		slog.String("pattern", r.Pattern),
 		slog.String("path", r.URL.Path),
+		slog.Int("status", status),
+		slog.Int64("bytes", size),
 		slog.Duration("dur", d.Truncate(time.Millisecond)),
 		slog.String("host", r.Host),
 	)
+	if aborted {
+		rec.AddAttrs(slog.Bool("aborted", true))
+	}
 	if s.recording() {
 		rec.AddAttrs(slog.String("trace_id", s.TraceID()), slog.String("span_id", s.spanHex()))
 	}
-	local.Handle(r.Context(), rec)
+	p.local.Handle(r.Context(), rec)
 }
 
 func route(pattern string) string {
@@ -172,12 +184,12 @@ type transport struct {
 // Without a span in the context it starts a rate-limited root client span.
 // Spans end on response headers, before the body is read.
 // The wrapper removes traceparent and tracestate before sending upstream.
-// A nil pipeline returns base unchanged after applying the default.
+// A disabled pipeline returns base unchanged after applying the default.
 func (p *Pipeline) Transport(base http.RoundTripper) http.RoundTripper {
 	if base == nil {
 		base = http.DefaultTransport
 	}
-	if p == nil {
+	if p.off() {
 		return base
 	}
 	return transport{p, base}

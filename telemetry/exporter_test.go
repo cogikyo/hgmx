@@ -50,7 +50,7 @@ func status(code int, retryAfter string) func(*http.Request) (*http.Response, er
 
 func offline(rt http.RoundTripper) *Pipeline {
 	u, _ := url.Parse("http://receiver.test/otlp")
-	p := newPipeline(u, nil, rt)
+	p := newPipeline(u, nil, rt, slog.DiscardHandler)
 	p.roots = newBucket(1e9)
 	return p
 }
@@ -201,7 +201,7 @@ func TestExportWarningsAreEdges(t *testing.T) {
 	rt := &fakeRT{reply: status(http.StatusNotFound, "")}
 	p := offline(rt)
 	var out bytes.Buffer
-	p.Handler(slog.NewTextHandler(&out, nil), http.NotFoundHandler())
+	p.local = slog.NewTextHandler(&out, nil)
 	for range 3 {
 		spans(p, 1)
 		p.flush(time.Now(), false)
@@ -242,9 +242,9 @@ func TestShutdownOnce(t *testing.T) {
 	}
 	wg.Wait()
 
-	h := p.Handler(nil, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	h := p.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/", nil))
-	slog.New(p.Logs(slog.DiscardHandler)).Info("late")
+	p.Logger().Info("late")
 	if _, s := p.Start(context.Background(), "late"); s != nil {
 		t.Error("Start after Shutdown returned a span")
 	}
@@ -259,14 +259,14 @@ func BenchmarkHandler(b *testing.B) {
 	for _, c := range []struct {
 		name string
 		p    *Pipeline
-	}{{"off", nil}, {"on", offline(&fakeRT{reply: status(http.StatusOK, "")})}} {
+	}{{"off", Disabled(slog.DiscardHandler)}, {"on", offline(&fakeRT{reply: status(http.StatusOK, "")})}} {
 		b.Run(c.name, func(b *testing.B) {
-			h := c.p.Handler(nil, mux)
+			h := c.p.Handler(mux)
 			r := httptest.NewRequest("GET", "/icons", nil)
 			b.ReportAllocs()
 			for i := 0; b.Loop(); i++ {
 				h.ServeHTTP(httptest.NewRecorder(), r)
-				if c.p != nil && i%batch == 0 {
+				if !c.p.off() && i%batch == 0 {
 					c.p.spans.take()
 				}
 			}

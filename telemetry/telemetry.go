@@ -1,21 +1,16 @@
 // Package telemetry exports OTLP traces, logs, and metrics for HTTP sites.
-// FromEnv may return a nil pipeline; all Pipeline methods accept it.
+// FromEnv always returns a usable pipeline; it is disabled when telemetry is off.
 // Given an application mux and a health handler, mount them separately:
 //
-//	p, err := telemetry.FromEnv()
+//	p, err := telemetry.FromEnv(slog.NewJSONHandler(os.Stderr, nil))
+//	log := p.Logger()
 //	if err != nil {
-//		return err
+//		log.Error("telemetry disabled", "err", err)
 //	}
-//	beacon, err := p.Beacon()
-//	if err != nil {
-//		return err
-//	}
-//	local := slog.NewJSONHandler(os.Stderr, nil)
-//	log := slog.New(p.Logs(local))
 //	root := http.NewServeMux()
 //	root.Handle("GET /healthz", health)
-//	root.Handle(telemetry.Path, beacon)
-//	root.Handle("/", p.Handler(local, mux))
+//	root.Handle(telemetry.Path, p.Beacon())
+//	root.Handle("/", p.Handler(mux))
 //
 // Caller-supplied span/log strings are cut to 1 KiB of valid UTF-8.
 // Local log output is not cut; resource strings are not length-limited.
@@ -88,8 +83,12 @@ type pending struct {
 	due  time.Time
 }
 
-// Pipeline owns the exporter; a nil pipeline disables telemetry.
+// Pipeline owns the exporter and the local log handler.
 type Pipeline struct {
+	local  slog.Handler
+	log    *slog.Logger
+	beacon *Beacon
+
 	urls   [3]string
 	res    []byte
 	client *http.Client
@@ -102,7 +101,6 @@ type Pipeline struct {
 	retry   [3]*pending
 	failing [3]bool
 	paths   [3]string
-	warn    atomic.Pointer[slog.Handler]
 
 	closed atomic.Bool
 	kick   chan struct{}
@@ -115,7 +113,7 @@ type Pipeline struct {
 	cancel context.CancelFunc
 }
 
-func (p *Pipeline) off() bool { return p == nil || p.closed.Load() }
+func (p *Pipeline) off() bool { return p.closed.Load() }
 
 type buffer[T any] struct {
 	mu     sync.Mutex
@@ -156,37 +154,57 @@ func (b *buffer[T]) take() []T {
 }
 
 // FromEnv starts an OTLP HTTP/protobuf exporter from OTEL environment variables.
-// It returns (nil, nil) if the endpoint is unset or OTEL_SDK_DISABLED is true.
-func FromEnv() (*Pipeline, error) {
-	if strings.EqualFold(strings.TrimSpace(os.Getenv("OTEL_SDK_DISABLED")), "true") {
-		return nil, nil
+// It returns a disabled pipeline if the endpoint is unset or OTEL_SDK_DISABLED is true,
+// and a disabled pipeline with an error saying why if the configuration is invalid.
+// The pipeline writes logs and access lines to local.
+func FromEnv(local slog.Handler) (*Pipeline, error) {
+	u, res, err := config()
+	if u == nil {
+		return Disabled(local), err
 	}
-	base := strings.TrimSpace(os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"))
-	if base == "" {
-		return nil, nil
-	}
-	u, err := url.Parse(base)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
-		return nil, fmt.Errorf("telemetry: OTEL_EXPORTER_OTLP_ENDPOINT %q is not an http(s) URL", base)
-	}
-	if v := os.Getenv("OTEL_EXPORTER_OTLP_PROTOCOL"); v != "" && v != "http/protobuf" {
-		return nil, fmt.Errorf("telemetry: OTEL_EXPORTER_OTLP_PROTOCOL %q is unsupported; use http/protobuf", v)
-	}
-	if v := strings.ToLower(os.Getenv("OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE")); v != "" && v != "cumulative" {
-		return nil, fmt.Errorf("telemetry: OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE %q is unsupported; use cumulative", v)
-	}
-	res, err := resource(os.Getenv("OTEL_SERVICE_NAME"), os.Getenv("OTEL_RESOURCE_ATTRIBUTES"))
-	if err != nil {
-		return nil, err
-	}
-	p := newPipeline(u, res, &http.Transport{MaxIdleConns: 2, IdleConnTimeout: time.Minute})
+	p := newPipeline(u, res, &http.Transport{MaxIdleConns: 2, IdleConnTimeout: time.Minute}, local)
 	go p.run()
 	return p, nil
 }
 
-func newPipeline(u *url.URL, res []slog.Attr, rt http.RoundTripper) *Pipeline {
+func config() (*url.URL, []slog.Attr, error) {
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("OTEL_SDK_DISABLED")), "true") {
+		return nil, nil, nil
+	}
+	base := strings.TrimSpace(os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT"))
+	if base == "" {
+		return nil, nil, nil
+	}
+	u, err := url.Parse(base)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return nil, nil, fmt.Errorf("telemetry: OTEL_EXPORTER_OTLP_ENDPOINT %q is not an http(s) URL", base)
+	}
+	if v := os.Getenv("OTEL_EXPORTER_OTLP_PROTOCOL"); v != "" && v != "http/protobuf" {
+		return nil, nil, fmt.Errorf("telemetry: OTEL_EXPORTER_OTLP_PROTOCOL %q is unsupported; use http/protobuf", v)
+	}
+	if v := strings.ToLower(os.Getenv("OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE")); v != "" && v != "cumulative" {
+		return nil, nil, fmt.Errorf("telemetry: OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE %q is unsupported; use cumulative", v)
+	}
+	res, err := resource(os.Getenv("OTEL_SERVICE_NAME"), os.Getenv("OTEL_RESOURCE_ATTRIBUTES"))
+	if err != nil {
+		return nil, nil, err
+	}
+	return u, res, nil
+}
+
+// Disabled returns a pipeline that records nothing and writes logs and access lines to local.
+func Disabled(local slog.Handler) *Pipeline {
+	p := &Pipeline{local: local, log: slog.New(local), done: make(chan struct{})}
+	p.closed.Store(true)
+	close(p.done)
+	p.beacon = newBeacon(p)
+	return p
+}
+
+func newPipeline(u *url.URL, res []slog.Attr, rt http.RoundTripper, local slog.Handler) *Pipeline {
 	p := &Pipeline{
-		res: encodeResource(res),
+		local: local,
+		res:   encodeResource(res),
 		client: &http.Client{
 			Timeout:       timeout,
 			Transport:     rt,
@@ -207,8 +225,14 @@ func newPipeline(u *url.URL, res []slog.Attr, rt http.RoundTripper) *Pipeline {
 	p.spans = &buffer[*Span]{closed: &p.closed, kick: p.kick, drop: func(n int) { p.drop(sigTraces, n) }}
 	p.recs = &buffer[record]{closed: &p.closed, kick: p.kick, drop: func(n int) { p.drop(sigLogs, n) }}
 	p.ctx, p.cancel = context.WithCancel(context.Background())
+	p.log = slog.New(&logs{local: local, p: p, frames: [][]slog.Attr{nil}})
+	p.beacon = newBeacon(p)
 	return p
 }
+
+// Logger writes to the local handler and, when enabled, exports records at Info or above.
+// Context-aware calls attach trace_id and span_id; locally they follow any open WithGroup.
+func (p *Pipeline) Logger() *slog.Logger { return p.log }
 
 func resource(name, env string) ([]slog.Attr, error) {
 	if !utf8.ValidString(name) {
@@ -371,8 +395,7 @@ func (p *Pipeline) send(s signal, body []byte) outcome {
 }
 
 func (p *Pipeline) note(s signal, o outcome) outcome {
-	h := p.warn.Load()
-	if h == nil || p.ctx.Err() != nil || o.ok != p.failing[s] {
+	if p.ctx.Err() != nil || o.ok != p.failing[s] {
 		return o
 	}
 	p.failing[s] = !o.ok
@@ -382,20 +405,10 @@ func (p *Pipeline) note(s signal, o outcome) outcome {
 		rec.AddAttrs(slog.String("reason", o.why))
 	}
 	rec.AddAttrs(slog.String("signal", signals[s]), slog.String("endpoint", p.paths[s]))
-	if (*h).Enabled(context.Background(), rec.Level) {
-		(*h).Handle(context.Background(), rec)
+	if p.local.Enabled(context.Background(), rec.Level) {
+		p.local.Handle(context.Background(), rec)
 	}
 	return o
-}
-
-func (p *Pipeline) local(h slog.Handler) slog.Handler {
-	if l, ok := h.(*logs); ok {
-		h = l.local
-	}
-	if p != nil && h != nil {
-		p.warn.CompareAndSwap(nil, &h)
-	}
-	return h
 }
 
 func retryAfter(h string) time.Duration {
@@ -415,9 +428,6 @@ func retryAfter(h string) time.Duration {
 // Shut down the HTTP server first, then the pipeline on the same deadline.
 // Repeated calls are safe; later recording is ignored.
 func (p *Pipeline) Shutdown(ctx context.Context) error {
-	if p == nil {
-		return nil
-	}
 	if p.closed.CompareAndSwap(false, true) {
 		release := context.AfterFunc(ctx, p.cancel)
 		close(p.stop)

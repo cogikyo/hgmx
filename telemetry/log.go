@@ -29,17 +29,6 @@ type logs struct {
 	frames [][]slog.Attr
 }
 
-// Logs exports records at Info or above and preserves local's level filtering.
-// Use context-aware logging to attach trace_id and span_id from a span.
-// In local output those attributes follow the logger's open WithGroup.
-func (p *Pipeline) Logs(local slog.Handler) slog.Handler {
-	local = p.local(local)
-	if p == nil {
-		return local
-	}
-	return &logs{local: local, p: p, frames: [][]slog.Attr{nil}}
-}
-
 func (h *logs) Enabled(ctx context.Context, l slog.Level) bool {
 	return (l >= slog.LevelInfo && !h.p.off()) || h.local.Enabled(ctx, l)
 }

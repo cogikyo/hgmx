@@ -60,7 +60,7 @@ func routes(t *testing.T, chain func(http.Handler) http.Handler, path string) (s
 	p := offline(nil)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET "+path+"/{id}", func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "ok") })
-	h := p.Handler(slog.DiscardHandler, chain(mux))
+	h := p.Handler(chain(mux))
 
 	before := counts(p)
 	w := httptest.NewRecorder()

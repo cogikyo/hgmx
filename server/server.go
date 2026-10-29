@@ -1,16 +1,8 @@
 // Package server runs HTTP sites behind Cloudflare with explicit middleware.
-// Given an application mux and a fallback handler, compose the chain as follows:
+// Given an application mux, a fallback handler, and a telemetry pipeline:
 //
-//	h := http.NewCrossOriginProtection().Handler(mux)
-//	h = server.Recover(log, fallback, h)
-//	h = server.Security(csp, h)
-//	h = server.Log(log, h)
-//	root := http.NewServeMux()
-//	root.Handle("GET /healthz", server.Health(version))
-//	root.Handle("/", h)
-//	err := server.Run(ctx, server.New(":8080", root, log))
-//
-// Keep the same *http.Request between Log and mux so Log sees the route pattern.
+//	h := server.Site{Version: version, CSP: csp, Fallback: fallback, Telemetry: p}.Handler(mux)
+//	err := server.Run(ctx, server.New(":8080", h, p.Logger()), p.Shutdown)
 package server
 
 import (
@@ -22,9 +14,36 @@ import (
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/cogikyo/hgmx/telemetry"
 )
 
 var drainTimeout = 10 * time.Second
+
+const afterTimeout = 5 * time.Second
+
+// Site composes a site's root handler.
+type Site struct {
+	Version   string
+	CSP       string
+	Fallback  http.Handler
+	Telemetry *telemetry.Pipeline
+}
+
+// Handler serves /healthz and the telemetry beacon outside the middleware, and mux behind
+// telemetry, [Security], [Recover], and cross-origin protection, in that order.
+// A nil Telemetry uses a disabled pipeline logging to [slog.Default].
+func (s Site) Handler(mux http.Handler) http.Handler {
+	p := s.Telemetry
+	if p == nil {
+		p = telemetry.Disabled(slog.Default().Handler())
+	}
+	root := http.NewServeMux()
+	root.Handle("GET /healthz", Health(s.Version))
+	root.Handle(telemetry.Path, p.Beacon())
+	root.Handle("/", p.Handler(Security(s.CSP, Recover(p.Logger(), s.Fallback, http.NewCrossOriginProtection().Handler(mux)))))
+	return root
+}
 
 // New configures a server for use behind Cloudflare.
 // Read and write timeouts stay unset to allow uploads and streams.
@@ -38,11 +57,23 @@ func New(addr string, h http.Handler, log *slog.Logger) *http.Server {
 	}
 }
 
-// Run binds synchronously, then serves until failure or ctx cancellation.
-// On cancellation it drains for up to 10 seconds, then closes on drain failure.
+// Run binds synchronously, then serves until failure, shutdown, or ctx cancellation.
+// It then drains for up to 10 seconds, and closes on drain failure.
 // Close does not wait for handlers, so they may outlive Run after the deadline.
 // Closing their resources after Run returns can race those handlers.
+// Each after hook then runs, even if binding failed, with a fresh 5-second context;
+// Run returns all errors joined.
 func Run(ctx context.Context, srv *http.Server, after ...func(context.Context) error) error {
+	err := serve(ctx, srv)
+	hooks, cancel := context.WithTimeout(context.WithoutCancel(ctx), afterTimeout)
+	defer cancel()
+	for _, f := range after {
+		err = errors.Join(err, f(hooks))
+	}
+	return err
+}
+
+func serve(ctx context.Context, srv *http.Server) error {
 	ln, err := net.Listen("tcp", cmp.Or(srv.Addr, ":http"))
 	if err != nil {
 		return err
@@ -50,25 +81,22 @@ func Run(ctx context.Context, srv *http.Server, after ...func(context.Context) e
 	served := make(chan error, 1)
 	go func() { served <- srv.Serve(ln) }()
 
+	var serr error
 	select {
-	case err = <-served:
+	case serr = <-served:
 	case <-ctx.Done():
 	}
 
 	drain, cancel := context.WithTimeout(context.WithoutCancel(ctx), drainTimeout)
 	defer cancel()
-	if err == nil {
-		if err = srv.Shutdown(drain); err != nil {
-			err = errors.Join(err, srv.Close())
-		}
-		if served := <-served; !errors.Is(served, http.ErrServerClosed) {
-			err = errors.Join(err, served)
-		}
-	} else if errors.Is(err, http.ErrServerClosed) {
-		err = nil
+	if err = srv.Shutdown(drain); err != nil {
+		err = errors.Join(err, srv.Close())
 	}
-	for _, f := range after {
-		err = errors.Join(err, f(drain))
+	if serr == nil {
+		serr = <-served
+	}
+	if !errors.Is(serr, http.ErrServerClosed) {
+		err = errors.Join(serr, err)
 	}
 	return err
 }

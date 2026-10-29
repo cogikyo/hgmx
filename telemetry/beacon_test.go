@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"bytes"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -28,10 +29,7 @@ func view(size int) string {
 }
 
 func TestBeaconCaps(t *testing.T) {
-	b, err := offline(nil).Beacon()
-	if err != nil {
-		t.Fatal(err)
-	}
+	b := offline(nil).Beacon()
 	if code := post(b, view(maxBeacon+1)); code != http.StatusRequestEntityTooLarge {
 		t.Errorf("2 KiB + 1: %d, want 413", code)
 	}
@@ -51,7 +49,7 @@ func TestBeaconCaps(t *testing.T) {
 
 func TestBeaconPrivacy(t *testing.T) {
 	p := offline(nil)
-	b, _ := p.Beacon()
+	b := p.Beacon()
 	if code := post(b, `{"type":"view","path":"/icons?q=secret#top","referrer":"https://news.ycombinator.com/item?id=1","traceparent":"00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"}`); code != http.StatusNoContent {
 		t.Fatalf("view: %d", code)
 	}
@@ -86,5 +84,29 @@ func TestBeaconPrivacy(t *testing.T) {
 	}
 	if attr(recs[1].attrs, "browser.vitals.inp") != "" || attr(recs[1].attrs, "browser.vitals.lcp") != "420" {
 		t.Errorf("vitals: %+v", recs[1].attrs)
+	}
+}
+
+func TestBeaconCrossOrigin(t *testing.T) {
+	for _, p := range []*Pipeline{offline(nil), Disabled(slog.DiscardHandler)} {
+		b := p.Beacon()
+		if (b.Head() == "") != p.off() {
+			t.Errorf("off=%v: Head %q", p.off(), b.Head())
+		}
+		for site, want := range map[string]int{"same-origin": http.StatusNoContent, "cross-site": http.StatusForbidden} {
+			r := httptest.NewRequest("POST", Path, strings.NewReader(`{"type":"view","path":"/"}`))
+			r.Header.Set("User-Agent", chrome)
+			r.Header.Set("Sec-Fetch-Site", site)
+			w := httptest.NewRecorder()
+			b.ServeHTTP(w, r)
+			if w.Code != want {
+				t.Errorf("off=%v, %s: %d, want %d", p.off(), site, w.Code, want)
+			}
+		}
+		if p.recs != nil {
+			if n := len(p.recs.take()); n != 1 {
+				t.Errorf("%d events accepted, want the same-origin one", n)
+			}
+		}
 	}
 }

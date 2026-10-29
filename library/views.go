@@ -25,30 +25,37 @@ const assets = "/static/"
 type site struct {
 	static  *static.Server
 	scripts *scripts.Handler
-	beacon  template.HTML
+	head    template.HTML
 	version string
 }
 
-func Mount(mux *http.ServeMux, version, dir string, beacon template.HTML) error {
-	s := &site{scripts: scripts.New(scripts.Navigation), beacon: beacon, version: version}
-	if dir != "" {
-		s.static = static.Dev(assets, os.DirFS(dir))
+type Config struct {
+	Version string
+	Static  string
+	Head    template.HTML
+}
+
+func New(c Config) (http.Handler, error) {
+	s := &site{scripts: scripts.New(scripts.Navigation), head: c.Head, version: c.Version}
+	if c.Static != "" {
+		s.static = static.Dev(assets, os.DirFS(c.Static))
 	} else {
 		sub, err := fs.Sub(files, "static")
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if s.static, err = static.New(assets, sub); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
+	mux := http.NewServeMux()
 	mux.Handle("GET "+assets, s.static)
 	mux.Handle("GET "+scripts.Path, s.scripts)
 	mux.Handle("GET /{$}", s.page(http.StatusOK, "Home", home()))
 	mux.Handle("GET /about", s.page(http.StatusOK, "About", about()))
 	mux.Handle("GET /", s.page(http.StatusNotFound, "Not Found", notFound()))
-	return nil
+	return mux, nil
 }
 
 func (s *site) page(status int, title string, content templ.Component) http.Handler {
