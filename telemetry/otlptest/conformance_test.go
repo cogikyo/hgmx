@@ -337,6 +337,9 @@ func TestConformance(t *testing.T) {
 		"http.request.method": "GET", "http.route": "/boom", "http.response.status_code": int64(500),
 		"url.path": "/boom", "http.response.body.size": int64(5),
 	})
+	if unrouted.Status != nil {
+		t.Errorf("404 span status: %v; 4xx leaves server spans unset", unrouted.Status)
+	}
 	same(t, "unrouted span", flat(unrouted.Attributes), map[string]any{
 		"http.request.method": "GET", "http.response.status_code": int64(404),
 		"url.path": "/\uFFFD", "http.response.body.size": int64(19),

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"log/slog"
 	"math/rand/v2"
+	"slices"
 	"sync"
 	"time"
 )
@@ -84,7 +85,7 @@ func (p *Pipeline) begin(ctx context.Context, name string, kind spanKind) *Span 
 	if !parent.recording() {
 		return nil
 	}
-	s := &Span{p: p, trace: parent.trace, parent: parent.id, name: name, kind: kind, start: time.Now().UnixNano()}
+	s := &Span{p: p, trace: parent.trace, parent: parent.id, name: clip(name), kind: kind, start: time.Now().UnixNano()}
 	binary.LittleEndian.PutUint64(s.id[:], rand.Uint64())
 	return s
 }
@@ -96,7 +97,7 @@ func (p *Pipeline) root(name string, kind spanKind) *Span {
 	if !p.roots.take() {
 		return &Span{}
 	}
-	s := &Span{p: p, name: name, kind: kind, start: time.Now().UnixNano()}
+	s := &Span{p: p, name: clip(name), kind: kind, start: time.Now().UnixNano()}
 	binary.LittleEndian.PutUint64(s.trace[:8], rand.Uint64())
 	binary.LittleEndian.PutUint64(s.trace[8:], rand.Uint64())
 	binary.LittleEndian.PutUint64(s.id[:], rand.Uint64())
@@ -107,10 +108,11 @@ func (s *Span) Set(attrs ...slog.Attr) {
 	if !s.recording() || s.end != 0 {
 		return
 	}
-	var flat []slog.Attr
+	flat := make([]slog.Attr, 0, len(attrs))
 	for _, a := range attrs {
 		flat = snapshot(flat, a)
 	}
+	s.attrs = slices.Grow(s.attrs, min(len(flat), maxAttrs-len(s.attrs)))
 	for _, a := range flat {
 		if i := s.index(a.Key); i >= 0 {
 			s.attrs[i] = a

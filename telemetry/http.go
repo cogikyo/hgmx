@@ -1,6 +1,7 @@
 package telemetry
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"log/slog"
@@ -43,6 +44,7 @@ func (r *recorder) Flush() {
 func (r *recorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }
 
 func (p *Pipeline) Handler(local slog.Handler, next http.Handler) http.Handler {
+	local = p.local(local)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		rec := &recorder{ResponseWriter: w}
@@ -81,10 +83,11 @@ func (p *Pipeline) Handler(local slog.Handler, next http.Handler) http.Handler {
 func (p *Pipeline) observe(s *Span, r *http.Request, status int, size int64, d time.Duration) {
 	method := normalize(r.Method)
 	route := route(r.Pattern)
-	attrs := []slog.Attr{
+	attrs := make([]slog.Attr, 0, 6)
+	attrs = append(attrs,
 		slog.String("http.request.method", method),
 		slog.Int("http.response.status_code", status),
-	}
+	)
 	if route != "" {
 		attrs = append(attrs, slog.String("http.route", route))
 	}
@@ -171,7 +174,7 @@ func (t transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req = req.Clone(req.Context())
 	req.Header.Del("traceparent")
 	req.Header.Del("tracestate")
-	method := normalize(req.Method)
+	method := normalize(cmp.Or(req.Method, http.MethodGet))
 	s := t.p.begin(req.Context(), method, client)
 	if !s.recording() {
 		return t.base.RoundTrip(req)

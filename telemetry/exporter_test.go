@@ -1,6 +1,7 @@
 package telemetry
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -8,6 +9,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -41,7 +44,7 @@ func status(code int, retryAfter string) func(*http.Request) (*http.Response, er
 		if code/100 == 3 {
 			h.Set("Location", "http://elsewhere.test/ingest")
 		}
-		return &http.Response{StatusCode: code, Header: h, Body: io.NopCloser(http.NoBody), Request: r}, nil
+		return &http.Response{StatusCode: code, Status: strconv.Itoa(code) + " " + http.StatusText(code), Header: h, Body: io.NopCloser(http.NoBody), Request: r}, nil
 	}
 }
 
@@ -152,10 +155,31 @@ func TestRetryLifecycle(t *testing.T) {
 		t.Errorf("Retry-After 120: retry %+v, %d dropped; want dropped", p.retry[sigTraces], dropped(p, sigTraces))
 	}
 
-	rt.reply = status(http.StatusBadRequest, "")
+	rt.reply = status(http.StatusServiceUnavailable, "9999999999")
 	spans(p, 1)
 	p.flush(t0, false)
 	if p.retry[sigTraces] != nil || dropped(p, sigTraces) != 4 {
+		t.Errorf("Retry-After 9999999999: retry %+v; want dropped", p.retry[sigTraces])
+	}
+
+	for _, reply := range []func(*http.Request) (*http.Response, error){
+		status(http.StatusBadGateway, ""),
+		status(http.StatusGatewayTimeout, ""),
+		func(*http.Request) (*http.Response, error) { return nil, errors.New("connection refused") },
+	} {
+		rt.reply = reply
+		spans(p, 1)
+		p.flush(t0, false)
+		if r := p.retry[sigTraces]; r == nil || !r.due.Equal(t0.Add(minRetry)) {
+			t.Errorf("502, 504 and transport errors must retry after %v: %+v", minRetry, r)
+		}
+		p.retry[sigTraces] = nil
+	}
+
+	rt.reply = status(http.StatusBadRequest, "")
+	spans(p, 1)
+	p.flush(t0, false)
+	if p.retry[sigTraces] != nil || dropped(p, sigTraces) != 5 {
 		t.Errorf("400 must drop without retry")
 	}
 
@@ -170,6 +194,27 @@ func TestRetryLifecycle(t *testing.T) {
 	p.flush(t0.Add(minRetry), false)
 	if rt.calls() != calls+2 || p.retry[sigMetrics] != nil {
 		t.Errorf("metrics retry at its time: %d calls", rt.calls()-calls)
+	}
+}
+
+func TestExportWarningsAreEdges(t *testing.T) {
+	rt := &fakeRT{reply: status(http.StatusNotFound, "")}
+	p := offline(rt)
+	var out bytes.Buffer
+	p.Handler(slog.NewTextHandler(&out, nil), http.NotFoundHandler())
+	for range 3 {
+		spans(p, 1)
+		p.flush(time.Now(), false)
+	}
+	rt.reply = status(http.StatusOK, "")
+	for range 2 {
+		spans(p, 1)
+		p.flush(time.Now(), false)
+	}
+	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+	if len(lines) != 2 || !strings.Contains(lines[0], `msg="telemetry export failing" reason="404 Not Found" signal=spans endpoint=/otlp/v1/traces`) ||
+		!strings.Contains(lines[1], `msg="telemetry export recovered" signal=spans endpoint=/otlp/v1/traces`) {
+		t.Errorf("want one failing and one recovered line:\n%s", out.String())
 	}
 }
 

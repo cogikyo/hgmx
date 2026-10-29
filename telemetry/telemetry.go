@@ -73,10 +73,13 @@ type Pipeline struct {
 	start  int64
 	meters meters
 
-	spans *buffer[*Span]
-	recs  *buffer[record]
-	roots *bucket
-	retry [3]*pending
+	spans   *buffer[*Span]
+	recs    *buffer[record]
+	roots   *bucket
+	retry   [3]*pending
+	failing [3]bool
+	paths   [3]string
+	warn    atomic.Pointer[slog.Handler]
 
 	closed atomic.Bool
 	kick   chan struct{}
@@ -100,10 +103,11 @@ type buffer[T any] struct {
 }
 
 func (b *buffer[T]) add(v T) {
+	b.mu.Lock()
 	if b.closed.Load() {
+		b.mu.Unlock()
 		return
 	}
-	b.mu.Lock()
 	if len(b.items) >= maxItems {
 		b.mu.Unlock()
 		b.drop(1)
@@ -173,6 +177,7 @@ func newPipeline(u *url.URL, res []slog.Attr, rt http.RoundTripper) *Pipeline {
 	}
 	for i, path := range [3]string{"v1/traces", "v1/logs", "v1/metrics"} {
 		p.urls[i] = u.JoinPath(path).String()
+		p.paths[i] = u.JoinPath(path).Path
 	}
 	p.spans = &buffer[*Span]{closed: &p.closed, kick: p.kick, drop: func(n int) { p.drop(sigTraces, n) }}
 	p.recs = &buffer[record]{closed: &p.closed, kick: p.kick, drop: func(n int) { p.drop(sigLogs, n) }}
@@ -282,7 +287,7 @@ func (p *Pipeline) ready(s signal, now time.Time, final bool) bool {
 		return true
 	}
 	p.retry[s] = nil
-	if ok, _, _ := p.send(s, r.body); !ok {
+	if !p.send(s, r.body).ok {
 		p.drop(s, r.n)
 	}
 	return true
@@ -293,38 +298,78 @@ func (p *Pipeline) deliver(s signal, body []byte, n int, now time.Time, final bo
 	zw, _ := gzip.NewWriterLevel(&buf, gzip.BestSpeed)
 	zw.Write(body)
 	zw.Close()
-	ok, retry, after := p.send(s, buf.Bytes())
+	o := p.send(s, buf.Bytes())
 	switch {
-	case ok:
-	case retry && !final && after <= maxRetry:
-		p.retry[s] = &pending{body: buf.Bytes(), n: n, due: now.Add(max(after, minRetry))}
+	case o.ok:
+	case o.retry && !final && o.after <= maxRetry:
+		p.retry[s] = &pending{body: buf.Bytes(), n: n, due: now.Add(max(o.after, minRetry))}
 	default:
 		p.drop(s, n)
 	}
 }
 
-func (p *Pipeline) send(s signal, body []byte) (ok, retry bool, after time.Duration) {
+type outcome struct {
+	ok, retry bool
+	after     time.Duration
+	why       string
+}
+
+func (p *Pipeline) send(s signal, body []byte) outcome {
 	req, err := http.NewRequestWithContext(p.ctx, http.MethodPost, p.urls[s], bytes.NewReader(body))
 	if err != nil {
-		return false, false, 0
+		return p.note(s, outcome{why: err.Error()})
 	}
 	req.Header.Set("Content-Type", "application/x-protobuf")
 	req.Header.Set("Content-Encoding", "gzip")
 	resp, err := p.client.Do(req)
 	if err != nil {
-		return false, false, 0
+		return p.note(s, outcome{retry: p.ctx.Err() == nil, why: err.Error()})
 	}
 	io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
 	resp.Body.Close()
 	switch resp.StatusCode {
-	case http.StatusTooManyRequests, http.StatusServiceUnavailable:
-		return false, true, retryAfter(resp.Header.Get("Retry-After"))
+	case http.StatusTooManyRequests, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return p.note(s, outcome{retry: true, after: retryAfter(resp.Header.Get("Retry-After")), why: resp.Status})
 	}
-	return resp.StatusCode/100 == 2, false, 0
+	if resp.StatusCode/100 != 2 {
+		return p.note(s, outcome{why: resp.Status})
+	}
+	return p.note(s, outcome{ok: true})
+}
+
+func (p *Pipeline) note(s signal, o outcome) outcome {
+	h := p.warn.Load()
+	if h == nil || p.ctx.Err() != nil || o.ok != p.failing[s] {
+		return o
+	}
+	p.failing[s] = !o.ok
+	rec := slog.NewRecord(time.Now(), slog.LevelInfo, "telemetry export recovered", 0)
+	if !o.ok {
+		rec = slog.NewRecord(time.Now(), slog.LevelWarn, "telemetry export failing", 0)
+		rec.AddAttrs(slog.String("reason", o.why))
+	}
+	rec.AddAttrs(slog.String("signal", signals[s]), slog.String("endpoint", p.paths[s]))
+	if (*h).Enabled(context.Background(), rec.Level) {
+		(*h).Handle(context.Background(), rec)
+	}
+	return o
+}
+
+func (p *Pipeline) local(h slog.Handler) slog.Handler {
+	if l, ok := h.(*logs); ok {
+		h = l.local
+	}
+	if p != nil && h != nil {
+		p.warn.CompareAndSwap(nil, &h)
+	}
+	return h
 }
 
 func retryAfter(h string) time.Duration {
 	if s, err := strconv.Atoi(h); err == nil {
+		if s > int(maxRetry/time.Second) {
+			return maxRetry + time.Second
+		}
 		return time.Duration(max(s, 0)) * time.Second
 	}
 	if t, err := http.ParseTime(h); err == nil {

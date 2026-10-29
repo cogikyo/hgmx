@@ -22,25 +22,19 @@ func severity(l slog.Level) int {
 	return min(max(int(l)+9, 1), 24)
 }
 
-type op struct {
-	group string
-	attrs []slog.Attr
-}
-
 type logs struct {
 	local  slog.Handler
-	base   slog.Handler
-	ops    []op
 	p      *Pipeline
 	groups []string
 	frames [][]slog.Attr
 }
 
 func (p *Pipeline) Logs(local slog.Handler) slog.Handler {
+	local = p.local(local)
 	if p == nil {
 		return local
 	}
-	return &logs{local: local, base: local, p: p, frames: [][]slog.Attr{nil}}
+	return &logs{local: local, p: p, frames: [][]slog.Attr{nil}}
 }
 
 func (h *logs) Enabled(ctx context.Context, l slog.Level) bool {
@@ -55,24 +49,11 @@ func (h *logs) Handle(ctx context.Context, r slog.Record) error {
 	if !h.local.Enabled(ctx, r.Level) {
 		return nil
 	}
-	if !s.recording() {
-		return h.local.Handle(ctx, r)
-	}
-	ids := []slog.Attr{slog.String("trace_id", s.TraceID()), slog.String("span_id", s.spanHex())}
-	if len(h.groups) == 0 {
+	if s.recording() {
 		r = r.Clone()
-		r.AddAttrs(ids...)
-		return h.local.Handle(ctx, r)
+		r.AddAttrs(slog.String("trace_id", s.TraceID()), slog.String("span_id", s.spanHex()))
 	}
-	l := h.base.WithAttrs(ids)
-	for _, o := range h.ops {
-		if o.group != "" {
-			l = l.WithGroup(o.group)
-		} else {
-			l = l.WithAttrs(o.attrs)
-		}
-	}
-	return l.Handle(ctx, r)
+	return h.local.Handle(ctx, r)
 }
 
 func (h *logs) record(r slog.Record, s *Span) record {
@@ -109,13 +90,7 @@ func (h *logs) WithAttrs(as []slog.Attr) slog.Handler {
 		frame = snapshot(frame, a)
 	}
 	c.frames = append(slices.Clip(h.frames[:last]), frame)
-	if len(h.groups) > 0 {
-		c.ops = append(slices.Clip(h.ops), op{attrs: slices.Clone(as)})
-	}
 	c.local = h.local.WithAttrs(as)
-	if len(h.groups) == 0 {
-		c.base = c.local
-	}
 	return &c
 }
 
@@ -124,9 +99,8 @@ func (h *logs) WithGroup(name string) slog.Handler {
 		return h
 	}
 	c := *h
-	c.groups = append(slices.Clip(h.groups), name)
+	c.groups = append(slices.Clip(h.groups), clip(name))
 	c.frames = append(slices.Clip(h.frames), nil)
-	c.ops = append(slices.Clip(h.ops), op{group: name})
 	c.local = h.local.WithGroup(name)
 	return &c
 }

@@ -2,8 +2,9 @@ package telemetry
 
 import (
 	"bytes"
-	"context"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"testing/slogtest"
@@ -40,15 +41,15 @@ func TestLogsSlogtest(t *testing.T) {
 	})
 }
 
-func TestLogsTraceIDsAtTopLevel(t *testing.T) {
+func TestHandlerUnwrapsLogs(t *testing.T) {
 	p := offline(nil)
 	var out bytes.Buffer
-	l := slog.New(p.Logs(slog.NewTextHandler(&out, nil))).With("a", 1).WithGroup("g").With("b", 2)
-	ctx, s := p.Start(context.Background(), "work")
-	l.InfoContext(ctx, "hi", "c", 3)
-	line := out.String()
-	want := "a=1 trace_id=" + s.TraceID() + " span_id=" + s.spanHex() + " g.b=2 g.c=3"
-	if !strings.Contains(line, want) {
-		t.Errorf("local line %q lacks %q", line, want)
+	h := p.Handler(p.Logs(slog.NewTextHandler(&out, nil)), http.NotFoundHandler())
+	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/", nil))
+	if n := strings.Count(out.String(), "trace_id="); n != 1 {
+		t.Errorf("access line has %d trace_id attrs, want 1: %s", n, out.String())
+	}
+	if recs := p.recs.take(); len(recs) != 0 {
+		t.Errorf("access line exported as %d log records", len(recs))
 	}
 }
