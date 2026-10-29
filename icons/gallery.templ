@@ -1,0 +1,39 @@
+package icons
+
+// Gallery renders a searchable icon list, with htmx updates when available.
+// Path must be a trusted search-page URL whose handler passes query q here.
+templ Gallery(path, q string) {
+	<form action={ templ.SafeURL(path) } role="search">
+		<input
+			type="search"
+			name="q"
+			value={ q }
+			aria-label="Search icons"
+			hx-get={ path }
+			hx-trigger="input changed delay:200ms"
+			hx-select="#icons"
+			hx-target="#results"
+			hx-swap="innerHTML"
+			hx-sync="queue last"
+			hx-select-oob=""
+			hx-replace-url="true"
+		/>
+	</form>
+	<section id="results">
+		<div id="icons">
+			@Specimen(Match(q))
+		</div>
+	</section>
+}
+
+// Specimen renders a labelled icon list with Hover targets for previews.
+templ Specimen(names []Name) {
+	<ul>
+		for _, n := range names {
+			<li { Hover... }>
+				@n
+				<span>{ string(n) }</span>
+			</li>
+		}
+	</ul>
+}

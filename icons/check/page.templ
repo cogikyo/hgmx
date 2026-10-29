@@ -1,0 +1,35 @@
+package main
+
+import (
+	"html/template"
+
+	"github.com/cogikyo/hgmx/icons"
+)
+
+templ page(head template.HTML, path, q string, only []icons.Name) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="utf-8"/>
+			<title>icons</title>
+			<link rel="stylesheet" href="/check.css"/>
+			@templ.Raw(string(head))
+		</head>
+		<body hx-boost:inherited="target:#main select:#main swap:'innerHTML strip show:top showTarget:body'">
+			<nav>
+				<a id="a" href={ templ.SafeURL("/a" + query(q, only)) }>a</a>
+				<a id="b" href={ templ.SafeURL("/b" + query(q, only)) }>b</a>
+			</nav>
+			<main id="main" hx-history-elt>
+				<h1 id="page">{ path }</h1>
+				if only != nil {
+					<div id="icons">
+						@icons.Specimen(only)
+					</div>
+				} else {
+					@icons.Gallery(path, q)
+				}
+			</main>
+		</body>
+	</html>
+}

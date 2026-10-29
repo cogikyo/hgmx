@@ -1,0 +1,11 @@
+svg[data-icon] {
+  overflow: visible;
+}
+
+svg[data-icon] :not([transform], [transform-origin]) {
+  transform-origin: 50% 50%;
+}
+
+svg[data-icon] [transform-origin] {
+  transform-box: view-box !important;
+}
