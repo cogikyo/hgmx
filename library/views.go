@@ -51,9 +51,11 @@ func Mount(mux *http.ServeMux, version, dir string) error {
 
 func (s *site) page(status int, title string, content templ.Component) http.Handler {
 	return server.PageVersion(s.version, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if err := render.HTML(w, r, status, full(s, r.URL.Path, title, content)); err != nil {
-			panic(err)
+		err := render.HTML(w, r, status, full(s, r.URL.Path, title, content))
+		if err == nil || r.Context().Err() != nil {
+			return
 		}
+		panic(err)
 	}))
 }
 
