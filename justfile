@@ -9,10 +9,7 @@ default:
     @just --list
 
 gen:
-    @templ generate
-
-templ-update:
-    go install github.com/a-h/templ/cmd/templ@latest
+    @go tool templ generate
 
 build: gen
     @go build -o {{BINARY_NAME}} {{MAIN_PACKAGE_PATH}}
