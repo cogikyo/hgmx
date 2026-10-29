@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"io/fs"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/cogikyo/hgmx"
 	"github.com/cogikyo/hgmx/palette"
@@ -69,35 +72,98 @@ func initCmd(args []string) (code int) {
 func paletteCmd(args []string) (code int) {
 	log := newLogger(logLevel, os.Stderr)
 
-	if len(args) != 1 {
-		log.Error("Missing or too many arguments: expected exactly one (hex) color argument.")
+	themes := make([]theme, 0, len(args))
+	for _, arg := range args {
+		t, err := parseTheme(arg)
+		if err != nil {
+			log.Error("Invalid theme", slog.String("theme", arg), slog.String("error", err.Error()))
+			return 64
+		}
+		themes = append(themes, t)
+		for _, c := range t.palette.Clashes() {
+			log.Warn(c.String(), slog.String("theme", t.name))
+		}
+	}
+
+	var buf bytes.Buffer
+	switch paletteFormat {
+	case "tailwind", "css":
+		for i, t := range themes {
+			sel := palette.Selector(t.name)
+			if i == 0 {
+				sel = ":root, " + sel
+			} else {
+				buf.WriteByte('\n')
+			}
+			t.palette.CSS(&buf, sel)
+		}
+		if paletteFormat == "tailwind" {
+			buf.WriteByte('\n')
+			themes[0].palette.Theme(&buf)
+		}
+	case "lua":
+		if len(themes) != 1 {
+			log.Error("Lua output takes exactly one theme")
+			return 64
+		}
+		themes[0].palette.Lua(&buf)
+	default:
+		log.Error("Unknown format", slog.String("format", paletteFormat))
 		return 64
 	}
 
-	hexColor := args[0]
-
-	log.Info("Generating palette for color:", slog.String("hex", hexColor))
-
-	generatedPalette, err := palette.Generate(hexColor)
-	if err != nil {
-		log.Error("Invalid color", slog.String("error", err.Error()))
-		return 1
-	}
-
-	if paletteLua {
-		generatedPalette.ToLua(os.Stdout)
+	if paletteOut == "" {
+		if _, err := os.Stdout.Write(buf.Bytes()); err != nil {
+			log.Error("Failed to write palette", slog.String("error", err.Error()))
+			return 1
+		}
 		return 0
 	}
-
-	outputFile := "library/static/css/colors.css"
-	f, err := os.Create(outputFile)
-	if err != nil {
-		log.Error("Failed to open output file for writing", slog.String("file", outputFile), slog.String("error", err.Error()))
+	if err := writeAtomic(paletteOut, buf.Bytes()); err != nil {
+		log.Error("Failed to write palette", slog.String("file", paletteOut), slog.String("error", err.Error()))
 		return 1
 	}
-	defer f.Close()
-	generatedPalette.ToCSS(f)
-
-	log.Info("Palette successfully generated and written", slog.String("file", outputFile))
+	log.Info("Palette written", slog.String("file", paletteOut), slog.Int("themes", len(themes)))
 	return 0
+}
+
+type theme struct {
+	name    string
+	palette palette.Palette
+}
+
+func parseTheme(arg string) (theme, error) {
+	name, spec, ok := strings.Cut(arg, "=")
+	if !ok || !palette.ValidName(name) {
+		return theme{}, errors.New("expected <name>=<base>,<primary>[,<accent>] with a name of a-z, 0-9 and -")
+	}
+	hexes := strings.Split(spec, ",")
+	if len(hexes) < 2 || len(hexes) > 3 {
+		return theme{}, errors.New("expected <name>=<base>,<primary>[,<accent>]")
+	}
+	hexes = append(hexes, "")
+	seed, err := palette.ParseSeed(hexes[0], hexes[1], hexes[2])
+	if err != nil {
+		return theme{}, err
+	}
+	return theme{name, palette.Generate(seed)}, nil
+}
+
+func writeAtomic(path string, data []byte) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Chmod(tmp.Name(), 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), path)
 }

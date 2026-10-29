@@ -6,10 +6,10 @@
     body {
         position: relative;
         font-family: var(--font-sans);
-        color: var(--color-surface-400);
+        color: var(--fg);
         min-height: 100svh;
-        background: linear-gradient(60deg, var(--color-base-400), var(--color-base-600));
-        background-color: var(--color-base-600);
+        background: linear-gradient(60deg, var(--surface), var(--base));
+        background-color: var(--base);
         background-size: 500% 500%;
         animation: osculate 8s ease-in-out infinite;
         padding: 1.5rem 2rem;
@@ -40,7 +40,7 @@
            
     @supports (-moz-appearance: none) {
         body {
-            background: var(--base-500);
+            background: var(--neutral-50);
             background-size: auto;
             animation: none;
         }
@@ -52,7 +52,7 @@
     }
     @media (prefers-reduced-motion: reduce) {
         body {
-            background: var(--base-500);
+            background: var(--neutral-50);
             background-size: auto;
             animation: none;
         }
