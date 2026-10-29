@@ -275,14 +275,28 @@ func (v View) dots() []dot {
 }
 
 type ring struct {
-	R     float64
-	Label string
+	R, X, Y float64
+	Label   string
 }
 
-func rings() []ring {
+func rings(dots []dot) []ring {
+	spoke, fewest := 0.0, len(dots)+1
+	for k := range 6 {
+		a := float64(k) * math.Pi / 3
+		n := 0
+		for _, d := range dots {
+			if math.Hypot(d.X, d.Y) > ringChroma/hexChroma*hexRadius/2 && math.Abs(math.Remainder(math.Atan2(d.Y, d.X)-a, 2*math.Pi)) < math.Pi/6 {
+				n++
+			}
+		}
+		if n < fewest {
+			spoke, fewest = a, n
+		}
+	}
 	var out []ring
 	for c := ringChroma; c <= hexChroma; c += ringChroma {
-		out = append(out, ring{c / hexChroma * hexRadius, fmt.Sprintf("C %.1f", c)})
+		r := c / hexChroma * hexRadius
+		out = append(out, ring{r, r * math.Cos(spoke), r * math.Sin(spoke), fmt.Sprintf("C %.1f", c)})
 	}
 	return out
 }

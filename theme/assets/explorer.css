@@ -65,14 +65,15 @@
 }
 
 .theme-explorer .tx-presets,
-.theme-explorer .tx-downloads {
+.theme-explorer .tx-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
 }
 
 .theme-explorer .tx-presets a,
-.theme-explorer .tx-downloads a {
+.theme-explorer .tx-actions a,
+.theme-explorer .tx-actions button {
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
@@ -86,6 +87,14 @@
 
 .theme-explorer .tx-presets a {
   padding-inline-start: 0.25rem;
+}
+
+.theme-explorer .tx-actions button {
+  block-size: auto;
+  border-color: transparent;
+  background: var(--tx-accent);
+  color: var(--tx-on-accent);
+  font-weight: 600;
 }
 
 .theme-explorer .tx-presets svg {
@@ -175,8 +184,57 @@
   flex: 3 1 30rem;
 }
 
+.theme-explorer .tx-scrollwrap {
+  position: relative;
+  min-inline-size: 0;
+}
+
 .theme-explorer .tx-scroll {
   overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--tx-muted) transparent;
+  padding-block-end: 0.5rem;
+}
+
+.theme-explorer .tx-scrollwrap::before,
+.theme-explorer .tx-scrollwrap::after {
+  position: absolute;
+  inset-block-start: 50%;
+  display: grid;
+  place-items: center;
+  inline-size: 2rem;
+  block-size: 2rem;
+  border: 1px solid var(--tx-line);
+  border-radius: 999px;
+  background: var(--tx-surface);
+  box-shadow: 0 1px 6px rgb(0 0 0 / 0.35);
+  color: var(--tx-fg);
+  font-size: 1.25rem;
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+  translate: 0 -50%;
+  transition: opacity 120ms;
+}
+
+.theme-explorer .tx-scrollwrap::before {
+  content: "‹" / "";
+  inset-inline-start: 0.375rem;
+}
+
+.theme-explorer .tx-scrollwrap::after {
+  content: "›" / "";
+  inset-inline-end: 0.375rem;
+}
+
+.theme-explorer .tx-scrollwrap[data-left]::before,
+.theme-explorer .tx-scrollwrap[data-right]::after {
+  opacity: 1;
+}
+
+.theme-explorer .tx-scrollwrap:not([data-left], [data-right]) + figcaption .tx-more {
+  display: none;
 }
 
 .theme-explorer .tx-swatches {
@@ -260,8 +318,14 @@
   cursor: grabbing;
 }
 
+.theme-explorer .tx-ringlabel {
+  pointer-events: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .theme-explorer .tx-dot {
+  .theme-explorer .tx-dot,
+  .theme-explorer .tx-scrollwrap::before,
+  .theme-explorer .tx-scrollwrap::after {
     transition: none;
   }
 }

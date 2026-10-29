@@ -4,6 +4,8 @@ const view = { yaw: -0.7, pitch: 0.5 };
 const spread = 2;
 const turn = 0.12;
 const scenes = new WeakMap();
+const scrollers = new WeakSet();
+const slack = 16;
 let focus = null;
 
 function linear(v) {
@@ -183,6 +185,16 @@ function select(swatch) {
   }
 }
 
+function reveal(el) {
+  const scroller = el.closest(".tx-scroll");
+  if (!scroller) return el.scrollIntoView({ block: "nearest" });
+  const box = scroller.getBoundingClientRect(), r = el.getBoundingClientRect();
+  if (r.right > box.right) scroller.scrollLeft += r.right - box.right + slack;
+  else if (r.left < box.left) scroller.scrollLeft -= box.left - r.left + slack;
+  const page = el.getBoundingClientRect();
+  if (page.top < 0 || page.bottom > window.innerHeight) el.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+
 function move(swatch, key) {
   const group = swatch.closest("[data-swatches]");
   const row = Number(swatch.dataset.row), col = Number(swatch.dataset.col);
@@ -195,7 +207,8 @@ function move(swatch, key) {
   if (!next) return;
   swatch.setAttribute("tabindex", "-1");
   next.setAttribute("tabindex", "0");
-  next.focus();
+  next.focus({ preventScroll: true });
+  reveal(next);
   select(next);
 }
 
@@ -219,8 +232,21 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
+function shade(scroller) {
+  const wrap = scroller.parentElement;
+  const max = scroller.scrollWidth - scroller.clientWidth;
+  wrap.toggleAttribute("data-left", scroller.scrollLeft > slack);
+  wrap.toggleAttribute("data-right", scroller.scrollLeft < max - slack);
+}
+
 function init(root) {
   if (!(root instanceof Element || root instanceof Document)) return;
+  for (const s of root.querySelectorAll(".tx-scroll")) {
+    if (scrollers.has(s)) continue;
+    scrollers.add(s);
+    s.addEventListener("scroll", () => shade(s), { passive: true });
+    new ResizeObserver(() => shade(s)).observe(s);
+  }
   for (const g of root.querySelectorAll("[data-swatches]")) {
     if (!g.querySelector('.tx-swatch[tabindex="0"]')) g.querySelector(".tx-swatch")?.setAttribute("tabindex", "0");
   }

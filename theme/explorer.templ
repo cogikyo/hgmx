@@ -64,10 +64,11 @@ templ Explorer(v View) {
 							<span>(derived)</span>
 						}
 					</p>
-					<nav class="tx-downloads" aria-label="Download this palette">
+					<div class="tx-actions" role="group" aria-label="Use or download this palette">
+						<button type="button" data-theme-live={ v.Live() }>Use on this page</button>
 						<a href={ templ.URL(v.download("css")) } download>Download CSS</a>
 						<a href={ templ.URL(v.download("tailwind")) } download>Download Tailwind theme</a>
-					</nav>
+					</div>
 				</header>
 				if clashes := v.Palette.Clashes(); len(clashes) > 0 {
 					<ul class="tx-clashes">
@@ -88,10 +89,12 @@ templ Explorer(v View) {
 				</div>
 				<div class="tx-row">
 					<figure class="tx-gridfig">
-						<div class="tx-scroll">
-							@swatches(v)
+						<div class="tx-scrollwrap">
+							<div class="tx-scroll">
+								@swatches(v)
+							</div>
 						</div>
-						<figcaption>Every scale by step; select a swatch, then use the arrow keys</figcaption>
+						<figcaption>Every scale by step; select a swatch, then use the arrow keys<span class="tx-more">. Scroll sideways for the rest of the steps.</span></figcaption>
 					</figure>
 					@readout(v.selected())
 				</div>
@@ -257,14 +260,18 @@ templ hexField(v View) {
 		<line x1="0" y1="-98" x2="0" y2="98" stroke={ line } stroke-dasharray="2 3"></line>
 		<text x="100" y="-4" fill={ muted } font-size="8" text-anchor="end">+a</text>
 		<text x="4" y="-100" fill={ muted } font-size="8">+b</text>
-		for _, r := range rings() {
+		{{ dots := v.dots() }}
+		{{ rings := rings(dots) }}
+		for _, r := range rings {
 			<polygon points={ hexagon(0, 0, r.R) } fill="none" stroke={ line } stroke-dasharray="2 3"></polygon>
-			<text x={ num(r.R - 2) } y="9" fill={ muted } font-size="7.5" text-anchor="end">{ r.Label }</text>
 		}
-		for _, d := range v.dots() {
+		for _, d := range dots {
 			<polygon class="tx-dot" data-family={ d.Families } points={ hexagon(d.X, d.Y, dotRadius) } fill={ d.Color.Hex() } stroke={ v.Seed.Base.Hex() } stroke-width="0.6">
 				<title>{ d.Title }</title>
 			</polygon>
+		}
+		for _, r := range rings {
+			<text class="tx-ringlabel" x={ num(r.X) } y={ num(r.Y) } fill={ muted } stroke={ v.Seed.Base.Hex() } stroke-width="2.5" stroke-linejoin="round" paint-order="stroke" font-size="7.5" text-anchor="middle" dominant-baseline="central">{ r.Label }</text>
 		}
 	</svg>
 }
