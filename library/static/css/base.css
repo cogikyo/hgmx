@@ -20,15 +20,22 @@
         view-transition-name: main;
     }
 
-    ::view-transition-old(root),
-    ::view-transition-new(root) {
-        animation: none;
+    [tabindex="-1"]:focus {
+        outline: none;
+    }
+
+    :root {
+        view-transition-name: none;
+    }
+
+    ::view-transition {
+        pointer-events: none;
     }
 
     ::view-transition-group(main),
     ::view-transition-old(main),
     ::view-transition-new(main) {
-        animation-duration: 200ms;
+        animation-duration: 120ms;
     }
 
     @media (max-width: 768px) {
@@ -44,21 +51,11 @@
             background-size: auto;
             animation: none;
         }
-        body::before,
-        body::after {
-            content: none;
-            animation: none;
-        }
     }
     @media (prefers-reduced-motion: reduce) {
         body {
             background: var(--base-500);
             background-size: auto;
-            animation: none;
-        }
-        body::before,
-        body::after {
-            content: none;
             animation: none;
         }
         ::view-transition-group(*),

@@ -8,6 +8,7 @@ require (
 	github.com/fatih/color v1.19.0
 	github.com/spf13/cobra v1.9.1
 	golang.org/x/image v0.46.0
+	golang.org/x/mod v0.41.0
 )
 
 require (
@@ -21,7 +22,6 @@ require (
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/natefinch/atomic v1.0.1 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
-	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/net v0.59.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect

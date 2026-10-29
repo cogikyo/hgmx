@@ -1,14 +1,18 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"io/fs"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"runtime"
+	"strconv"
 
 	"github.com/cogikyo/hgmx"
 	"github.com/cogikyo/hgmx/palette"
+	"golang.org/x/mod/modfile"
 )
 
 // --- info command ---
@@ -31,12 +35,25 @@ func infoCmd() (code int) {
 func initCmd(args []string) (code int) {
 	log := newLogger(logLevel, os.Stderr)
 
-	const viewsDir = "views"
-	if _, err := os.Lstat(viewsDir); err == nil {
-		log.Error("Refusing to overwrite existing " + viewsDir + "; move it aside or run init in an empty project")
+	const viewsDir, mainFile = "views", "main.go"
+	for _, name := range []string{viewsDir, mainFile} {
+		if _, err := os.Lstat(name); err == nil {
+			log.Error("Refusing to overwrite existing " + name + "; move it aside or run init in an empty project")
+			return 1
+		} else if !errors.Is(err, fs.ErrNotExist) {
+			log.Error("Failed to check "+name, slog.String("error", err.Error()))
+			return 1
+		}
+	}
+
+	gomod, err := os.ReadFile("go.mod")
+	if err != nil {
+		log.Error("Failed to read go.mod; run go mod init first", slog.String("error", err.Error()))
 		return 1
-	} else if !errors.Is(err, fs.ErrNotExist) {
-		log.Error("Failed to check "+viewsDir, slog.String("error", err.Error()))
+	}
+	module := modfile.ModulePath(gomod)
+	if module == "" {
+		log.Error("go.mod declares no module path")
 		return 1
 	}
 
@@ -47,20 +64,37 @@ func initCmd(args []string) (code int) {
 	}
 	defer os.RemoveAll(tmp)
 
-	if err := scaffold(hgmx.LibraryFS, "library", []string{"static", "views.templ", "views.go", "icon.png"}, tmp); err != nil {
+	if err := scaffold(hgmx.LibraryFS, "library", []string{"static", "views.templ", "views_templ.go", "views.go"}, tmp); err != nil {
 		log.Error("Failed to copy scaffold", slog.String("error", err.Error()))
+		return 1
+	}
+	src, err := hgmx.LibraryFS.ReadFile("library/main/main.go")
+	if err != nil {
+		log.Error("Failed to read scaffold main.go", slog.String("error", err.Error()))
+		return 1
+	}
+	src = bytes.Replace(src, []byte(`"github.com/cogikyo/hgmx/library"`), []byte(strconv.Quote(module+"/"+viewsDir)), 1)
+	staged := filepath.Join(tmp, mainFile)
+	if err := os.WriteFile(staged, src, 0o644); err != nil {
+		log.Error("Failed to write "+mainFile, slog.String("error", err.Error()))
 		return 1
 	}
 	if err := os.Chmod(tmp, 0o755); err != nil {
 		log.Error("Failed to set permissions", slog.String("dir", tmp), slog.String("error", err.Error()))
 		return 1
 	}
+
+	if err := os.Rename(staged, mainFile); err != nil {
+		log.Error("Failed to move "+mainFile+" into place", slog.String("error", err.Error()))
+		return 1
+	}
 	if err := os.Rename(tmp, viewsDir); err != nil {
+		os.Remove(mainFile)
 		log.Error("Failed to move scaffold into place", slog.String("error", err.Error()))
 		return 1
 	}
 
-	log.Info("hgmx project initialized successfully in ./" + viewsDir)
+	log.Info("hgmx project initialized successfully in ./" + viewsDir + " and ./" + mainFile)
 	return 0
 }
 
