@@ -21,8 +21,8 @@ To install instead, use `go install github.com/cogikyo/hgmx/cmd/hgmx@latest`.
 - `hgmx init` copies a working two-page scaffold from the embedded `library/` into `./views/`.
   - It copies `views.go`, `views.templ`, `icon.png` and `static/`.
   - Before the first build, run `go get github.com/cogikyo/hgmx` to require the hgmx packages.
-  - It copies no generated code, so pin templ once with `go get -tool github.com/a-h/templ/cmd/templ@v0.3.1100`.
-  - Then run `go tool templ generate`, and build.
+  - It copies no generated code, so run `go run github.com/a-h/templ/cmd/templ@v0.3.1100 generate`.
+  - Then run `go mod tidy` and `go mod vendor`, and build.
   - `views.New(dev)` builds the `Site`; `Site.Scripts` loads htmx, hx-preload and _hyperscript.
   - `Site.Mount` registers the static, scripts and webapp handlers and the pages `GET /{$}` and `GET /about`.
   - It also registers `GET /` as a full-page 404 through the layout.

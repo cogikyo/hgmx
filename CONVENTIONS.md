@@ -194,11 +194,13 @@ Never branch on `HX-Request-Type`; preload requests lack it, so the full page wo
   - Process constants such as the build version are package variables set once at startup.
 - **No templ `css` components**; Tailwind owns styling.
 - **Rendering is buffered** (the default `templ.Handler`) unless a measured need calls for streaming.
-- **`go tool templ` is pinned in `go.mod`**, and `_templ.go` files are committed.
-  - Pin it with `go get -tool github.com/a-h/templ/cmd/templ@v0.3.1100`.
-- **`nix flake check` verifies that generated files are fresh.**
-  - It runs `go tool templ generate -check` and `go tool templ fmt -fail .`.
-  - It also checks that a Tailwind rebuild leaves no diff.
+- **The templ version in `go.mod` is the one authority.** Sites require templ's runtime as usual.
+  - Run the generator at that version: `go run github.com/a-h/templ/cmd/templ@v0.3.1100 generate`.
+- **No templ `tool` line:** Go would vendor the generator's whole dependency tree.
+  - It grew a site's `vendor/` from about 0.8 MB to 16 MB.
+  - hgmx keeps its own `tool` line because it has no `vendor/`.
+- **Generated templ and CSS are committed**, and regenerated and checked before each commit.
+  - templ checks its output with `generate -check` and `fmt -fail .`, run at the same version.
 
 ## Tailwind v4
 
@@ -232,7 +234,7 @@ templ Button(size Size, active bool, attrs templ.Attributes) {
 - **`@layer components`** is only for single-element patterns or HTML you don't author.
   - Rendered markdown is one example of HTML you don't author.
 - **Use `@apply` rarely.**
-- **Built CSS is committed.** Load the typography plugin only where `prose` is used.
+- **Load the typography plugin** only where `prose` is used.
 
 ## Routing and Server
 
@@ -272,6 +274,7 @@ mux.Handle(webapp.Path, app)
   - Don't split a page between a handlers tree and a views tree.
 - **`views/components/<name>/`** holds components copied from hgmx and the site's own.
 - **No service or store layers** without a database, and no DI framework.
+- **Commit `vendor/`:** deployed sites build offline from it.
 
 ## Components
 
