@@ -18,6 +18,8 @@ func post(b *Beacon, body string) int {
 	r.Header.Set("User-Agent", chrome)
 	r.Header.Set("CF-Connecting-IP", "203.0.113.77")
 	r.Header.Set("CF-IPCountry", "NZ")
+	r.Header.Set("CF-Region-Code", "AUK")
+	r.Header.Set("CF-IPCity", "Auckland")
 	w := httptest.NewRecorder()
 	b.ServeHTTP(w, r)
 	return w.Code
@@ -79,7 +81,8 @@ func TestBeaconPrivacy(t *testing.T) {
 	}
 	v := recs[0]
 	if v.event != "browser.page_view" || attr(v.attrs, "url.path") != "/icons" || attr(v.attrs, "referrer.host") != "news.ycombinator.com" ||
-		len(attr(v.attrs, "visitor.hash")) != 16 || attr(v.attrs, "geo.country.iso_code") != "NZ" || v.trace == (traceID{}) {
+		len(attr(v.attrs, "visitor.hash")) != 16 || attr(v.attrs, "geo.country.iso_code") != "NZ" ||
+		attr(v.attrs, "geo.region.iso_code") != "NZ-AUK" || attr(v.attrs, "geo.locality.name") != "Auckland" || v.trace == (traceID{}) {
 		t.Errorf("page view: %+v", v)
 	}
 	if attr(recs[1].attrs, "browser.vitals.inp") != "" || attr(recs[1].attrs, "browser.vitals.lcp") != "420" {

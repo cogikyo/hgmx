@@ -18,6 +18,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/cogikyo/hgmx/static"
 )
@@ -164,6 +166,12 @@ func (b *Beacon) accept(r *http.Request) int {
 	)
 	if c := r.Header.Get("CF-IPCountry"); len(c) == 2 && c != "XX" && c != "T1" && upper(c) {
 		rec.attrs = append(rec.attrs, slog.String("geo.country.iso_code", strings.Clone(c)))
+		if code := r.Header.Get("CF-Region-Code"); len(code) >= 1 && len(code) <= 3 && upperNum(code) {
+			rec.attrs = append(rec.attrs, slog.String("geo.region.iso_code", c+"-"+code))
+		}
+	}
+	if city := r.Header.Get("CF-IPCity"); len(city) >= 1 && len(city) <= 100 && utf8.ValidString(city) && strings.IndexFunc(city, unicode.IsControl) < 0 {
+		rec.attrs = append(rec.attrs, slog.String("geo.locality.name", strings.Clone(city)))
 	}
 	if l, ok := parseTraceparent(e.Traceparent); ok {
 		rec.trace, rec.span = l.trace, l.id
@@ -230,6 +238,15 @@ func family(ua string) string {
 func upper(s string) bool {
 	for i := range len(s) {
 		if s[i] < 'A' || s[i] > 'Z' {
+			return false
+		}
+	}
+	return true
+}
+
+func upperNum(s string) bool {
+	for i := range len(s) {
+		if (s[i] < 'A' || s[i] > 'Z') && (s[i] < '0' || s[i] > '9') {
 			return false
 		}
 	}
