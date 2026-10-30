@@ -50,7 +50,7 @@ func run(p *telemetry.Pipeline, addr, dir string) error {
 ```
 
 The imports, `version` and `csp` declarations are in that generated file.
-`server.Site` owns the middleware, health check and beacon; `views.New` returns the application's handler.
+`server.Site` owns the middleware, health check and beacon; `views.New` returns the application's mux.
 
 ## Packages
 

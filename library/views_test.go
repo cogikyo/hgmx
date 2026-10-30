@@ -32,16 +32,18 @@ func TestRenderFailure(t *testing.T) {
 	s := &site{static: st, scripts: scripts.New(scripts.Navigation), version: "v1"}
 	broken := templ.ComponentFunc(func(context.Context, io.Writer) error { return errors.New("broken") })
 	page := s.page(http.StatusOK, "Broken", broken)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "public, max-age=600")
+		w.Header().Set("ETag", `"v1"`)
+		page.ServeHTTP(w, r)
+	})
 	var logged bytes.Buffer
 	h := server.Site{
 		Version:   "v1",
 		Fallback:  http.HandlerFunc(InternalError),
 		Telemetry: telemetry.Disabled(slog.NewTextHandler(&logged, &slog.HandlerOptions{Level: slog.LevelWarn})),
-	}.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "public, max-age=600")
-		w.Header().Set("ETag", `"v1"`)
-		page.ServeHTTP(w, r)
-	}))
+	}.Handler(mux)
 
 	for _, method := range []string{"GET", "HEAD"} {
 		rec := httptest.NewRecorder()

@@ -35,8 +35,8 @@ type Config struct {
 	Head    template.HTML // Trusted HTML appended to the document head.
 }
 
-// New builds the application handler; wrap it with [server.Site.Handler].
-func New(c Config) (http.Handler, error) {
+// New builds the application mux; wrap it with [server.Site.Handler].
+func New(c Config) (*http.ServeMux, error) {
 	s := &site{scripts: scripts.New(scripts.Navigation), head: c.Head, version: c.Version}
 	if c.Static != "" {
 		s.static = static.Dev(assets, os.DirFS(c.Static))

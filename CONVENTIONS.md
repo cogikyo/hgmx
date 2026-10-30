@@ -271,7 +271,7 @@ mux.Handle(webapp.Path, app)
 
 - **`server.Site{Version, CSP, Fallback, Telemetry}.Handler(mux)` owns composition.**
   - Health and the `/_v/` beacon sit outside the middleware chain.
-  - The chain is telemetry, security headers, recovery, `http.CrossOriginProtection`, then mux.
+  - The chain is telemetry, security headers, recovery, `http.CrossOriginProtection`, then an unwrapped `*http.ServeMux`.
   - Supply a non-nil telemetry pipeline and a fixed fallback that renders without calling failing templates.
 - **Safe methods never mutate.** Cross-origin protection guards the application routes.
 - **`server.Site` sends security headers:** the site's CSP, `nosniff`, referrer and permissions policies, and opener isolation.

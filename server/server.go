@@ -31,10 +31,12 @@ type Site struct {
 }
 
 // Handler wraps mux with telemetry, security headers, and panic recovery.
+// The mux type rejects outer wrappers that can hide r.Pattern from telemetry.
+// StripPrefix, nested muxes, and route wrappers can still coarsen http.route.
 // Cross-origin protection runs last, before mux.
 // It serves /healthz and the telemetry beacon outside that chain.
 // It panics if Fallback or Telemetry is nil; use [telemetry.Disabled] to opt out.
-func (s Site) Handler(mux http.Handler) http.Handler {
+func (s Site) Handler(mux *http.ServeMux) http.Handler {
 	if s.Fallback == nil {
 		panic("server: Site.Fallback is nil")
 	}
