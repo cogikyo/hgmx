@@ -1,0 +1,279 @@
+package theme
+
+import (
+	"fmt"
+	"github.com/cogikyo/hgmx/palette"
+)
+
+// Explorer renders the palette editor and preview; serve it with v.Status().
+// Include Handler.Head in the layout to enable the live-theme controls.
+templ Explorer(v View) {
+	<link rel="stylesheet" href={ v.assets.css }/>
+	<script type="module" src={ v.assets.js }></script>
+	<section class="theme-explorer" aria-label="Palette explorer">
+		<form
+			class="tx-controls"
+			action={ templ.URL(v.Action) }
+			method="get"
+			hx-get={ string(templ.URL(v.Action)) }
+			hx-trigger="input delay:150ms, submit"
+			hx-select="#tx-view"
+			hx-target="#tx-results"
+			hx-swap="innerHTML"
+			hx-sync="queue last"
+			hx-select-oob=""
+			hx-replace-url="true"
+		>
+			<label>
+				<span>Base</span>
+				<input type="color" name="base" value={ v.Seed.Base.Hex() }/>
+			</label>
+			<label>
+				<span>Primary</span>
+				<input type="color" name="primary" value={ v.Seed.Primary.Hex() }/>
+			</label>
+			<label>
+				<span>Accent</span>
+				<input type="text" name="accent" value={ v.Accent() } placeholder="derived" pattern="#[0-9a-fA-F]{6}" size="8" spellcheck="false" autocomplete="off"/>
+			</label>
+			<button type="submit">Generate</button>
+			if len(v.Presets) > 0 {
+				<nav class="tx-presets" aria-label="Presets">
+					for _, p := range v.Presets {
+						<a href={ templ.URL(v.Link(p.Seed)) }>
+							<svg viewBox="0 0 20 20" aria-hidden="true">
+								<rect width="20" height="20" rx="4" fill={ p.Seed.Base.Hex() }></rect>
+								<circle cx="10" cy="10" r="5" fill={ p.Seed.Primary.Hex() }></circle>
+							</svg>
+							{ p.Name }
+						</a>
+					}
+				</nav>
+			}
+		</form>
+		<div id="tx-results">
+			<div id="tx-view" class="tx-view">
+				if v.Err != nil {
+					<p class="tx-error" role="alert">{ v.Err.Error() }</p>
+				}
+				<header class="tx-summary">
+					<p>
+						<strong>{ v.Palette.Scheme() }</strong>
+						base <code>{ v.Seed.Base.Hex() }</code>
+						primary <code>{ v.Seed.Primary.Hex() }</code>
+						accent <code>{ v.scale("accent").Fill.Hex() }</code>
+						if v.Seed.Accent == nil {
+							<span>(derived)</span>
+						}
+					</p>
+					<div class="tx-actions" role="group" aria-label="Use or download this palette">
+						<button type="button" data-theme-live={ v.Live() }>Use on this page</button>
+						<a href={ templ.URL(v.download("css")) } download>Download CSS</a>
+						<a href={ templ.URL(v.download("tailwind")) } download>Download Tailwind theme</a>
+					</div>
+				</header>
+				if clashes := v.Palette.Clashes(); len(clashes) > 0 {
+					<ul class="tx-clashes">
+						for _, c := range clashes {
+							<li>{ c.String() }.</li>
+						}
+					</ul>
+				}
+				<div class="tx-row">
+					<figure class="tx-mockfig">
+						@mockup(v.mock())
+						<figcaption>Roles and control states in use</figcaption>
+					</figure>
+					<figure class="tx-rolefig">
+						@roleStrip(v)
+						<figcaption>Roles and fills</figcaption>
+					</figure>
+				</div>
+				<div class="tx-row">
+					<figure class="tx-gridfig">
+						<div class="tx-scrollwrap">
+							<div class="tx-scroll">
+								@swatches(v)
+							</div>
+						</div>
+						<figcaption>Every scale by step; select a swatch, then use the arrow keys<span class="tx-more">. Scroll sideways for the rest of the steps.</span></figcaption>
+					</figure>
+					@readout(v.selected())
+				</div>
+				<div class="tx-row">
+					<figure class="tx-plotfig">
+						@hexField(v)
+						<figcaption>Hue and chroma (the a–b plane)</figcaption>
+					</figure>
+					<figure class="tx-plotfig">
+						<canvas class="tx-space" data-oklab={ v.space() } tabindex="0" role="img" aria-label="Palette in OKLab space with the sRGB gamut; drag or use the arrow keys to rotate"></canvas>
+						<figcaption>OKLab, a and b doubled · drag or use the arrow keys to rotate</figcaption>
+					</figure>
+				</div>
+			</div>
+		</div>
+	</section>
+}
+
+templ readout(s swatch) {
+	<aside class="tx-readout" aria-label="Selected colour">
+		<svg viewBox="0 0 48 48" aria-hidden="true">
+			<rect width="48" height="48" rx="8" fill={ s.Color.Hex() } data-readout="swatch"></rect>
+		</svg>
+		<dl aria-live="polite">
+			<dt>Token</dt>
+			<dd data-readout="token">{ s.Detail.Token }</dd>
+			<dt>Hex</dt>
+			<dd data-readout="hex"><code>{ s.Detail.Hex }</code></dd>
+			<dt>OKLCH</dt>
+			<dd data-readout="oklch">{ s.Detail.OKLCH }</dd>
+			<dt>On base</dt>
+			<dd data-readout="base">{ s.Detail.Base }</dd>
+			<dt>On surface</dt>
+			<dd data-readout="surface">{ s.Detail.Surface }</dd>
+			<dt>On inset</dt>
+			<dd data-readout="inset">{ s.Detail.Inset }</dd>
+			<dt>ΔL from base</dt>
+			<dd data-readout="dl">{ s.Detail.DL }</dd>
+			<dt>Note</dt>
+			<dd data-readout="note">{ s.Detail.Note }</dd>
+		</dl>
+	</aside>
+}
+
+templ swatchCell(s swatch, row, col int, x, y float64, tab, ink, muted string) {
+	<g
+		class="tx-swatch"
+		role="button"
+		tabindex={ tab }
+		aria-label={ s.Token + " " + s.Color.Hex() }
+		data-family={ s.Family }
+		data-row={ fmt.Sprint(row) }
+		data-col={ fmt.Sprint(col) }
+		data-detail={ s.Detail.JSON() }
+	>
+		if s.Short {
+			<rect x={ num(x + 1) } y={ num(y + 1) } width={ num(cellW - 2) } height={ num(cellH - 2) } rx="4" fill="none" stroke={ muted } stroke-dasharray="3 3"></rect>
+			<line x1={ num(x + 6) } y1={ num(y + cellH - 6) } x2={ num(x + cellW - 6) } y2={ num(y + 6) } stroke={ muted }></line>
+		} else {
+			<rect x={ num(x) } y={ num(y) } width={ num(cellW) } height={ num(cellH) } rx="4" fill={ s.Color.Hex() }></rect>
+		}
+		<rect x={ num(x - 2) } y={ num(y - 2) } width={ num(cellW + 4) } height={ num(cellH + 4) } rx="6" fill="none" stroke={ ink } stroke-width="2" class="tx-ring"></rect>
+	</g>
+}
+
+templ swatches(v View) {
+	{{ rows := v.rows() }}
+	{{ fg, muted := v.role("fg").Hex(), v.role("muted").Hex() }}
+	<svg class="tx-swatches" viewBox={ fmt.Sprintf("0 0 %d %d", gridW, gridH(len(rows))) } role="group" aria-label="Every scale by step" data-swatches>
+		<rect width="100%" height="100%" rx="10" fill={ v.Seed.Base.Hex() }></rect>
+		for i, step := range palette.Steps {
+			<text x={ num(colX(i) + cellW/2) } y="18" fill={ muted } font-size="12" text-anchor="middle">{ fmt.Sprint(step) }</text>
+		}
+		for r, row := range rows {
+			<text x="10" y={ num(rowY(r) + cellH/2 + 4) } fill={ fg } font-size="12">{ row.Label }</text>
+			for i, c := range row.Cells {
+				if r == 0 && i == 0 {
+					@swatchCell(c, r, i, colX(i), rowY(r), "0", fg, muted)
+				} else {
+					@swatchCell(c, r, i, colX(i), rowY(r), "-1", fg, muted)
+				}
+			}
+		}
+	</svg>
+}
+
+templ roleStrip(v View) {
+	{{ items := v.roles() }}
+	{{ base := v.Seed.Base.Hex() }}
+	<svg class="tx-roles" viewBox={ fmt.Sprintf("0 0 200 %d", rolesH(len(items))) } role="group" aria-label="Roles and fills" data-swatches>
+		<rect width="200" height="100%" rx="10" fill={ base }></rect>
+		for i, s := range items {
+			<g
+				class="tx-swatch"
+				role="button"
+				tabindex="-1"
+				aria-label={ s.Token + " " + s.Color.Hex() }
+				data-family={ s.Family }
+				data-row={ fmt.Sprint(i) }
+				data-col="0"
+				data-detail={ s.Detail.JSON() }
+			>
+				<rect x="10" y={ num(roleY(i)) } width="40" height="24" rx="4" fill={ s.Color.Hex() } stroke={ v.role("line").Hex() }></rect>
+				<rect x="6" y={ num(roleY(i) - 3) } width="188" height="30" rx="6" fill="none" stroke={ v.role("fg").Hex() } stroke-width="2" class="tx-ring"></rect>
+				<text x="60" y={ num(roleY(i) + 16) } fill={ v.role("fg").Hex() } font-size="12">{ s.Token }</text>
+				<text x="186" y={ num(roleY(i) + 16) } fill={ v.role("muted").Hex() } font-size="11" text-anchor="end">{ s.Color.Hex() }</text>
+			</g>
+		}
+	</svg>
+}
+
+templ mockup(m mock) {
+	<svg class="tx-mock" viewBox="0 0 340 560" role="img" aria-label="Sample interface drawn with the palette, showing roles and control states">
+		<rect width="340" height="560" rx="10" fill={ m.Base.Hex() }></rect>
+		<path d="M10 0 H330 A10 10 0 0 1 340 10 V40 H0 V10 A10 10 0 0 1 10 0 Z" fill={ m.Inset.Hex() }></path>
+		<text x="16" y="26" fill={ m.Strong.Hex() } font-size="14" font-weight="600">Pier</text>
+		<text x="324" y="26" fill={ m.Muted.Hex() } font-size="12" text-anchor="end">inset app bar</text>
+		<rect x="10" y="52" width="320" height="372" rx="8" fill={ m.Surface.Hex() } stroke={ m.Line.Hex() }></rect>
+		<text x="24" y="78" fill={ m.Strong.Hex() } font-size="15" font-weight="600">Leads</text>
+		<text x="24" y="98" fill={ m.Fg.Hex() } font-size="12">Body text sits on the surface.</text>
+		<text x="24" y="116" fill={ m.Muted.Hex() } font-size="12">Muted text carries detail.</text>
+		<text x="24" y="136" fill={ m.Link.Hex() } font-size="12" text-decoration="underline">primary-600 link</text>
+		<text x="170" y="136" fill={ m.LinkHover.Hex() } font-size="12" text-decoration="underline">601 on hover</text>
+		<rect x="24" y="148" width="292" height="28" rx="6" fill={ m.Base.Hex() } stroke={ m.Border.Hex() }></rect>
+		<text x="34" y="167" fill={ m.Muted.Hex() } font-size="12">Search leads (placeholder)</text>
+		<text x="34" y="203" fill={ m.Fg.Hex() } font-size="12">Rest</text>
+		<rect x="24" y="214" width="292" height="24" rx="5" fill={ m.Hover.Hex() }></rect>
+		<text x="34" y="231" fill={ m.Fg.Hex() } font-size="12">Hover · ink/5</text>
+		<rect x="24" y="242" width="292" height="24" rx="5" fill={ m.Pressed.Hex() }></rect>
+		<text x="34" y="259" fill={ m.Fg.Hex() } font-size="12">Pressed · ink/10</text>
+		<rect x="24" y="270" width="292" height="24" rx="5" fill={ m.Selected.Hex() }></rect>
+		<rect x="24" y="270" width="4" height="24" rx="2" fill={ m.Focus.Hex() }></rect>
+		<text x="34" y="287" fill={ m.OnSelected.Hex() } font-size="12" font-weight="600">Selected · accent wash</text>
+		<text x="34" y="315" fill={ m.Disabled.Hex() } font-size="12">Disabled · neutral-400</text>
+		<rect x="25" y="327" width="290" height="22" rx="5" fill="none" stroke={ m.Focus.Hex() } stroke-width="2"></rect>
+		<text x="34" y="343" fill={ m.Fg.Hex() } font-size="12">Keyboard focus · accent-500 ring</text>
+		<rect x="24" y="362" width="292" height="50" rx="6" fill={ m.Raised.Hex() }></rect>
+		<text x="34" y="382" fill={ m.Fg.Hex() } font-size="12">Nested panel on raised</text>
+		<text x="34" y="401" fill={ m.Fg.Hex() } font-size="12">Overlays and menus use raised too.</text>
+		<rect x="10" y="436" width="100" height="32" rx="6" fill={ m.Primary.Hex() }></rect>
+		<text x="60" y="456" fill={ m.OnPrimary.Hex() } font-size="12" font-weight="600" text-anchor="middle">primary</text>
+		<rect x="118" y="436" width="104" height="32" rx="6" fill={ m.Interface.Hex() }></rect>
+		<text x="170" y="456" fill={ m.White.Hex() } font-size="12" font-weight="600" text-anchor="middle">interface fill</text>
+		<rect x="230" y="436" width="100" height="32" rx="6" fill={ m.Secondary.Hex() }></rect>
+		<text x="280" y="456" fill={ m.OnSecondary.Hex() } font-size="12" font-weight="600" text-anchor="middle">secondary</text>
+		<rect x="10" y="478" width="150" height="32" rx="6" fill={ m.Error.Hex() }></rect>
+		<text x="85" y="498" fill={ m.OnError.Hex() } font-size="12" font-weight="600" text-anchor="middle">✕ Delete</text>
+		<rect x="170.5" y="478.5" width="159" height="31" rx="6" fill="none" stroke={ m.Border.Hex() }></rect>
+		<text x="250" y="498" fill={ m.Fg.Hex() } font-size="12" text-anchor="middle">Ghost</text>
+		for i, c := range m.Chips {
+			<rect x={ num(10 + float64(i)*81) } y="522" width="76" height="26" rx="13" fill={ c.Bg.Hex() } stroke={ c.Edge.Hex() }></rect>
+			<text x={ num(48 + float64(i)*81) } y="539" fill={ c.Text.Hex() } font-size="12" text-anchor="middle">{ c.Glyph } { c.Name }</text>
+		}
+	</svg>
+}
+
+templ hexField(v View) {
+	{{ line, muted := v.role("line").Hex(), v.role("muted").Hex() }}
+	<svg class="tx-hex" viewBox="-110 -110 220 220" role="img" aria-label="Palette colours by hue angle and chroma">
+		<rect x="-110" y="-110" width="220" height="220" rx="10" fill={ v.Seed.Base.Hex() }></rect>
+		<polygon points={ hexagon(0, 0, 98) } fill="none" stroke={ line }></polygon>
+		<line x1="-98" y1="0" x2="98" y2="0" stroke={ line } stroke-dasharray="2 3"></line>
+		<line x1="0" y1="-98" x2="0" y2="98" stroke={ line } stroke-dasharray="2 3"></line>
+		<text x="100" y="-4" fill={ muted } font-size="8" text-anchor="end">+a</text>
+		<text x="4" y="-100" fill={ muted } font-size="8">+b</text>
+		{{ dots := v.dots() }}
+		{{ rings := rings(dots) }}
+		for _, r := range rings {
+			<polygon points={ hexagon(0, 0, r.R) } fill="none" stroke={ line } stroke-dasharray="2 3"></polygon>
+		}
+		for _, d := range dots {
+			<polygon class="tx-dot" data-family={ d.Families } points={ hexagon(d.X, d.Y, dotRadius) } fill={ d.Color.Hex() } stroke={ v.Seed.Base.Hex() } stroke-width="0.6">
+				<title>{ d.Title }</title>
+			</polygon>
+		}
+		for _, r := range rings {
+			<text class="tx-ringlabel" x={ num(r.X) } y={ num(r.Y) } fill={ muted } stroke={ v.Seed.Base.Hex() } stroke-width="2.5" stroke-linejoin="round" paint-order="stroke" font-size="7.5" text-anchor="middle" dominant-baseline="central">{ r.Label }</text>
+		}
+	</svg>
+}

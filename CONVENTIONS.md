@@ -20,7 +20,7 @@ A rule holds unless its own text names an exception.
 **Search-as-you-type** filters the page in place.
 `GET /items?q=` renders the filtered full page, so reload and share keep the query.
 This spelling was measured with htmx 4.0.0 in Chromium and Firefox, under the boost from [Navigation](#navigation).
-It relies on the stale-response extension described there.
+It relies on `scripts.Navigation`, described there.
 
 ```html
 <form action="/items" role="search">
@@ -61,6 +61,7 @@ This spelling was verified with htmx 4.0.0 in Chromium and Firefox; WebKit is un
 <body
   hx-boost:inherited="target:#main select:#main swap:'innerHTML strip show:top showTarget:body' transition:true"
   hx-select-oob:inherited="#nav-links:outerMorph"
+  hx-config:inherited='{"headers":{"HGMX-Version":"<rev>"}}'
 >
   <nav id="nav">
     …
@@ -76,14 +77,16 @@ This spelling was verified with htmx 4.0.0 in Chromium and Firefox; WebKit is un
 #main {
   view-transition-name: main;
 }
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation: none;
+:root {
+  view-transition-name: none;
+}
+::view-transition {
+  pointer-events: none;
 }
 ::view-transition-group(main),
 ::view-transition-old(main),
 ::view-transition-new(main) {
-  animation-duration: 200ms;
+  animation-duration: 120ms;
 }
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*),
@@ -100,29 +103,36 @@ This spelling was verified with htmx 4.0.0 in Chromium and Firefox; WebKit is un
   - Use explicit `hx-get` and `hx-target` only where a link behaves differently from navigation.
   - Don't put `hx-get` with `hx-push-url` on nav links.
 - **Handlers always return the full page:** no `HX-Request` branch, no `Vary`, no partial template.
+- **The body takes no `hx-sync`** when loading `scripts.Navigation`.
+- **Version reloads pair `server.VersionConfig` with `server.PageVersion`.**
+  - Emit `server.VersionConfig(version)` on `<body>` and wrap page handlers with `PageVersion`.
+  - A GET or HEAD carrying a different build version gets a full reload; requests without the header pass through.
+  - `scripts.Navigation` re-sends the config headers on history restores.
 - **Per-page regions outside `#main`**, such as a breadcrumb, are listed in `hx-select-oob` and morphed.
   - Morph only regions whose attributes only the server writes.
   - Morph strips classes and inline styles that JS set.
 - **Persistent elements outside `#main`** keep their DOM node and JS state across clicks, Back and Forward.
   - Examples are a nav controller, Motion state, or a background canvas.
-- **Error and 404 pages are full pages.** htmx 4 swaps 4xx and 5xx bodies, so it selects their `#main`.
+- **Validation and 404 pages use the full layout.** htmx 4 selects their `#main` as on success.
+  - Recovery serves the fixed `InternalError` page for a 500; it has no nav.
+  - A boosted 500 leaves the previous page marked in the nav; this is accepted.
 - **Links to non-page responses** get `hx-boost="false"` or `download`; otherwise `#main` ends up empty.
   - These include feeds, PDFs, `/healthz`, downloads and pages without `#main`.
 - **Inheritance is explicit in htmx 4:** add `:inherited` on purpose and expect nothing implicit.
 
-**Drop responses from elements that left the page.**
-In htmx 4.0.0, navigation and an element's own requests run in separate queues, and history updates before the swap.
-A late response from an element that navigation removed would still overwrite the URL and title.
-Register this extension from a static module (see [Scripting](#scripting)):
+**Load `scripts.Navigation` for the boost.**
+Its implementation is [scripts/hgmx.js](scripts/hgmx.js).
+In htmx 4.0.0, it drops a response once its body arrives if its source left the page or its request was aborted.
+It also drops an older navigation response when a newer navigation has started, ordered by trigger time.
+This happens before redirects, history, title or swap; a newer navigation alone does not cancel widget responses.
+After a navigation swap, focus moves to the main heading or `main`, unless already inside `main`.
 
-```js
-htmx.registerExtension("stale", {
-  htmx_after_request: (elt) => elt.isConnected,
-});
-```
+**`hx-sync` cannot replace this:**
 
-It drops the response once its body has arrived, before redirects, history, title or swap.
-Abort-based `hx-sync` fixes log an htmx error per abort or slow navigation down.
+- **`body:replace` loses track from the third request:** an aborted request's cleanup frees the queue slot.
+- **Widgets without their own `hx-sync`** share the body queue and abort each other.
+- **Each abort logs `htmx:error`.**
+- **The preload promise ignores the abort signal.**
 
 **Each part of the spelling prevents a measured failure:**
 
@@ -138,7 +148,7 @@ Abort-based `hx-sync` fixes log an htmx error per abort or slow navigation down.
 
 **Costs:** each navigation fetches the whole page.
 Inline scripts in `#main` run on every swap, restores included, which is why [Scripting](#scripting) bans them.
-Text typed into an input in `#main` during a navigation is lost, though focus is kept.
+Text typed into an input in `#main` during a navigation is lost.
 
 The htmx 4.0.0 source differs from its docs.
 Boosted swaps default to `config.defaultSwap` (`innerHTML`), not `outerSync`.
@@ -150,7 +160,7 @@ Never branch on `HX-Request-Type`; preload requests lack it, so the full page wo
 
 ## Prefetch and Transitions
 
-- **htmx sites use hx-preload** (`scripts.Preload`).
+- **htmx sites load `scripts.Navigation`**, which includes htmx and hx-preload.
   - It preloads boosted anchors on mousedown and touchstart and reuses the response for 5 s.
   - Plain links need no preload attributes.
 - **Don't add Speculation Rules** to links hx-preload covers: they fetch twice, with no documented shared cache.
@@ -160,7 +170,7 @@ Never branch on `HX-Request-Type`; preload requests lack it, so the full page wo
   - It also adds `@view-transition { navigation: auto; }`.
 - **Only `#main` animates**, and the root animation is off.
   - `#main` carries `view-transition-name`, so persistent chrome doesn't flash.
-- **Transitions take 200 ms or less**, and reduced motion turns them off.
+- **Page transitions take 120 ms**, and reduced motion turns them off.
 - **Function never depends on animation.**
 - **Motion handles choreographed component animation**, such as a logo, menu or icons.
   - View transitions handle page-to-page changes; the two don't overlap.
@@ -193,7 +203,9 @@ Never branch on `HX-Request-Type`; preload requests lack it, so the full page wo
 - **Context carries only request-scoped values**, such as the current path or user, read through typed getters.
   - Process constants such as the build version are package variables set once at startup.
 - **No templ `css` components**; Tailwind owns styling.
-- **Rendering is buffered** (the default `templ.Handler`) unless a measured need calls for streaming.
+- **Render pages with `render.HTML`**, buffered with an ETag and conditional handling for 200 GET and HEAD responses.
+  - On a render error, return if the request was cancelled; otherwise panic into recovery.
+  - Stream only for a measured need.
 - **The templ version in `go.mod` is the one authority.** Sites require templ's runtime as usual.
   - Run the generator at that version: `go run github.com/a-h/templ/cmd/templ@v0.3.1100 generate`.
 - **No templ `tool` line:** Go would vendor the generator's whole dependency tree.
@@ -207,6 +219,8 @@ Never branch on `HX-Request-Type`; preload requests lack it, so the full page wo
 - **Standalone CLI 4.3.3** with one input, `main.css`.
   - It starts with `@import "tailwindcss" source(none);` plus explicit `@source` for `**/*.templ` and `**/*.go`.
 - **Palette sites** map `palette` output to `:root` variables, then to `@theme inline` semantic tokens.
+  - Generate from a base and primary colour, with an optional accent, and inspect `Palette.Clashes()`.
+  - Tier labels express contrast targets, not fixed lightness; unreachable tiers stay in the output.
   - Shared components use semantic utilities only.
 - **Single-brand sites** without palette swapping use brand-named `@theme` tokens.
   - Semantic names would only add indirection there.
@@ -238,7 +252,7 @@ templ Button(size Size, active bool, attrs templ.Attributes) {
 
 ## Routing and Server
 
-Sites use Go 1.26 or later.
+Sites use Go 1.27 or later.
 
 - **`net/http.ServeMux` with method patterns** routes a 5–20 page site; no router dependency.
 - **Mount hgmx handlers at their full prefix**, without `http.StripPrefix`.
@@ -250,26 +264,34 @@ mux.HandleFunc("GET /docs", docs)
 mux.HandleFunc("GET /docs/{path...}", doc)
 mux.HandleFunc("GET /items", items) // ?q= search uses the page route
 mux.HandleFunc("GET /items/{name}", item)
-mux.HandleFunc("GET /healthz", healthz)
 mux.Handle("/static/", assets)
 mux.Handle(scripts.Path, js)
 mux.Handle(webapp.Path, app)
 ```
 
-- **Middleware is `func(http.Handler) http.Handler`**, applied in one visible chain.
-  - The order from outside in: recover, log, security headers, `CrossOriginProtection`, mux.
-- **`http.NewCrossOriginProtection()`** guards any site with forms or mutations; safe methods never mutate.
-- **Every site sends security headers:** its own CSP, `nosniff`, `Referrer-Policy` and `Permissions-Policy`.
+- **`server.Site{Version, CSP, Fallback, Telemetry}.Handler(mux)` owns composition.**
+  - Health and the `/_v/` beacon sit outside the middleware chain.
+  - The chain is telemetry, security headers, recovery, `http.CrossOriginProtection`, then an unwrapped `*http.ServeMux`.
+  - Supply a non-nil telemetry pipeline and a fixed fallback that renders without calling failing templates.
+- **Safe methods never mutate.** Cross-origin protection guards the application routes.
+- **`server.Site` sends security headers:** the site's CSP, `nosniff`, referrer and permissions policies, and opener isolation.
 - **CSP starts from `default-src 'none'`** and allows `script-src 'self'` for scripts.
   - Sites using `webapp` add `manifest-src 'self'` and `img-src 'self'`; these were checked in Chromium.
-- **Set `ReadHeaderTimeout` explicitly.**
-- **On a signal, call `Shutdown` with a deadline**, and exit only after `Shutdown` returns.
-  - `Serve` returns `ErrServerClosed` at once, while active requests are still draining.
-- **`/healthz` returns `ok <shortrev>`** with `no-store`; the version comes from `-X main.version`.
+  - The telemetry beacon needs `script-src 'self'` and `connect-src 'self'`.
+- **Use `server.New` and `server.Run(ctx, srv, hooks...)`** for the server lifecycle.
+  - `New` sets header and idle timeouts; read and write timeouts stay unset for uploads and streams.
+  - `Run` drains for up to 10 seconds, then closes on drain failure and runs shutdown hooks.
+  - All hooks share a fresh 5-second context; they run even after bind failure.
+  - After a drain timeout, handlers may outlive `Run`; closing their resources can race them.
+- **`telemetry.FromEnv(local)` never returns nil**, even with export disabled or invalid configuration.
+  - Log its configuration error through `Logger()`; local logs and access lines still work.
+  - Export is OTLP HTTP/protobuf, configured by supported `OTEL_*` environment variables.
+  - Pass `p.Shutdown` to `server.Run` so export flushes after the HTTP drain.
+- **`server.Site` serves `/healthz` as `ok <version>`** with `no-store`; set the build version via `-X main.version`.
 
 ## Layout
 
-- **`cmd/main.go`** holds flags and wiring, and `internal/server` holds the server setup.
+- **`./main.go`** holds flags and wiring; `hgmx init` also writes `./views/`.
 - **Feature folders:** a page's handler, view model and templ live together in `views/pages/<name>/`.
   - Don't split a page between a handlers tree and a views tree.
 - **`views/components/<name>/`** holds components copied from hgmx and the site's own.
@@ -289,10 +311,16 @@ Copy styled components; import infrastructure.
 
 The infrastructure packages are:
 
+- **`server`** owns HTTP composition, recovery, version reloads and shutdown.
+- **`render`** buffers templ HTML with cache validation.
+- **`telemetry`** owns local logging, OTLP export and browser beacons.
 - **`static`** serves the site's files under a set-hash URL.
-- **`scripts`** serves the vendored scripts and their head tags.
+- **`scripts`** serves selected scripts and navigation support with ordered head tags.
 - **`webapp`** serves the install manifest and icons.
-- **`palette`** generates the colour palette.
+- **`palette`** generates contrast-tier scales and semantic colour tokens.
+- **`theme`** serves palette stylesheets, switching and the explorer.
+- **`icons`** provides SVG templ components and hover-animation assets.
 
-Put `scripts.Handler.Head()` and `webapp.Handler.Head()` in the document head.
-Both return `template.HTML`, which html/template renders as-is and templ takes as `@templ.Raw(...)`.
+Put the selected handlers' `Head()` output in the document head.
+It returns `template.HTML`, which html/template renders as-is and templ takes as `@templ.Raw(...)`.
+The icons handler's `Head()` belongs after the `scripts.Motion` tag; the icon hover helper also needs hyperscript.

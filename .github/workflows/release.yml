@@ -30,6 +30,9 @@ jobs:
       - name: Verify Vendored Scripts
         run: go run ./scripts/fetch -check scripts
 
+      - name: Test
+        run: go test ./...
+
       - name: Set up Cosign
         uses: sigstore/cosign-installer@v3.7.0
 

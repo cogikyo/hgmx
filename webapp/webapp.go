@@ -13,8 +13,8 @@ import (
 	"image/color"
 	"image/png"
 	"math"
-	"strconv"
 
+	"github.com/cogikyo/hgmx/palette"
 	"github.com/cogikyo/hgmx/static"
 	"golang.org/x/image/draw"
 )
@@ -77,13 +77,14 @@ func New(a App) (*Handler, error) {
 	if a.Name == "" {
 		return nil, errors.New("webapp: name is required")
 	}
-	if _, err := parseHex(a.Theme); err != nil {
+	if _, err := palette.ParseHex(a.Theme); err != nil {
 		return nil, fmt.Errorf("webapp: theme: %w", err)
 	}
-	bg, err := parseHex(a.Background)
+	c, err := palette.ParseHex(a.Background)
 	if err != nil {
 		return nil, fmt.Errorf("webapp: background: %w", err)
 	}
+	bg := color.RGBA{R: c.R, G: c.G, B: c.B, A: 255}
 	src, err := decode(a.Icon)
 	if err != nil {
 		return nil, fmt.Errorf("webapp: icon: %w", err)
@@ -147,17 +148,6 @@ func New(a App) (*Handler, error) {
 // Head returns manifest, apple-touch-icon and theme-colour tags for the head.
 func (h *Handler) Head() template.HTML {
 	return h.head
-}
-
-func parseHex(s string) (color.RGBA, error) {
-	if len(s) != 7 || s[0] != '#' {
-		return color.RGBA{}, fmt.Errorf("%q is not a #RRGGBB colour", s)
-	}
-	v, err := strconv.ParseUint(s[1:], 16, 32)
-	if err != nil {
-		return color.RGBA{}, fmt.Errorf("%q is not a #RRGGBB colour", s)
-	}
-	return color.RGBA{R: uint8(v >> 16), G: uint8(v >> 8), B: uint8(v), A: 255}, nil
 }
 
 func decode(b []byte) (*image.RGBA, error) {

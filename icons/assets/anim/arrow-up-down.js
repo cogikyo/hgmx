@@ -1,0 +1,9 @@
+import { animate, τmid, τmin } from "../motion.js";
+
+export default function (el) {
+  const up = el.querySelector("g.up");
+  animate(up, { translateY: [0, -4, 1, 0] }, { duration: τmid });
+
+  const down = el.querySelector("g.down");
+  animate(down, { translateY: [0, 4, -1, 0] }, { duration: τmid, delay: τmin });
+}

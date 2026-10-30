@@ -1,8 +1,8 @@
-// Package scripts serves selected vendored scripts with ordered HTML tags.
+// Package scripts serves selected vendored and first-party scripts with ordered HTML tags.
 package scripts
 
 import (
-	"embed"
+	_ "embed"
 	"fmt"
 	"html/template"
 	"slices"
@@ -13,13 +13,23 @@ import (
 
 //go:generate go run ./fetch
 
-//go:embed vendor
-var vendor embed.FS
+var (
+	//go:embed vendor/htmx.min.js
+	htmx []byte
+	//go:embed vendor/hx-preload.js
+	preload []byte
+	//go:embed hgmx.js
+	hgmx []byte
+	//go:embed vendor/hyperscript.min.js
+	hyperscript []byte
+	//go:embed vendor/motion.min.js
+	motion []byte
+)
 
 // Path is the mount prefix; keep it in the request path.
 const Path = "/scripts/"
 
-// Library selects a script from the vendored set.
+// Library selects a script from the embedded set.
 type Library int
 
 const (
@@ -27,17 +37,29 @@ const (
 	HTMX Library = iota
 	// Preload selects hx-preload and includes [HTMX] automatically.
 	Preload
+	// Navigation includes [HTMX] and [Preload] with newest-navigation-wins swaps.
+	// Late responses from removed elements or aborted requests are dropped.
+	// A newer boosted navigation or history restore drops older navigation responses.
+	// Other requests are unaffected by newer navigations.
+	// History restores re-send the element's hx-config headers.
+	// After either swap, focus moves to main's h1 or main unless already inside main.
+	// Do not add hx-sync to body when loading Navigation.
+	Navigation
 	// Hyperscript selects the _hyperscript runtime.
 	Hyperscript
 	// Motion provides the global Motion object, not ES module exports.
 	Motion
 )
 
-var files = [...]string{
-	HTMX:        "htmx.min.js",
-	Preload:     "hx-preload.js",
-	Hyperscript: "hyperscript.min.js",
-	Motion:      "motion.min.js",
+var files = [...]struct {
+	name string
+	data []byte
+}{
+	HTMX:        {"htmx.min.js", htmx},
+	Preload:     {"hx-preload.js", preload},
+	Navigation:  {"hgmx.js", hgmx},
+	Hyperscript: {"hyperscript.min.js", hyperscript},
+	Motion:      {"motion.min.js", motion},
 }
 
 // Handler serves the selected scripts and their matching HTML tags.
@@ -50,8 +72,11 @@ type Handler struct {
 // New adds dependencies and removes duplicate selections.
 // Scripts load in [Library] declaration order, not argument order.
 // Undeclared Library values panic.
-func New(libs ...Library) (*Handler, error) {
+func New(libs ...Library) *Handler {
 	libs = slices.Clone(libs)
+	if slices.Contains(libs, Navigation) {
+		libs = append(libs, Preload)
+	}
 	if slices.Contains(libs, Preload) {
 		libs = append(libs, HTMX)
 	}
@@ -59,24 +84,17 @@ func New(libs ...Library) (*Handler, error) {
 	libs = slices.Compact(libs)
 	selected := make(map[string][]byte, len(libs))
 	for _, lib := range libs {
-		data, err := vendor.ReadFile("vendor/" + files[lib])
-		if err != nil {
-			return nil, fmt.Errorf("scripts: %w", err)
-		}
-		selected[files[lib]] = data
+		selected[files[lib].name] = files[lib].data
 	}
 
 	h := &Handler{Server: static.Map(Path, selected)}
 	tags := make([]string, len(libs))
 	for i, lib := range libs {
-		url, err := h.URL(files[lib])
-		if err != nil {
-			return nil, err
-		}
+		url, _ := h.URL(files[lib].name)
 		tags[i] = fmt.Sprintf("<script src=\"%s\" defer></script>", url)
 	}
 	h.head = template.HTML(strings.Join(tags, "\n"))
-	return h, nil
+	return h
 }
 
 // Head returns deferred script tags for the document head.
