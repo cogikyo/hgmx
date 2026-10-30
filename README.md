@@ -6,7 +6,7 @@ Each site imports only what it uses.
 
 ## Start a Site
 
-Use Go 1.26 or later, in a new project directory:
+Use Go 1.27 or later, in a new project directory:
 
 ```bash
 go install github.com/cogikyo/hgmx/cmd/hgmx@latest

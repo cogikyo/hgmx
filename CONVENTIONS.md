@@ -252,7 +252,7 @@ templ Button(size Size, active bool, attrs templ.Attributes) {
 
 ## Routing and Server
 
-Sites use Go 1.26 or later.
+Sites use Go 1.27 or later.
 
 - **`net/http.ServeMux` with method patterns** routes a 5–20 page site; no router dependency.
 - **Mount hgmx handlers at their full prefix**, without `http.StripPrefix`.
