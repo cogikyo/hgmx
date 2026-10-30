@@ -145,11 +145,15 @@ func (b *buffer[T]) take() []T {
 // FromEnv starts an OTLP HTTP/protobuf exporter from OTEL environment variables.
 // It always returns a pipeline with local logging and access lines.
 // An unset endpoint or OTEL_SDK_DISABLED=true disables export without an error.
-// Invalid configuration disables export and returns an error.
+// Non-cumulative metrics preferences warn once; metrics remain cumulative.
+// Other invalid configuration disables export and returns an error.
 func FromEnv(local slog.Handler) (*Pipeline, error) {
 	u, res, err := config()
 	if u == nil {
 		return Disabled(local), err
+	}
+	if v := strings.TrimSpace(os.Getenv("OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE")); v != "" && !strings.EqualFold(v, "cumulative") {
+		slog.New(local).Warn("telemetry: unsupported metrics temporality preference; exporting cumulative only", "OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE", v)
 	}
 	p := newPipeline(u, res, &http.Transport{MaxIdleConns: 2, IdleConnTimeout: time.Minute}, local)
 	go p.run()
@@ -170,9 +174,6 @@ func config() (*url.URL, []slog.Attr, error) {
 	}
 	if v := os.Getenv("OTEL_EXPORTER_OTLP_PROTOCOL"); v != "" && v != "http/protobuf" {
 		return nil, nil, fmt.Errorf("telemetry: OTEL_EXPORTER_OTLP_PROTOCOL %q is unsupported; use http/protobuf", v)
-	}
-	if v := strings.ToLower(os.Getenv("OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE")); v != "" && v != "cumulative" {
-		return nil, nil, fmt.Errorf("telemetry: OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE %q is unsupported; use cumulative", v)
 	}
 	res, err := resource(os.Getenv("OTEL_SERVICE_NAME"), os.Getenv("OTEL_RESOURCE_ATTRIBUTES"))
 	if err != nil {

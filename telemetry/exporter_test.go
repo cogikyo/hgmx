@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -271,5 +272,43 @@ func BenchmarkHandler(b *testing.B) {
 				}
 			}
 		})
+	}
+}
+
+func TestTemporalityPreference(t *testing.T) {
+	t.Setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf")
+	t.Setenv("OTEL_SERVICE_NAME", "")
+	t.Setenv("OTEL_RESOURCE_ATTRIBUTES", "")
+	for pref, warn := range map[string]string{"": "", " delta ": "OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE=delta"} {
+		var traces atomic.Int32
+		receiver := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/v1/traces" {
+				traces.Add(1)
+			}
+		}))
+		defer receiver.Close()
+		t.Setenv("OTEL_SDK_DISABLED", "")
+		t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", receiver.URL)
+		t.Setenv("OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE", pref)
+		var out bytes.Buffer
+		p, err := FromEnv(slog.NewTextHandler(&out, nil))
+		if err != nil {
+			t.Fatalf("preference %q: %v", pref, err)
+		}
+		_, s := p.Start(context.Background(), "x")
+		s.End()
+		if err := p.Shutdown(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if traces.Load() != 1 {
+			t.Errorf("preference %q: %d trace exports, want 1", pref, traces.Load())
+		}
+		lines := strings.Split(strings.TrimSpace(out.String()), "\n")
+		switch {
+		case warn == "" && out.Len() != 0:
+			t.Errorf("unset preference logged %q", out.String())
+		case warn != "" && (len(lines) != 1 || !strings.Contains(lines[0], "level=WARN") || !strings.Contains(lines[0], warn)):
+			t.Errorf("preference %q logged %q, want one warning naming %s", pref, out.String(), warn)
+		}
 	}
 }
