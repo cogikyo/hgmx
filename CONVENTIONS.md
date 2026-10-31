@@ -428,14 +428,14 @@ An applied migration can remain after a later step fails, so every intermediate 
 | `hgmx dev [-- site flags…]` | Watch templ and CSS, restarting `go run . -static views/static`             |
 | `hgmx fmt`                  | Format Go and templ files                                                   |
 | `hgmx migrate …`            | Run `go run . migrate …` for development                                    |
-| `hgmx check`                | Run rules, generation and format checks, vet, build and tests               |
+| `hgmx check`                | Run the gen, rules, fmt, vet, build and test stages                         |
 
 `init` refuses if any scaffold target already exists and pins the site's templ requirement to hgmx's.
 It rewrites site imports and regenerates templ Go files for the site's module path.
 Tailwind generation uses `tailwindcss` from PATH when `views/static/css/main.css` exists.
 `check` compares generated output to the tree in its gen stage without writing.
 It stops at the first failed stage and never writes formatted files.
-Its package loading and Go commands use `GOWORK=off`; Go 1.14+ uses `vendor/` automatically.
+Only `check` forces a module policy: its package loading and Go commands use `GOWORK=off`, plus `-mod=vendor` when `vendor/` exists, so an inherited `GOFLAGS` cannot bypass the vendored code.
 
 **Release hgmx by tagging and pushing the tag.** The CLI version comes from Go build info.
 

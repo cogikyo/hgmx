@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"cmp"
 	"errors"
 	"fmt"
 	"go/scanner"
@@ -132,8 +133,14 @@ type templMap struct {
 	src       string
 	sm        *parser.SourceMap
 	raw, disk *token.File
-	rawToks   []int
-	diskToks  []int
+	rawToks   []goTok
+	diskToks  []goTok
+}
+
+type goTok struct {
+	off int
+	tok token.Token
+	lit string
 }
 
 func (a *audit) templMap(rel string) (*templMap, error) {
@@ -161,39 +168,63 @@ func (a *audit) templMap(rel string) (*templMap, error) {
 	if err != nil {
 		return nil, err
 	}
+	m.sm = out.SourceMap
 	m.raw, m.rawToks = goTokens(raw.Bytes())
 	m.disk, m.diskToks = goTokens(disk)
-	if len(m.rawToks) == len(m.diskToks) {
-		m.sm = out.SourceMap
-	}
 	return m, nil
 }
 
-func goTokens(src []byte) (*token.File, []int) {
+func goTokens(src []byte) (*token.File, []goTok) {
 	f := token.NewFileSet().AddFile("", -1, len(src))
 	var s scanner.Scanner
 	s.Init(f, src, nil, 0)
-	var offs []int
+	var toks []goTok
 	for {
 		pos, tok, lit := s.Scan()
 		if tok == token.EOF {
-			return f, offs
+			return f, toks
 		}
-		if tok != token.SEMICOLON || lit != "\n" {
-			offs = append(offs, f.Offset(pos))
+		if tok != token.SEMICOLON {
+			toks = append(toks, goTok{f.Offset(pos), tok, lit})
 		}
 	}
+}
+
+func unique(toks []goTok, t goTok) int {
+	at := -1
+	for i, u := range toks {
+		if u.tok == t.tok && u.lit == t.lit {
+			if at >= 0 {
+				return -1
+			}
+			at = i
+		}
+	}
+	return at
 }
 
 func (m *templMap) source(line, col int) (int, int, bool) {
 	if m.sm == nil || line > m.disk.LineCount() {
 		return 0, 0, false
 	}
-	i, ok := slices.BinarySearch(m.diskToks, m.disk.Offset(m.disk.LineStart(line))+col-1)
+	off := m.disk.Offset(m.disk.LineStart(line)) + col - 1
+	i, ok := slices.BinarySearchFunc(m.diskToks, off, func(t goTok, off int) int { return cmp.Compare(t.off, off) })
 	if !ok {
 		return 0, 0, false
 	}
-	p := m.raw.Position(m.raw.Pos(m.rawToks[i]))
+	t, j := m.diskToks[i], -1
+	switch {
+	case t.tok == token.STRING:
+		if unique(m.diskToks, t) >= 0 {
+			j = unique(m.rawToks, t)
+		}
+	case len(m.rawToks) == len(m.diskToks) && m.rawToks[i].tok == t.tok && m.rawToks[i].lit == t.lit:
+		j = i
+	}
+	if j < 0 {
+		return 0, 0, false
+	}
+	p := m.raw.Position(m.raw.Pos(m.rawToks[j].off))
 	src, ok := m.sm.SourcePositionFromTarget(uint32(p.Line-1), uint32(p.Column-1))
 	return int(src.Line) + 1, int(src.Col) + 1, ok
 }

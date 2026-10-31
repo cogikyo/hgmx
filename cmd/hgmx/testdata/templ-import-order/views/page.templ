@@ -1,0 +1,17 @@
+package views
+
+import (
+	"log/slog"
+	//hgmx:ignore imports/direction status codes only
+	"net/http"
+	"context"
+)
+
+func status(ctx context.Context) int {
+	slog.InfoContext(ctx, "status")
+	return http.StatusOK
+}
+
+templ Ping() {
+	<p>ok</p>
+}

@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"golang.org/x/mod/modfile"
@@ -18,8 +19,9 @@ const (
 )
 
 type site struct {
-	dir string
-	mod *modfile.File
+	dir   string
+	mod   *modfile.File
+	flags []string
 }
 
 func loadSite(dir string) (site, error) {
@@ -38,7 +40,11 @@ func loadSite(dir string) (site, error) {
 	if mod.Module == nil {
 		return site{}, errors.New("go.mod declares no module path")
 	}
-	return site{dir: dir, mod: mod}, nil
+	s := site{dir: dir, mod: mod}
+	if _, err := os.Stat(filepath.Join(dir, "vendor")); err == nil {
+		s.flags = []string{"-mod=vendor"}
+	}
+	return s, nil
 }
 
 func (s site) path(rel string) string {
@@ -64,7 +70,7 @@ func (s site) env() []string {
 }
 
 func (s site) gocmd(sub string, args ...string) *exec.Cmd {
-	cmd := exec.Command("go", append([]string{sub}, args...)...)
+	cmd := exec.Command("go", slices.Concat([]string{sub}, s.flags, args)...)
 	cmd.Dir = s.dir
 	cmd.Env = s.env()
 	cmd.Stdout = os.Stdout

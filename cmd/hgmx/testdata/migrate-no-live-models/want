@@ -1,1 +1,1 @@
-store/migrations/migrations.go:3:8 [migrate/no-live-models] store/migrations imports billing, which imports store
+store/migrations/migrations.go:3:10 [migrate/no-live-models] store/migrations imports billing, which imports store

@@ -26,19 +26,6 @@ func checkCmd() (code int) {
 		name string
 		run  func() error
 	}{
-		{"rules", func() error {
-			findings, err := runRules(s)
-			if err != nil {
-				return err
-			}
-			for _, f := range findings {
-				f.print(os.Stdout)
-			}
-			if len(findings) > 0 {
-				return fmt.Errorf("findings: %d", len(findings))
-			}
-			return nil
-		}},
 		{"gen", func() error {
 			stale, err := staleOutputs(ctx, s)
 			if err != nil {
@@ -49,6 +36,19 @@ func checkCmd() (code int) {
 			}
 			if len(stale) > 0 {
 				return fmt.Errorf("stale files: %d", len(stale))
+			}
+			return nil
+		}},
+		{"rules", func() error {
+			findings, err := runRules(s)
+			if err != nil {
+				return err
+			}
+			for _, f := range findings {
+				f.print(os.Stdout)
+			}
+			if len(findings) > 0 {
+				return fmt.Errorf("findings: %d", len(findings))
 			}
 			return nil
 		}},

@@ -83,9 +83,10 @@ func (a *audit) goRules() error {
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedImports | packages.NeedTypes |
 			packages.NeedSyntax | packages.NeedTypesInfo,
-		Dir:   a.site.dir,
-		Env:   a.site.env(),
-		Tests: true,
+		Dir:        a.site.dir,
+		Env:        a.site.env(),
+		BuildFlags: a.site.flags,
+		Tests:      true,
 	}
 	pkgs, err := packages.Load(cfg, "./...")
 	if err != nil {
@@ -150,7 +151,7 @@ func (a *audit) imports(sp sitePkg, site map[string]sitePkg) error {
 				continue
 			}
 			report := func(r *rule, msg string) error {
-				return a.goReport(p.Fset.Position(spec.Pos()), r, msg, "")
+				return a.goReport(p.Fset.Position(spec.Path.Pos()), r, msg, "")
 			}
 			to, internal := site[path]
 			var chain []string

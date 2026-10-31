@@ -1,5 +1,5 @@
-middleware/middleware.go:3:8 [imports/direction] middleware imports views/nav (views); middleware may import site packages only from middleware, store and domain packages
-store/cache/cache.go:3:8 [imports/direction] store/cache imports billing; store may import site packages only from store
-views/nav/nav.go:4:2 [imports/direction] views/nav imports net/http; views render, and handlers live in routes
-views/nav/nav.go:6:2 [imports/direction] views/nav imports views/pages/home (views/pages); views may import site packages only from views
-views/pages/home/home.go:3:8 [imports/direction] views/pages/home imports billing; views/pages may import site packages only from views and views/pages
+middleware/middleware.go:3:10 [imports/direction] middleware imports views/nav (views); middleware may import site packages only from middleware, store and domain packages
+store/cache/cache.go:3:10 [imports/direction] store/cache imports billing; store may import site packages only from store
+views/nav/nav.go:4:4 [imports/direction] views/nav imports net/http; views render, and handlers live in routes
+views/nav/nav.go:6:4 [imports/direction] views/nav imports views/pages/home (views/pages); views may import site packages only from views
+views/pages/home/home.go:3:10 [imports/direction] views/pages/home imports billing; views/pages may import site packages only from views and views/pages

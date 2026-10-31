@@ -67,7 +67,7 @@ var devCobraCmd = &cobra.Command{
 
 var checkCobraCmd = &cobra.Command{
 	Use:   "check",
-	Short: "Runs the site rules, generation and format checks, vet, build and tests",
+	Short: "Runs the generation check, site rules, format check, vet, build and tests",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		os.Exit(checkCmd())
