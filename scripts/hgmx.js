@@ -11,6 +11,10 @@
     },
     htmx_after_request: (elt, { ctx }) =>
       elt.isConnected && !ctx.request.signal?.aborted && (!navigation(ctx.request) || ctx === latest),
+    htmx_before_viewTransition: (elt, detail) => {
+      let { ctx, task } = detail;
+      if (navigation(ctx.request)) detail.task = () => ctx === latest ? task() : (ctx.title = null);
+    },
   });
 
   htmx.registerExtension("navigation", {
