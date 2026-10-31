@@ -1,0 +1,15 @@
+package views
+
+templ Page() {
+	<button onclick="go()">Go</button>
+	<form hx-post="/x" hx-on:htmx:after-request="this.reset()"></form>
+	<script>alert(1)</script>
+	<script src="/static/js/app.js"></script>
+	<script type="application/ld+json">{"@type": "Person"}</script>
+	@templ.Raw("<script>alert(2)</script>")
+	<div _="on click toggle .open on me"></div>
+}
+
+script legacy() {
+	alert(3)
+}

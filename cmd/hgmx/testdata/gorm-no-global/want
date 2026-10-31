@@ -1,0 +1,1 @@
+store/store.go:5:5 [gorm/no-global] package-level DB holds a *gorm.DB

@@ -1,0 +1,5 @@
+views/page.templ:4:10 [templ/no-inline-js] onclick handler attribute
+views/page.templ:5:21 [templ/no-inline-js] hx-on:htmx:after-request attribute evaluates code
+views/page.templ:6:2 [templ/no-inline-js] inline <script> body
+views/page.templ:9:3 [templ/no-inline-js] templ.Raw renders a <script> element
+views/page.templ:13:1 [templ/no-inline-js] script template legacy

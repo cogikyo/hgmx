@@ -1,0 +1,4 @@
+jobs/jobs.go:11:2 [exit/main-only] os.Exit outside main
+jobs/jobs.go:11:13 [hgmx/ignore] ignore of exit/main-only gives no reason
+jobs/jobs.go:15:2 [hgmx/ignore] unused ignore: no exit/main-only finding on this or the next line
+jobs/jobs.go:18:1 [hgmx/ignore] ignore names unknown rule exit/anywhere

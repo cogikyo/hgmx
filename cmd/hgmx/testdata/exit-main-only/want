@@ -1,0 +1,2 @@
+jobs/jobs.go:6:2 [exit/main-only] os.Exit outside main
+main.go:13:2 [exit/main-only] log.Fatal outside main

@@ -30,8 +30,70 @@ func init() {
 	rootCmd.AddCommand(infoCobraCmd)
 	rootCmd.AddCommand(initCobraCmd)
 	rootCmd.AddCommand(paletteCobraCmd)
+	rootCmd.AddCommand(genCobraCmd)
+	rootCmd.AddCommand(fmtCobraCmd)
+	rootCmd.AddCommand(devCobraCmd)
+	rootCmd.AddCommand(checkCobraCmd)
+	rootCmd.AddCommand(migrateCobraCmd)
 	paletteCobraCmd.Flags().StringVarP(&paletteFormat, "format", "f", "tailwind", "Output format [tailwind, css, lua]")
 	paletteCobraCmd.Flags().StringVarP(&paletteOut, "out", "o", "", "Write to this file instead of stdout")
+	genCobraCmd.Flags().BoolVar(&genCheckOnly, "check", false, "Report stale generated files without writing")
+}
+
+var genCheckOnly bool
+
+var genCobraCmd = &cobra.Command{
+	Use:   "gen",
+	Short: "Generates templ Go code and the minified Tailwind CSS",
+	Args:  cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		if code := genCmd(genCheckOnly); code != 0 {
+			os.Exit(code)
+		}
+	},
+}
+
+var fmtCobraCmd = &cobra.Command{
+	Use:   "fmt",
+	Short: "Formats the site's templ and Go files",
+	Args:  cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		if code := fmtCmd(); code != 0 {
+			os.Exit(code)
+		}
+	},
+}
+
+var devCobraCmd = &cobra.Command{
+	Use:   "dev [-- site flags...]",
+	Short: "Regenerates on change and restarts the site",
+	Run: func(cmd *cobra.Command, args []string) {
+		if code := devCmd(args); code != 0 {
+			os.Exit(code)
+		}
+	},
+}
+
+var checkCobraCmd = &cobra.Command{
+	Use:   "check",
+	Short: "Runs the site rules, generation and format checks, vet, build and tests",
+	Args:  cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		if code := checkCmd(); code != 0 {
+			os.Exit(code)
+		}
+	},
+}
+
+var migrateCobraCmd = &cobra.Command{
+	Use:                "migrate <args>...",
+	Short:              "Runs the site's migrate command",
+	DisableFlagParsing: true,
+	Run: func(cmd *cobra.Command, args []string) {
+		if code := migrateCmd(args); code != 0 {
+			os.Exit(code)
+		}
+	},
 }
 
 var infoCobraCmd = &cobra.Command{

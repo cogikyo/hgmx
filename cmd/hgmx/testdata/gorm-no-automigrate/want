@@ -1,0 +1,1 @@
+store/store.go:8:9 [gorm/no-automigrate] AutoMigrate changes the schema outside a migration
