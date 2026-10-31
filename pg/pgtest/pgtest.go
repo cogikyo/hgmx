@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -30,19 +31,20 @@ type server struct {
 
 var cluster = sync.OnceValues(start)
 
+var unavailable = errors.New("Postgres unavailable")
+
 // Open creates a test database and non-superuser role, cleaned up with t.
-// Cluster startup errors skip the test unless HGMX_PGTEST=require.
 // The per-user cluster lives in $TMPDIR/hgmx-pgtest-<uid> and stays running.
 func Open(t testing.TB) *gorm.DB {
 	t.Helper()
 	s, err := cluster()
 	if err != nil {
-		if os.Getenv("HGMX_PGTEST") == "require" {
+		if os.Getenv("HGMX_PGTEST") == "require" || !errors.Is(err, unavailable) {
 			t.Fatalf("pgtest: %v", err)
 		}
 		t.Skipf("pgtest: %v", err)
 	}
-	name := fmt.Sprintf("t%016x", rand.Uint64())
+	name := fmt.Sprintf("hgmx_%d_%016x", os.Getpid(), rand.Uint64())
 	admin := func(stmt string) error {
 		_, err := s.admin.ExecContext(context.Background(), stmt)
 		return err
@@ -79,6 +81,9 @@ func Open(t testing.TB) *gorm.DB {
 func start() (*server, error) {
 	for _, bin := range []string{"initdb", "pg_ctl"} {
 		if _, err := exec.LookPath(bin); err != nil {
+			if errors.Is(err, exec.ErrNotFound) {
+				return nil, fmt.Errorf("%w: %w", unavailable, err)
+			}
 			return nil, err
 		}
 	}
@@ -108,17 +113,61 @@ func start() (*server, error) {
 	}
 	if exec.Command("pg_ctl", "status", "-D", data).Run() != nil {
 		logfile := filepath.Join(dir, "log")
+		if err := os.WriteFile(logfile, nil, 0o600); err != nil {
+			return nil, err
+		}
 		cmd := exec.Command("pg_ctl", "start", "-w", "-s", "-D", data, "-l", logfile)
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 		if out, err := cmd.CombinedOutput(); err != nil {
-			return nil, fmt.Errorf("pg_ctl start: %v: %s (server log: %s)", err, out, logfile)
+			startErr := fmt.Errorf("pg_ctl start: %v: %s (server log: %s)", err, out, logfile)
+			log, _ := os.ReadFile(logfile)
+			if strings.Contains(string(log), "could not bind Unix address") && strings.Contains(string(log), "could not create any Unix-domain sockets") {
+				return nil, fmt.Errorf("%w: %w", unavailable, startErr)
+			}
+			return nil, startErr
 		}
 	}
 	admin, err := sql.Open("pgx", dsn(dir, "postgres"))
 	if err != nil {
 		return nil, err
 	}
+	if err := reclaim(admin); err != nil {
+		admin.Close()
+		return nil, err
+	}
 	return &server{dir: dir, admin: admin}, nil
+}
+
+func reclaim(admin *sql.DB) error {
+	rows, err := admin.QueryContext(context.Background(), "SELECT rolname FROM pg_roles WHERE rolname ~ '^hgmx_[1-9][0-9]*_[0-9a-f]{16}$'")
+	if err != nil {
+		return err
+	}
+	var names []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			rows.Close()
+			return err
+		}
+		names = append(names, name)
+	}
+	if err := errors.Join(rows.Err(), rows.Close()); err != nil {
+		return err
+	}
+	for _, name := range names {
+		pid, err := strconv.Atoi(strings.Split(name, "_")[1])
+		if err != nil || !errors.Is(syscall.Kill(pid, 0), syscall.ESRCH) {
+			continue
+		}
+		if _, err := admin.ExecContext(context.Background(), "DROP DATABASE IF EXISTS "+name+" WITH (FORCE)"); err != nil {
+			return err
+		}
+		if _, err := admin.ExecContext(context.Background(), "DROP ROLE "+name); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func initdb(dir, data string) error {

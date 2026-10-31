@@ -55,16 +55,6 @@ func Like(column, q string) func(*gorm.DB) *gorm.DB {
 	}
 }
 
-// In filters column to vs; an empty or nil slice matches nothing.
-func In[T any](column string, vs []T) func(*gorm.DB) *gorm.DB {
-	return func(db *gorm.DB) *gorm.DB {
-		if len(vs) == 0 {
-			return db.Where("false")
-		}
-		return db.Where("? IN ?", clause.Column{Name: column}, vs)
-	}
-}
-
 // Sort orders by an allowlisted key's column; an unknown key adds no order.
 func Sort(allowed map[string]string, by string, desc bool) func(*gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {

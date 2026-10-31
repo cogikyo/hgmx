@@ -8,22 +8,6 @@ import (
 	"github.com/cogikyo/hgmx/pg/pgtest"
 )
 
-func TestInEmpty(t *testing.T) {
-	db := pgtest.Open(t)
-	if err := db.Exec("CREATE TABLE things (id int); INSERT INTO things VALUES (1), (2)").Error; err != nil {
-		t.Fatal(err)
-	}
-	for _, c := range []struct{ in, want []int }{{[]int{1}, []int{1}}, {[]int{}, nil}, {nil, nil}} {
-		var got []int
-		if err := db.Table("things").Scopes(pg.In("id", c.in)).Pluck("id", &got).Error; err != nil {
-			t.Fatal(err)
-		}
-		if !slices.Equal(got, c.want) {
-			t.Errorf("In(%v) = %v, want %v", c.in, got, c.want)
-		}
-	}
-}
-
 func TestListSort(t *testing.T) {
 	db := pgtest.Open(t)
 	type fruit struct{ Name string }
