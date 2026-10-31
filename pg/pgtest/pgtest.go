@@ -34,6 +34,9 @@ var cluster = sync.OnceValues(start)
 var unavailable = errors.New("Postgres unavailable")
 
 // Open creates a test database and non-superuser role, cleaned up with t.
+// Missing executables or a socket bind failure skip unless HGMX_PGTEST=require.
+// Other startup failures fail the test.
+// Names include the owning PID; later runs reclaim them once that PID is dead.
 // The per-user cluster lives in $TMPDIR/hgmx-pgtest-<uid> and stays running.
 func Open(t testing.TB) *gorm.DB {
 	t.Helper()

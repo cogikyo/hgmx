@@ -275,12 +275,18 @@ mux.Handle(scripts.Path, js)
 mux.Handle(webapp.Path, app)
 ```
 
-- **`server.Site{Version, CSP, Fallback, Telemetry}.Handler(mux)` owns composition.**
-  - Health and the `/_v/` beacon sit outside the middleware chain.
-  - The chain is telemetry, security headers, recovery, `http.CrossOriginProtection`, then an unwrapped `*http.ServeMux`.
-  - Supply a non-nil telemetry pipeline and a fixed fallback that renders without calling failing templates.
+- **`server.Site{Version, CSP, Allow, InternalError, Telemetry}.Handler(mux)` owns composition.**
+  - Application routes run telemetry, recovery, `http.CrossOriginProtection`, then an unwrapped `*http.ServeMux`.
+  - `/healthz` and the `/_v/` beacon bypass that application chain; the beacon mounts only when telemetry is enabled.
+  - Supply non-nil `Telemetry` and `InternalError`; use `telemetry.Disabled` to opt out of telemetry.
+- **`InternalError` is the panic (500) page, not the 404 page.** It renders fixed markup without calling failing templates.
+  - The application's mux owns its 404 page.
 - **Safe methods never mutate.** Cross-origin protection guards the application routes.
-- **`server.Site` sends security headers:** the site's CSP, `nosniff`, referrer and permissions policies, and opener isolation.
+- **Security headers cover every route**, including `/healthz` and the mounted `/_v/` beacon.
+  - `server.Site` sets the site's CSP, `nosniff`, referrer and permissions policies, and opener isolation.
+- **`Site.Allow []string`** changes named default Permissions-Policy entries from `()` to `(self)`.
+  - Unknown names panic when `Handler` is built.
+  - Supported names are `accelerometer`, `browsing-topics`, `camera`, `geolocation`, `gyroscope`, `magnetometer`, `microphone`, `payment` and `usb`.
 - **CSP starts from `default-src 'none'`** and allows `script-src 'self'` for scripts.
   - Sites using `webapp` add `manifest-src 'self'` and `img-src 'self'`; these were checked in Chromium.
   - The telemetry beacon needs `script-src 'self'` and `connect-src 'self'`.
@@ -293,12 +299,14 @@ mux.Handle(webapp.Path, app)
   - Log its configuration error through `Logger()`; local logs and access lines still work.
   - Export is OTLP HTTP/protobuf, configured by supported `OTEL_*` environment variables.
   - Pass `p.Shutdown` to `server.Run` so export flushes after the HTTP drain.
+  - `Shutdown` logs dropped telemetry and returns nil if the final export fails or times out.
 - **`server.Site` serves `/healthz` as `ok <version>`** with `no-store`; set the build version via `-X main.version`.
 
 ## Layout
 
 - **`main.go`** holds flags, wiring and the `migrate` dispatch; serving never migrates.
-- **`routes/routes.go`** holds the URL table in `New(Config) (*http.ServeMux, error)`.
+  - It builds the store and `views.New` result, then calls `routes.New(store, views)` for the mux.
+- **`routes/routes.go`** holds the URL table in `New(*store.Store, *views.Site) *http.ServeMux`.
   - Handlers in `routes/` parse input, call the store and render a full page.
 - **`store/`** holds `Store`, models and queries; `store/migrations/` holds `All []migrate.Step`.
 - **`views/`** owns embedded static files, the page shell and fixed error markup.
@@ -370,7 +378,7 @@ The check exempts test files.
   - `pg.List[T]` counts the supplied query, then fetches the requested page.
 - **`pg.Like`** trims the query and matches a case-insensitive substring, escaping `%`, `_` and `\`.
   - Empty or whitespace-only input leaves the query unchanged.
-- **`pg.In` on an empty list matches nothing**, including a nil list.
+- **Use `db.Where("x IN ?", vs)` for membership.** An empty or nil slice produces `IN (NULL)` and matches no rows.
 - **`pg.Sort`** uses an allowlist of keys to columns; an unknown key adds no order.
 
 ## Migrations
@@ -386,8 +394,8 @@ Versions must be exactly **1, 2, 3, … in list order**; append steps without de
   - Keep one concurrent statement per step, plus the cleanup needed to retry it.
   - For an index, run `DROP INDEX CONCURRENTLY IF EXISTS`, then `CREATE INDEX CONCURRENTLY`.
   - Use separate `Exec` calls; a multi-statement call cannot run these outside a transaction.
-- **`migrate.Command`** accepts `up`, `down`, `down-to VERSION` and `status`.
-  - `down` rolls back one step; `down-to 0` attempts a full rollback and stops on error.
+- **`migrate.Command`** accepts only `up`, `down` and `status`.
+  - `down` rolls back one step.
   - All commands require `PGDATABASE` and ping the database, even with no steps.
   - With steps registered, all commands take the session lock, including `status`.
   - `status` can wait behind a deploy; it is not a lock-free probe.
@@ -416,7 +424,7 @@ An applied migration can remain after a later step fails, so every intermediate 
 | Command                     | Task                                                                        |
 | --------------------------- | --------------------------------------------------------------------------- |
 | `hgmx init`                 | Write `main.go`, `routes/`, `store/` and `views/` in a module with `go.mod` |
-| `hgmx gen [--check]`        | Generate templ and minified CSS, or report drift without writing            |
+| `hgmx gen`                  | Generate templ and minified CSS                                             |
 | `hgmx dev [-- site flags…]` | Watch templ and CSS, restarting `go run . -static views/static`             |
 | `hgmx fmt`                  | Format Go and templ files                                                   |
 | `hgmx migrate …`            | Run `go run . migrate …` for development                                    |
@@ -425,8 +433,9 @@ An applied migration can remain after a later step fails, so every intermediate 
 `init` refuses if any scaffold target already exists and pins the site's templ requirement to hgmx's.
 It rewrites site imports and regenerates templ Go files for the site's module path.
 Tailwind generation uses `tailwindcss` from PATH when `views/static/css/main.css` exists.
-`check` stops at the first failed stage and never writes generated or formatted files.
-Its package loading and Go commands use `GOWORK=off` and `-mod=vendor` when `vendor/` exists.
+`check` compares generated output to the tree in its gen stage without writing.
+It stops at the first failed stage and never writes formatted files.
+Its package loading and Go commands use `GOWORK=off`; Go 1.14+ uses `vendor/` automatically.
 
 **Release hgmx by tagging and pushing the tag.** The CLI version comes from Go build info.
 
@@ -446,12 +455,14 @@ Its package loading and Go commands use `GOWORK=off` and `-mod=vendor` when `ven
 **Use `pgtest.Open(t)` for database tests.** It supplies a fresh database and non-superuser role per call, then cleans both up with the test.
 Production and test connections share hgmx's gorm configuration.
 
-- **Put `initdb` and `pg_ctl` on PATH.** A startup failure skips the test by default.
+- **Put `initdb` and `pg_ctl` on PATH.** Missing executables or a socket bind failure skip the test.
   - Set `HGMX_PGTEST=require` to fail instead; CI requires it.
+  - All other startup failures fail the test.
 - **The cluster is shared per user**, under `$TMPDIR/hgmx-pgtest-<uid>` (`/tmp` if `TMPDIR` is unset).
   - Startup is file-locked; tests reuse it across binaries and leave it running.
   - It listens only on a Unix socket, whose path must fit within 107 bytes.
   - Set `TMPDIR` to a shorter path if needed.
+- **Database and role names include the owning PID.** A later run reclaims them when that PID is dead.
 
 ## Logging and Exit
 
@@ -466,6 +477,7 @@ Production and test connections share hgmx's gorm configuration.
 ### hgmx: Ignore
 
 **An exception names its rule and reason:** put `//hgmx:ignore <rule> <reason>` on the finding's line or the line above.
+Go-rule findings from generated templ code map to the `.templ` source line; put the ignore there, not in `_templ.go`.
 A missing reason, unknown rule or unused ignore is a finding; remove the directive when its finding goes away.
 
 ## Components
@@ -476,7 +488,6 @@ Copy styled components; import infrastructure.
   - Copies use semantic tokens, so restyling rarely needs edits.
 - **Imported as Go modules:** infrastructure, and any small helper a copied component calls.
   - Copied helpers drift out of step with the module, so helpers stay imported.
-  - hgmx only adds to helpers, so a `go.mod` bump never breaks an untouched copy.
 - **A component moves into hgmx** only when a second site needs it.
 
 The infrastructure packages are:

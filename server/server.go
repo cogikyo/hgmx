@@ -20,17 +20,21 @@ const afterTimeout = 5 * time.Second // Fresh cleanup budget after the HTTP drai
 
 // Site configures the root handler around an application mux.
 type Site struct {
-	Version       string
-	CSP           string
-	Allow         []string
+	Version string
+	CSP     string
+	// Allow grants (self) for named default Permissions-Policy features.
+	Allow []string
+	// InternalError serves the panic (500) page, not the 404 page.
 	InternalError http.Handler
 	Telemetry     *telemetry.Pipeline
 }
 
-// Handler wraps mux with telemetry, security headers, and panic recovery.
+// Handler wraps mux with telemetry, panic recovery and cross-origin protection.
 // The mux type rejects outer wrappers that can hide r.Pattern from telemetry.
 // StripPrefix, nested muxes, and route wrappers can still coarsen http.route.
-// Cross-origin protection runs last, before mux.
+// Security headers cover all routes; health and enabled beacons bypass mux.
+// It panics on nil InternalError or Telemetry, or unknown Allow names.
+// Use [telemetry.Disabled] to opt out of telemetry.
 func (s Site) Handler(mux *http.ServeMux) http.Handler {
 	if s.InternalError == nil {
 		panic("server: Site.InternalError is nil")

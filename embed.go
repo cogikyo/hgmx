@@ -5,7 +5,8 @@ import (
 	"runtime/debug"
 )
 
-// Version reads hgmx's module version from Go build info, or returns empty.
+// Version reads the main module's build-info version only when it is hgmx.
+// It returns empty in sites that import hgmx.
 // Local builds can report "(devel)" instead of a release tag.
 func Version() string {
 	info, ok := debug.ReadBuildInfo()

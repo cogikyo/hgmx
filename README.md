@@ -24,10 +24,11 @@ go build -o site .
 `init` writes `main.go`, `routes/`, `store/` and `views/`, including migrations, generated templ code and static assets.
 It requires `go.mod`, refuses to overwrite any scaffold target and pins templ to hgmx's compiled-in version.
 The scaffold serves Home, About and a full-page 404, with system-ui and OFL-licensed Iosevka fonts.
-`main` wires `pg.Open`, `store.New` and `routes.New` into `server.Site` and `server.Run`.
+`main` builds views with `views.New`, then passes the mux from `routes.New(store, views)` to `server.Site` and `server.Run`.
+`server.Site.InternalError` is the panic (500) page, not the application's 404 page.
 The database pool is lazy: the scaffold serves without Postgres, but migrations require connectivity and `PGDATABASE`.
 Set `PGHOST`, `PGDATABASE` and `PGUSER` for the site's database and `OTEL_*` for telemetry export.
-Serving never migrates; the site binary accepts `migrate up`, `down`, `down-to VERSION` and `status`.
+Serving never migrates; the site binary accepts only `migrate up`, `down` and `status`.
 See [the deploy contract](CONVENTIONS.md#deploy-contract) before deploying schema changes.
 
 ## Site Commands
@@ -36,14 +37,16 @@ Run these from the site's module root; there is no justfile.
 
 | Command                     | Task                                                                |
 | --------------------------- | ------------------------------------------------------------------- |
-| `hgmx gen [--check]`        | Generate templ Go and minified CSS, or report drift without writing |
+| `hgmx gen`                  | Generate templ Go and minified CSS                                  |
 | `hgmx dev [-- site flags…]` | Watch templ and CSS; restart the site with disk-backed static files |
 | `hgmx fmt`                  | Format Go and templ                                                 |
 | `hgmx migrate …`            | Run the site's migration command through `go run .`                 |
 | `hgmx check`                | Run site rules, generation and format checks, vet, build and tests  |
 
 Generation and formatting use templ in-process; the site's templ version must match hgmx's.
-Database tests use `pgtest.Open(t)`; put `initdb` and `pg_ctl` on PATH and set `HGMX_PGTEST=require` to fail rather than skip on cluster startup errors.
+`check` compares generated output to the tree without writing.
+Database tests use `pgtest.Open(t)`; put `initdb` and `pg_ctl` on PATH.
+Missing executables or a socket bind failure skip the test unless `HGMX_PGTEST=require`; other startup failures fail.
 
 ## Packages
 
@@ -76,4 +79,5 @@ From this repository: `go build -o hgmx ./cmd/hgmx`.
 ## Release
 
 Tag the release and push the tag; the release workflow builds and publishes the CLI.
-`hgmx.Version()` reads Go build info, without a version file or linker flag.
+`hgmx.Version()` reports the main module's Go build-info version only when that module is hgmx itself, as in the CLI.
+It returns empty in a site; set the site's own version separately.

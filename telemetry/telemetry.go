@@ -417,6 +417,7 @@ func retryAfter(h string) time.Duration {
 }
 
 // Shutdown stops recording and flushes pending telemetry within ctx's deadline.
+// It logs dropped telemetry and returns nil on export failure or timeout.
 // Pass it as an after hook to [github.com/cogikyo/hgmx/server.Run].
 // Repeated calls are safe; later recording is ignored.
 func (p *Pipeline) Shutdown(ctx context.Context) error {

@@ -29,6 +29,7 @@ type Step struct {
 
 const usage = "usage: migrate up | down | status"
 
+// Command runs up, down (one step) or status and writes to out.
 // It requires PGDATABASE and pings db, even when steps is empty.
 // With steps registered, all commands take the session lock, including status.
 func Command(ctx context.Context, db *gorm.DB, steps []Step, args []string, out io.Writer) error {
