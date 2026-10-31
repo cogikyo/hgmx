@@ -182,14 +182,19 @@ Never branch on `HX-Request-Type`; preload requests lack it, so the full page wo
   - Repeated logic becomes a `behavior` in a `._hs` file, attached with `install`.
 - **JS modules** cover widgets with real logic, such as a scroll controller or Motion choreography.
   - They live in `.js` files served through `static`, whose set-hash URLs keep relative imports working.
+
+### templ: No Inline JS
+
 - **No inline scripts:** no inline modules, classic scripts, importmaps or `templ.Raw("<script>…")`.
   - Inline scripts rerun on every swap; external modules evaluate once and cache.
   - CSP then needs only `script-src 'self'`, without nonces.
+  - Data scripts (`application/json`, `application/ld+json`) and `text/hyperscript` are allowed.
 - **Module JS is idempotent across swaps.**
   - Delegate events on `document`, or initialise from `htmx:after:process`.
   - Don't guard with `data-*` "ready" markers; morph removes attributes the server didn't send.
 - **One runtime per responsibility:** no `hx-live` or Alpine next to hyperscript.
-- **No `hx-on`:** it evaluates code, which strict CSP blocks.
+- **No handler attributes:** no `on*=`, `hx-on`, `hx-on:` or `hx-on-`, including `data-hx-on` forms.
+  - They evaluate code, which strict CSP blocks; hyperscript `_=` is allowed.
 - **No templ `script` templates**; they are legacy.
 
 ## templ
@@ -206,13 +211,16 @@ Never branch on `HX-Request-Type`; preload requests lack it, so the full page wo
 - **Render pages with `render.HTML`**, buffered with an ETag and conditional handling for 200 GET and HEAD responses.
   - On a render error, return if the request was cancelled; otherwise panic into recovery.
   - Stream only for a measured need.
-- **The templ version in `go.mod` is the one authority.** Sites require templ's runtime as usual.
-  - Run the generator at that version: `go run github.com/a-h/templ/cmd/templ@v0.3.1100 generate`.
-- **No templ `tool` line:** Go would vendor the generator's whole dependency tree.
-  - It grew a site's `vendor/` from about 0.8 MB to 16 MB.
-  - hgmx keeps its own `tool` line because it has no `vendor/`.
 - **Generated templ and CSS are committed**, and regenerated and checked before each commit.
-  - templ checks its output with `generate -check` and `fmt -fail .`, run at the same version.
+  - Run `hgmx gen`; `hgmx check` checks generation and formatting without writing.
+
+### templ: Version
+
+- **The site's required templ version equals hgmx's compiled-in version.** `hgmx init` sets it in `go.mod`.
+  - `hgmx check` reports a mismatch and the `go get` command that fixes it.
+- **hgmx runs templ generation and formatting in-process.** Use `hgmx gen`, `dev` and `fmt`.
+  - Sites add no templ `tool` line and do not run `go run templ@version`.
+  - A `tool` line would vendor the generator's dependency tree into every site.
 
 ## Tailwind v4
 
@@ -252,8 +260,6 @@ templ Button(size Size, active bool, attrs templ.Attributes) {
 
 ## Routing and Server
 
-Sites use Go 1.27 or later.
-
 - **`net/http.ServeMux` with method patterns** routes a 5–20 page site; no router dependency.
 - **Mount hgmx handlers at their full prefix**, without `http.StripPrefix`.
 
@@ -291,12 +297,176 @@ mux.Handle(webapp.Path, app)
 
 ## Layout
 
-- **`./main.go`** holds flags and wiring; `hgmx init` also writes `./views/`.
-- **Feature folders:** a page's handler, view model and templ live together in `views/pages/<name>/`.
-  - Don't split a page between a handlers tree and a views tree.
+- **`main.go`** holds flags, wiring and the `migrate` dispatch; serving never migrates.
+- **`routes/routes.go`** holds the URL table in `New(Config) (*http.ServeMux, error)`.
+  - Handlers in `routes/` parse input, call the store and render a full page.
+- **`store/`** holds `Store`, models and queries; `store/migrations/` holds `All []migrate.Step`.
+- **`views/`** owns embedded static files, the page shell and fixed error markup.
+  - `views/pages/<name>/` holds templ and its view-model types, without HTTP handlers.
 - **`views/components/<name>/`** holds components copied from hgmx and the site's own.
-- **No service or store layers** without a database, and no DI framework.
+- **Add `middleware/`** when application routes need shared request handling.
+  - Add a root domain package when business rules need a home outside handlers and queries.
+  - Don't scaffold empty packages or add a DI framework.
 - **Commit `vendor/`:** deployed sites build offline from it.
+
+### Imports: Direction
+
+Site-internal imports point in these directions; `main` wires them together.
+Each package may also import its own layer, subject to the page restriction below.
+
+| Package                | May import                                                  |
+| ---------------------- | ----------------------------------------------------------- |
+| `routes`               | `middleware`, `store`, domain packages, `views`, page views |
+| `middleware`           | `store`, domain packages                                    |
+| A domain package       | Its own domain and `store`                                  |
+| `store`                | `store/...`, excluding `store/migrations/...`               |
+| `store/migrations`     | `store/migrations/...` only                                 |
+| `views` and components | `views/...`, excluding `views/pages/...`                    |
+| `views/pages/...`      | `views/...`, including other page views                     |
+
+**Views only render:** they do not import `net/http`, routes, middleware, store or domain packages.
+The table governs site-internal edges; standard-library and external imports remain available, except for the `net/http` and gorm restrictions.
+
+### Layout: No Internal
+
+**No `internal/` directories.** A site is a main module nobody imports; `internal/` adds no useful boundary.
+Put packages at the root under the names above.
+
+### Layout: Go Version
+
+**Use at least hgmx's Go release**, currently `go 1.27.0` in `go.mod`.
+Raise the site's `go` directive when upgrading hgmx requires it.
+
+## Data
+
+### Gorm: Store Only
+
+- **Models and gorm imports stay in `store/`**, including its migrations.
+  - `main` passes `pg.Open`'s result to `store.New` without naming a gorm type.
+- **`store.Store` methods take `ctx` first** and query through `s.db.WithContext(ctx)`.
+  - Routes hold `*store.Store` and call its methods.
+- **Test outcomes with `errors.Is`**, using `pg.ErrNotFound`, `pg.ErrDuplicate` or `pg.ErrForeignKey`.
+- **A Store method owns its transactions**, using `s.db.WithContext(ctx).Transaction`.
+  - No generic repository interface, gorm-forwarding methods or transaction-passing machinery.
+- **Use gorm's `clause.OnConflict` for upserts.** Keep the conflict target and updates in the Store method.
+- **Raw SQL carries a one-line reason** for what the query builder cannot express clearly.
+- **Timestamps use `timestamptz` only.** hgmx supplies UTC timestamps.
+
+### Gorm: No Global
+
+**Keep `*gorm.DB` in `store.Store`, not a package variable.** Pass the Store to its callers so ownership and test isolation stay visible.
+The check exempts test files.
+
+### Column Types and Queries
+
+- **`pg.ID` is a UUIDv7** when made with `pg.NewID`; parse external IDs with `pg.ParseID`.
+  - A zero ID saves as SQL NULL; scanning NULL gives the zero ID.
+- **`pg.JSON[T]` stores `V` as `jsonb`** and marshals as `V`, without a wrapper object.
+  - SQL NULL scans to the zero value of `T`; saving writes non-NULL JSON, even for a nil value.
+  - Use it on `NOT NULL DEFAULT` columns; it does not preserve SQL NULL.
+- **`pg.Enum[T]`** validates string values and creates or extends a Postgres enum in a migration.
+  - Keep each migration's values local to that migration, and use a new value in a later step.
+- **`pg.Page.Scope`** clamps a negative offset to zero, defaults a non-positive limit to 20 and caps it at 100.
+  - `pg.List[T]` counts the supplied query, then fetches the requested page.
+- **`pg.Like`** trims the query and matches a case-insensitive substring, escaping `%`, `_` and `\`.
+  - Empty or whitespace-only input leaves the query unchanged.
+- **`pg.In` on an empty list matches nothing**, including a nil list.
+- **`pg.Sort`** uses an allowlist of keys to columns; an unknown key adds no order.
+
+## Migrations
+
+### Gorm: No AutoMigrate
+
+**Schema changes are `migrate.Step` entries in `store/migrations.All`.** Never call `AutoMigrate` or migrate at server startup.
+Versions must be exactly **1, 2, 3, … in list order**; append steps without deleting or reordering applied ones.
+
+- **`Up` is required.** A nil `Down` makes rollback fail and leaves the history row in place.
+- **Each step runs in a transaction** with a 5-second `lock_timeout`, unless `NoTx` is set.
+- **`NoTx` steps must be rerunnable:** the operation and its history row are not atomic.
+  - Keep one concurrent statement per step, plus the cleanup needed to retry it.
+  - For an index, run `DROP INDEX CONCURRENTLY IF EXISTS`, then `CREATE INDEX CONCURRENTLY`.
+  - Use separate `Exec` calls; a multi-statement call cannot run these outside a transaction.
+- **`migrate.Command`** accepts `up`, `down`, `down-to VERSION` and `status`.
+  - `down` rolls back one step; `down-to 0` attempts a full rollback and stops on error.
+  - All commands require `PGDATABASE` and ping the database, even with no steps.
+  - With steps registered, all commands take the session lock, including `status`.
+  - `status` can wait behind a deploy; it is not a lock-free probe.
+
+### Migrate: No Live Models
+
+**Migrations never import live models**, directly or through another package.
+Declare the columns a step needs inside that step, or write SQL.
+_A fresh database must replay each step against the schema of its own time._
+
+### Deploy Contract
+
+**Kiln runs migrations only during deploys**, using the new binary's `<site> migrate up` in a transient unit with the site's user and `PG*` environment.
+A non-zero exit, including a lock timeout, keeps the old binary version running.
+Production never runs `down`; rollback reverts binaries only.
+
+**Expand, then contract:** add schema compatible with the old binary, deploy code that uses it, and remove obsolete schema in a later deploy after old binaries no longer need it.
+An applied migration can remain after a later step fails, so every intermediate schema must support the old binary.
+
+## Commands
+
+### Layout: No Justfile
+
+**No justfile anywhere.** Run the shared hgmx commands from the site's module root.
+
+| Command                     | Task                                                                        |
+| --------------------------- | --------------------------------------------------------------------------- |
+| `hgmx init`                 | Write `main.go`, `routes/`, `store/` and `views/` in a module with `go.mod` |
+| `hgmx gen [--check]`        | Generate templ and minified CSS, or report drift without writing            |
+| `hgmx dev [-- site flags…]` | Watch templ and CSS, restarting `go run . -static views/static`             |
+| `hgmx fmt`                  | Format Go and templ files                                                   |
+| `hgmx migrate …`            | Run `go run . migrate …` for development                                    |
+| `hgmx check`                | Run rules, generation and format checks, vet, build and tests               |
+
+`init` refuses if any scaffold target already exists and pins the site's templ requirement to hgmx's.
+It rewrites site imports and regenerates templ Go files for the site's module path.
+Tailwind generation uses `tailwindcss` from PATH when `views/static/css/main.css` exists.
+`check` stops at the first failed stage and never writes generated or formatted files.
+Its package loading and Go commands use `GOWORK=off` and `-mod=vendor` when `vendor/` exists.
+
+**Release hgmx by tagging and pushing the tag.** The CLI version comes from Go build info.
+
+## Env
+
+- **`PGHOST`, `PGDATABASE`, `PGUSER`** configure Postgres through libpq-compatible `PG*` settings.
+  - hgmx defines no database URL variable; `migrate` refuses without `PGDATABASE`.
+- **`pg.Open` opens a lazy pool**, so serving can start without a reachable database.
+  - The first query establishes connectivity; migrations always ping first.
+  - SQL logs retain placeholders and never include bound parameter values.
+- **`OTEL_*`** configures telemetry; export uses HTTP/protobuf.
+  - Set `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` as needed.
+  - An unset endpoint or `OTEL_SDK_DISABLED=true` disables export; local logging still works.
+
+## Tests
+
+**Use `pgtest.Open(t)` for database tests.** It supplies a fresh database and non-superuser role per call, then cleans both up with the test.
+Production and test connections share hgmx's gorm configuration.
+
+- **Put `initdb` and `pg_ctl` on PATH.** A startup failure skips the test by default.
+  - Set `HGMX_PGTEST=require` to fail instead; CI requires it.
+- **The cluster is shared per user**, under `$TMPDIR/hgmx-pgtest-<uid>` (`/tmp` if `TMPDIR` is unset).
+  - Startup is file-locked; tests reuse it across binaries and leave it running.
+  - It listens only on a Unix socket, whose path must fit within 107 bytes.
+  - Set `TMPDIR` to a shorter path if needed.
+
+## Logging and Exit
+
+### slog: Context
+
+**Use slog's `DebugContext`, `InfoContext`, `WarnContext` and `ErrorContext` when a context or request is in scope.** Pass `ctx` or `r.Context()` so the record carries the request's trace and span IDs.
+
+### Exit: Main Only
+
+**Only `main` may call `os.Exit` or `log.Fatal*`; `TestMain` is also allowed.** Return errors elsewhere so deferred cleanup and graceful shutdown can run.
+
+### hgmx: Ignore
+
+**An exception names its rule and reason:** put `//hgmx:ignore <rule> <reason>` on the finding's line or the line above.
+A missing reason, unknown rule or unused ignore is a finding; remove the directive when its finding goes away.
 
 ## Components
 
@@ -314,6 +484,8 @@ The infrastructure packages are:
 - **`server`** owns HTTP composition, recovery, version reloads and shutdown.
 - **`render`** buffers templ HTML with cache validation.
 - **`telemetry`** owns local logging, OTLP export and browser beacons.
+- **`pg`** owns Postgres connections, column types and query scopes; `pg/pgtest` supplies test databases.
+- **`migrate`** runs Go-defined schema steps under a session lock.
 - **`static`** serves the site's files under a set-hash URL.
 - **`scripts`** serves selected scripts and navigation support with ordered head tags.
 - **`webapp`** serves the install manifest and icons.

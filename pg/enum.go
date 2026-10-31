@@ -7,13 +7,17 @@ import (
 	"gorm.io/gorm"
 )
 
+// Enum names a Postgres enum and the string values accepted by Valid.
 type Enum[T ~string] struct {
 	Name   string
 	Values []T
 }
 
+// Valid reports whether v is listed in Values.
 func (e Enum[T]) Valid(v T) bool { return slices.Contains(e.Values, v) }
 
+// Create creates the type in the current schema or adds any missing values.
+// Use a newly added value in a later migration step, after this step commits.
 func (e Enum[T]) Create(tx *gorm.DB) error {
 	var exists bool
 	err := tx.Raw(`SELECT EXISTS (SELECT 1 FROM pg_type WHERE typname = ? AND typnamespace = (SELECT oid FROM pg_namespace WHERE nspname = current_schema()))`, e.Name).Scan(&exists).Error

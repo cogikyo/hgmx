@@ -1,3 +1,4 @@
+// Package migrate runs Go-defined Postgres schema steps through goose.
 package migrate
 
 import (
@@ -16,15 +17,22 @@ import (
 	"gorm.io/gorm"
 )
 
+// Step is a schema change; versions must run 1, 2, 3, ... in list order.
+// Steps run in transactions with a 5-second lock_timeout unless NoTx is set.
 type Step struct {
-	Version  int64
-	Name     string
+	Version int64
+	Name    string
+	// Up is required; a nil Down makes rollback fail without changing history.
 	Up, Down func(ctx context.Context, db *gorm.DB) error
-	NoTx     bool
+	// NoTx disables the transaction; the step must tolerate a partial rerun.
+	NoTx bool
 }
 
 const usage = "usage: migrate up | down | down-to VERSION | status"
 
+// Command runs up, down (one step), down-to VERSION or status and writes to out.
+// It requires PGDATABASE and pings db, even when steps is empty.
+// With steps registered, all commands take the session lock, including status.
 func Command(ctx context.Context, db *gorm.DB, steps []Step, args []string, out io.Writer) error {
 	var to int64
 	switch {

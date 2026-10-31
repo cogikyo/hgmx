@@ -6,57 +6,52 @@ Each site imports only what it uses.
 
 ## Start a Site
 
-Use Go 1.27 or later, in a new project directory:
+Use Go 1.27 or later and put the standalone Tailwind CLI 4.3.3 on PATH.
+In a new project directory:
 
 ```bash
-go install github.com/cogikyo/hgmx/cmd/hgmx@latest
+go install github.com/cogikyo/hgmx/cmd/hgmx@v0.0.30
 go mod init example.com/site
 hgmx init
-go get github.com/cogikyo/hgmx
+go get github.com/cogikyo/hgmx@v0.0.30
 go mod tidy
 go mod vendor
+hgmx check
 go build -o site .
 ./site
 ```
 
-`init` writes `./main.go` and `./views/`, including generated templ code and static assets.
-It refuses to overwrite an existing `main.go` or `views/`.
+`init` writes `main.go`, `routes/`, `store/` and `views/`, including migrations, generated templ code and static assets.
+It requires `go.mod`, refuses to overwrite any scaffold target and pins templ to hgmx's compiled-in version.
 The scaffold serves Home, About and a full-page 404, with system-ui and OFL-licensed Iosevka fonts.
-Pass `-static views/static` to read assets from disk while editing.
+`main` wires `pg.Open`, `store.New` and `routes.New` into `server.Site` and `server.Run`.
+The database pool is lazy: the scaffold serves without Postgres, but migrations require connectivity and `PGDATABASE`.
+Set `PGHOST`, `PGDATABASE` and `PGUSER` for the site's database and `OTEL_*` for telemetry export.
+Serving never migrates; the site binary accepts `migrate up`, `down`, `down-to VERSION` and `status`.
+See [the deploy contract](CONVENTIONS.md#deploy-contract) before deploying schema changes.
 
-The generated `main.go` starts with `telemetry.FromEnv`, which returns a usable pipeline even when export is disabled or configuration fails.
-It logs configuration errors locally, then composes the site in its `run` function:
+## Site Commands
 
-```go
-func run(p *telemetry.Pipeline, addr, dir string) error {
-	site, err := views.New(views.Config{Version: version, Static: dir, Head: p.Beacon().Head()})
-	if err != nil {
-		return err
-	}
-	h := server.Site{
-		Version:   version,
-		CSP:       csp,
-		Fallback:  http.HandlerFunc(views.InternalError),
-		Telemetry: p,
-	}.Handler(site)
+Run these from the site's module root; there is no justfile.
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-	context.AfterFunc(ctx, stop)
-	log := p.Logger()
-	log.Info("listening", "addr", addr, "version", version)
-	return server.Run(ctx, server.New(addr, h, log), p.Shutdown)
-}
-```
+| Command                     | Task                                                                |
+| --------------------------- | ------------------------------------------------------------------- |
+| `hgmx gen [--check]`        | Generate templ Go and minified CSS, or report drift without writing |
+| `hgmx dev [-- site flags…]` | Watch templ and CSS; restart the site with disk-backed static files |
+| `hgmx fmt`                  | Format Go and templ                                                 |
+| `hgmx migrate …`            | Run the site's migration command through `go run .`                 |
+| `hgmx check`                | Run site rules, generation and format checks, vet, build and tests  |
 
-The imports, `version` and `csp` declarations are in that generated file.
-`server.Site` owns the middleware, health check and beacon; `views.New` returns the application's mux.
+Generation and formatting use templ in-process; the site's templ version must match hgmx's.
+Database tests use `pgtest.Open(t)`; put `initdb` and `pg_ctl` on PATH and set `HGMX_PGTEST=require` to fail rather than skip on cluster startup errors.
 
 ## Packages
 
 - **`server`** composes the root handler, version reloads, recovery and graceful shutdown.
 - **`render`** buffers templ HTML with ETags and conditional requests.
 - **`telemetry`** exports OTLP/HTTP traces, logs and metrics from `OTEL_*` settings, with local logging and a browser beacon.
+- **`pg`** opens Postgres from `PG*` settings and supplies IDs, JSON, enums and query scopes; `pg/pgtest` supplies test databases.
+- **`migrate`** runs Go-defined schema steps with transactions and a session lock.
 - **`static`** serves file sets under hashed URLs, with a disk-backed dev mode.
 - **`scripts`** serves selected htmx, hx-preload, navigation support, hyperscript and Motion scripts in dependency order.
 - **`palette`** generates contrast-tier scales and semantic tokens from base, primary and optional accent colours.
@@ -77,3 +72,8 @@ Without `-o`, output goes to stdout.
 ## Build the CLI
 
 From this repository: `go build -o hgmx ./cmd/hgmx`.
+
+## Release
+
+Tag the release and push the tag; the release workflow builds and publishes the CLI.
+`hgmx.Version()` reads Go build info, without a version file or linker flag.

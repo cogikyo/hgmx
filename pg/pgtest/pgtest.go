@@ -1,3 +1,4 @@
+// Package pgtest supplies isolated databases on a shared local Postgres cluster.
 package pgtest
 
 import (
@@ -29,6 +30,9 @@ type server struct {
 
 var cluster = sync.OnceValues(start)
 
+// Open creates a test database and non-superuser role, cleaned up with t.
+// Cluster startup errors skip the test unless HGMX_PGTEST=require.
+// The per-user cluster lives in $TMPDIR/hgmx-pgtest-<uid> and stays running.
 func Open(t testing.TB) *gorm.DB {
 	t.Helper()
 	s, err := cluster()
