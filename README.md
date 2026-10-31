@@ -41,7 +41,7 @@ Run these from the site's module root; there is no justfile.
 | `hgmx dev [-- site flags…]` | Watch templ and CSS; restart the site with disk-backed static files |
 | `hgmx fmt`                  | Format Go and templ                                                 |
 | `hgmx migrate …`            | Run the site's migration command through `go run .`                 |
-| `hgmx check`                | Run the gen, rules, fmt, vet, build and test stages                 |
+| `hgmx check`                | Check generation, rules and formatting; then vet, build and test    |
 
 Generation and formatting use templ in-process; the site's templ version must match hgmx's.
 `check` compares generated output to the tree without writing.

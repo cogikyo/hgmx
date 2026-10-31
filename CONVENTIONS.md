@@ -428,14 +428,15 @@ An applied migration can remain after a later step fails, so every intermediate 
 | `hgmx dev [-- site flags…]` | Watch templ and CSS, restarting `go run . -static views/static`             |
 | `hgmx fmt`                  | Format Go and templ files                                                   |
 | `hgmx migrate …`            | Run `go run . migrate …` for development                                    |
-| `hgmx check`                | Run the gen, rules, fmt, vet, build and test stages                         |
+| `hgmx check`                | Check generation, rules and formatting; then vet, build and test            |
 
 `init` refuses if any scaffold target already exists and pins the site's templ requirement to hgmx's.
 It rewrites site imports and regenerates templ Go files for the site's module path.
 Tailwind generation uses `tailwindcss` from PATH when `views/static/css/main.css` exists.
 `check` compares generated output to the tree in its gen stage without writing.
 It stops at the first failed stage and never writes formatted files.
-Only `check` forces a module policy: its package loading and Go commands use `GOWORK=off`, plus `-mod=vendor` when `vendor/` exists, so an inherited `GOFLAGS` cannot bypass the vendored code.
+For package loading and Go commands, `check` sets `GOWORK=off` and, when `vendor/` exists, passes `-mod=vendor` even if `GOFLAGS` selects another mode.
+`dev` and `migrate` keep the caller's workspace settings.
 
 **Release hgmx by tagging and pushing the tag.** The CLI version comes from Go build info.
 
@@ -462,7 +463,10 @@ Production and test connections share hgmx's gorm configuration.
   - Startup is file-locked; tests reuse it across binaries and leave it running.
   - It listens only on a Unix socket, whose path must fit within 107 bytes.
   - Set `TMPDIR` to a shorter path if needed.
-- **Database and role names include the owning PID.** A later run reclaims them when that PID is dead.
+- **Each test binary holds a `flock` lease for its lifetime**, named by a random owner ID.
+  - Its databases and roles carry that ID; ownership works across process namespaces.
+  - Another binary reclaims them and the lease file only after taking the lease without blocking.
+  - Resources without a matching owner lease are left untouched.
 
 ## Logging and Exit
 
