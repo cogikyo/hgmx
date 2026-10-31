@@ -30,7 +30,7 @@ type Step struct {
 const usage = "usage: migrate up | down | status"
 
 // Command runs up, down (one step) or status and writes to out.
-// It requires PGDATABASE and pings db, even when steps is empty.
+// It requires PGDATABASE and pings db only when steps is nonempty.
 // With steps registered, all commands take the session lock, including status.
 func Command(ctx context.Context, db *gorm.DB, steps []Step, args []string, out io.Writer) error {
 	if len(args) != 1 || (args[0] != "up" && args[0] != "down" && args[0] != "status") {
@@ -44,6 +44,14 @@ func Command(ctx context.Context, db *gorm.DB, steps []Step, args []string, out 
 			return fmt.Errorf("step %d (%s) has no Up", s.Version, s.Name)
 		}
 	}
+	if len(steps) == 0 {
+		if args[0] == "up" || args[0] == "status" {
+			fmt.Fprintln(out, "no migrations")
+		} else {
+			fmt.Fprintln(out, "nothing to roll back")
+		}
+		return nil
+	}
 	if os.Getenv("PGDATABASE") == "" {
 		return errors.New("PGDATABASE is unset; refusing to migrate the default database")
 	}
@@ -55,14 +63,6 @@ func Command(ctx context.Context, db *gorm.DB, steps []Step, args []string, out 
 		return err
 	}
 
-	if len(steps) == 0 {
-		if args[0] == "up" || args[0] == "status" {
-			fmt.Fprintln(out, "no migrations")
-		} else {
-			fmt.Fprintln(out, "nothing to roll back")
-		}
-		return nil
-	}
 	p, err := provider(db, conn, steps)
 	if err != nil {
 		return err

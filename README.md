@@ -26,7 +26,7 @@ It requires `go.mod`, refuses to overwrite any scaffold target and pins templ to
 The scaffold serves Home, About and a full-page 404, with system-ui and OFL-licensed Iosevka fonts.
 `main` builds views with `views.New`, then passes the mux from `routes.New(store, views)` to `server.Site` and `server.Run`.
 `server.Site.InternalError` is the panic (500) page, not the application's 404 page.
-The database pool is lazy: the scaffold serves without Postgres, but migrations require connectivity and `PGDATABASE`.
+The database pool is lazy: the scaffold serves without Postgres.
 Set `PGHOST`, `PGDATABASE` and `PGUSER` for the site's database and `OTEL_*` for telemetry export.
 Serving never migrates; the site binary accepts only `migrate up`, `down` and `status`.
 See [the deploy contract](CONVENTIONS.md#deploy-contract) before deploying schema changes.

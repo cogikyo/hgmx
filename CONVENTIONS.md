@@ -396,7 +396,7 @@ Versions must be exactly **1, 2, 3, … in list order**; append steps without de
   - Use separate `Exec` calls; a multi-statement call cannot run these outside a transaction.
 - **`migrate.Command`** accepts only `up`, `down` and `status`.
   - `down` rolls back one step.
-  - All commands require `PGDATABASE` and ping the database, even with no steps.
+  - With steps registered, all commands require `PGDATABASE` and ping the database.
   - With steps registered, all commands take the session lock, including `status`.
   - `status` can wait behind a deploy; it is not a lock-free probe.
 
@@ -443,9 +443,9 @@ For package loading and Go commands, `check` sets `GOWORK=off` and, when `vendor
 ## Env
 
 - **`PGHOST`, `PGDATABASE`, `PGUSER`** configure Postgres through libpq-compatible `PG*` settings.
-  - hgmx defines no database URL variable; `migrate` refuses without `PGDATABASE`.
+  - hgmx defines no database URL variable.
 - **`pg.Open` opens a lazy pool**, so serving can start without a reachable database.
-  - The first query establishes connectivity; migrations always ping first.
+  - The first query establishes connectivity.
   - SQL logs retain placeholders and never include bound parameter values.
 - **`OTEL_*`** configures telemetry; export uses HTTP/protobuf.
   - Set `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` as needed.

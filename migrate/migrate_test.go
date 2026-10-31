@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
 	"testing"
 
 	"github.com/cogikyo/hgmx/migrate"
+	"github.com/cogikyo/hgmx/pg"
 	"github.com/cogikyo/hgmx/pg/pgtest"
 	"gorm.io/gorm"
 )
@@ -112,19 +114,19 @@ func TestNilDown(t *testing.T) {
 }
 
 func TestEmpty(t *testing.T) {
-	db := open(t)
-	for _, arg := range []string{"up", "status"} {
-		out, err := command(t, db, nil, arg)
-		if err != nil || out != "no migrations\n" {
-			t.Errorf("%s: %q, %v", arg, out, err)
-		}
-	}
-	conn, err := db.DB()
+	t.Setenv("PGDATABASE", "")
+	db, err := pg.Open(slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
 	}
-	conn.Close()
-	if _, err := command(t, db, nil, "up"); err == nil {
-		t.Error("up on a closed pool succeeded; Command must ping")
+	for arg, want := range map[string]string{
+		"up":     "no migrations\n",
+		"status": "no migrations\n",
+		"down":   "nothing to roll back\n",
+	} {
+		out, err := command(t, db, nil, arg)
+		if err != nil || out != want {
+			t.Errorf("%s: %q, %v", arg, out, err)
+		}
 	}
 }
