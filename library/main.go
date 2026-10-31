@@ -9,9 +9,14 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/cogikyo/hgmx/library"
+	"github.com/cogikyo/hgmx/migrate"
+	"github.com/cogikyo/hgmx/pg"
 	"github.com/cogikyo/hgmx/server"
 	"github.com/cogikyo/hgmx/telemetry"
+
+	"github.com/cogikyo/hgmx/library/routes"
+	"github.com/cogikyo/hgmx/library/store"
+	"github.com/cogikyo/hgmx/library/store/migrations"
 )
 
 var version = "dev"
@@ -19,6 +24,10 @@ var version = "dev"
 const csp = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "migrate" {
+		os.Exit(migrateMain(os.Args[2:]))
+	}
+
 	addr := flag.String("addr", "127.0.0.1:8080", "listen address")
 	dir := flag.String("static", "", "serve /static/ from this directory instead of the embedded files")
 	flag.Parse()
@@ -37,7 +46,17 @@ func main() {
 }
 
 func run(p *telemetry.Pipeline, addr, dir string) error {
-	site, err := views.New(views.Config{Version: version, Static: dir, Head: p.Beacon().Head()})
+	log := p.Logger()
+	db, err := pg.Open(log)
+	if err != nil {
+		return err
+	}
+	mux, err := routes.New(routes.Config{
+		Store:   store.New(db),
+		Version: version,
+		Static:  dir,
+		Head:    p.Beacon().Head(),
+	})
 	if err != nil {
 		return err
 	}
@@ -45,14 +64,29 @@ func run(p *telemetry.Pipeline, addr, dir string) error {
 	h := server.Site{
 		Version:   version,
 		CSP:       csp,
-		Fallback:  http.HandlerFunc(views.InternalError),
+		Fallback:  http.HandlerFunc(routes.InternalError),
 		Telemetry: p,
-	}.Handler(site)
+	}.Handler(mux)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	context.AfterFunc(ctx, stop)
-	log := p.Logger()
-	log.Info("listening", "addr", addr, "version", version)
+	log.InfoContext(ctx, "listening", "addr", addr, "version", version)
 	return server.Run(ctx, server.New(addr, h, log), p.Shutdown)
+}
+
+func migrateMain(args []string) int {
+	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	db, err := pg.Open(log)
+	if err == nil {
+		err = migrate.Command(ctx, db, migrations.All, args, os.Stdout)
+	}
+	if err != nil {
+		log.ErrorContext(ctx, "migrate", "err", err)
+		return 1
+	}
+	return 0
 }

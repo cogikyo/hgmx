@@ -1,0 +1,33 @@
+package views
+
+import (
+	"github.com/cogikyo/hgmx/server"
+
+	"github.com/cogikyo/hgmx/library/views/components/nav"
+)
+
+templ layout(s *Site, path, title string, content templ.Component) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>{ title }</title>
+			<link rel="icon" type="image/svg+xml" href={ s.Static.URL("favicon/favicon.svg") }/>
+			<link rel="shortcut icon" href={ s.Static.URL("favicon/favicon.ico") }/>
+			<link rel="stylesheet" href={ s.Static.URL("css/main.min.css") }/>
+			@templ.Raw(s.Scripts.Head())
+			@templ.Raw(s.head)
+		</head>
+		<body
+			hx-boost:inherited="target:#main select:#main swap:'innerHTML strip show:top showTarget:body' transition:true"
+			hx-select-oob:inherited="#nav-links:outerMorph"
+			hx-config:inherited={ server.VersionConfig(s.version) }
+		>
+			@nav.Nav(path)
+			<main id="main" hx-history-elt>
+				@content
+			</main>
+		</body>
+	</html>
+}

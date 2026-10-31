@@ -1,11 +1,10 @@
-package views
+package routes
 
 import (
 	"bytes"
 	"context"
 	"errors"
 	"io"
-	"io/fs"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -14,24 +13,20 @@ import (
 	"testing"
 
 	"github.com/a-h/templ"
-	"github.com/cogikyo/hgmx/scripts"
 	"github.com/cogikyo/hgmx/server"
-	"github.com/cogikyo/hgmx/static"
 	"github.com/cogikyo/hgmx/telemetry"
+
+	"github.com/cogikyo/hgmx/library/views"
 )
 
 func TestRenderFailure(t *testing.T) {
-	sub, err := fs.Sub(files, "static")
+	v, err := views.New(views.Config{Version: "v1"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	st, err := static.New(assets, sub)
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := &site{static: st, scripts: scripts.New(scripts.Navigation), version: "v1"}
+	p := &pages{views: v, version: "v1"}
 	broken := templ.ComponentFunc(func(context.Context, io.Writer) error { return errors.New("broken") })
-	page := s.page(http.StatusOK, "Broken", broken)
+	page := p.page(http.StatusOK, "Broken", broken)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "public, max-age=600")
@@ -52,7 +47,7 @@ func TestRenderFailure(t *testing.T) {
 		if rec.Code != http.StatusInternalServerError || header.Get("Cache-Control") != "no-store" || header.Get("ETag") != "" {
 			t.Fatalf("%s: status %d, Cache-Control %q, ETag %q", method, rec.Code, header.Get("Cache-Control"), header.Get("ETag"))
 		}
-		if header.Get("Content-Length") != strconv.Itoa(len(internalError)) {
+		if header.Get("Content-Length") != strconv.Itoa(len(views.InternalError)) {
 			t.Fatalf("%s: Content-Length %q", method, header.Get("Content-Length"))
 		}
 		body := rec.Body.String()

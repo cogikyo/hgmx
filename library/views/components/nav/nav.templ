@@ -1,0 +1,21 @@
+package nav
+
+templ Nav(current string) {
+	<nav id="nav">
+		<ul id="nav-links">
+			@link(current, "/", "Home")
+			@link(current, "/about", "About")
+		</ul>
+	</nav>
+}
+
+templ link(current, href, label string) {
+	<li>
+		<a
+			href={ templ.SafeURL(href) }
+			if current == href {
+				aria-current="page"
+			}
+		>{ label }</a>
+	</li>
+}

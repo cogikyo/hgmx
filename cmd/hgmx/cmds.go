@@ -2,16 +2,19 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
+	"io"
 	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
-	"strconv"
 	"strings"
 
+	"github.com/a-h/templ"
+	"github.com/a-h/templ/cmd/templ/generatecmd"
 	"github.com/cogikyo/hgmx"
 	"github.com/cogikyo/hgmx/palette"
 	"golang.org/x/mod/modfile"
@@ -37,66 +40,91 @@ func infoCmd() (code int) {
 func initCmd(args []string) (code int) {
 	log := newLogger(logLevel, os.Stderr)
 
-	const viewsDir, mainFile = "views", "main.go"
-	for _, name := range []string{viewsDir, mainFile} {
-		if _, err := os.Lstat(name); err == nil {
-			log.Error("Refusing to overwrite existing " + name + "; move it aside or run init in an empty project")
+	const root, prefix = "library", "github.com/cogikyo/hgmx/library"
+	entries, err := fs.ReadDir(hgmx.LibraryFS, root)
+	if err != nil {
+		log.Error("Failed to read scaffold", slog.String("error", err.Error()))
+		return 1
+	}
+	for _, e := range entries {
+		if _, err := os.Lstat(e.Name()); err == nil {
+			log.Error("Refusing to overwrite existing " + e.Name() + "; move it aside or run init in an empty project")
 			return 1
 		} else if !errors.Is(err, fs.ErrNotExist) {
-			log.Error("Failed to check "+name, slog.String("error", err.Error()))
+			log.Error("Failed to check "+e.Name(), slog.String("error", err.Error()))
 			return 1
 		}
 	}
 
-	gomod, err := os.ReadFile("go.mod")
+	data, err := os.ReadFile("go.mod")
 	if err != nil {
 		log.Error("Failed to read go.mod; run go mod init first", slog.String("error", err.Error()))
 		return 1
 	}
-	module := modfile.ModulePath(gomod)
-	if module == "" {
+	gomod, err := modfile.Parse("go.mod", data, nil)
+	if err != nil {
+		log.Error("Failed to parse go.mod", slog.String("error", err.Error()))
+		return 1
+	}
+	if gomod.Module == nil {
 		log.Error("go.mod declares no module path")
 		return 1
 	}
+	module := gomod.Module.Mod.Path
+	if err := gomod.AddRequire(templPath, templ.Version()); err != nil {
+		log.Error("Failed to require templ", slog.String("error", err.Error()))
+		return 1
+	}
+	gomod.Cleanup()
+	gomod.SortBlocks()
+	updated, err := gomod.Format()
+	if err != nil {
+		log.Error("Failed to format go.mod", slog.String("error", err.Error()))
+		return 1
+	}
 
-	tmp, err := os.MkdirTemp(".", "."+viewsDir+"-*")
+	tmp, err := os.MkdirTemp(".", "hgmx-init-*")
 	if err != nil {
 		log.Error("Failed to create temporary directory", slog.String("error", err.Error()))
 		return 1
 	}
 	defer os.RemoveAll(tmp)
 
-	if err := scaffold(hgmx.LibraryFS, "library", []string{"static", "views.templ", "views_templ.go", "views.go"}, tmp); err != nil {
+	rewrite := func(name string, data []byte) ([]byte, bool) {
+		switch {
+		case strings.HasSuffix(name, "_templ.go"):
+			return nil, false
+		case strings.HasSuffix(name, ".go") || strings.HasSuffix(name, ".templ"):
+			return bytes.ReplaceAll(data, []byte(prefix), []byte(module)), true
+		}
+		return data, true
+	}
+	if err := copyFS(hgmx.LibraryFS, root, tmp, rewrite); err != nil {
 		log.Error("Failed to copy scaffold", slog.String("error", err.Error()))
 		return 1
 	}
-	src, err := hgmx.LibraryFS.ReadFile("library/main/main.go")
-	if err != nil {
-		log.Error("Failed to read scaffold main.go", slog.String("error", err.Error()))
-		return 1
-	}
-	src = bytes.Replace(src, []byte(`"github.com/cogikyo/hgmx/library"`), []byte(strconv.Quote(module+"/"+viewsDir)), 1)
-	staged := filepath.Join(tmp, mainFile)
-	if err := os.WriteFile(staged, src, 0o644); err != nil {
-		log.Error("Failed to write "+mainFile, slog.String("error", err.Error()))
-		return 1
-	}
-	if err := os.Chmod(tmp, 0o755); err != nil {
-		log.Error("Failed to set permissions", slog.String("dir", tmp), slog.String("error", err.Error()))
+	if err := generatecmd.Run(context.Background(), io.Discard, os.Stderr, []string{"-path", tmp, "-log-level", "error"}); err != nil {
+		log.Error("Failed to generate templ code", slog.String("error", err.Error()))
 		return 1
 	}
 
-	if err := os.Rename(staged, mainFile); err != nil {
-		log.Error("Failed to move "+mainFile+" into place", slog.String("error", err.Error()))
-		return 1
+	var moved []string
+	for _, e := range entries {
+		if err := os.Rename(filepath.Join(tmp, e.Name()), e.Name()); err != nil {
+			for _, name := range moved {
+				os.RemoveAll(name)
+			}
+			log.Error("Failed to move "+e.Name()+" into place", slog.String("error", err.Error()))
+			return 1
+		}
+		moved = append(moved, e.Name())
 	}
-	if err := os.Rename(tmp, viewsDir); err != nil {
-		os.Remove(mainFile)
-		log.Error("Failed to move scaffold into place", slog.String("error", err.Error()))
+	if err := writeAtomic("go.mod", updated); err != nil {
+		log.Error("Failed to write go.mod", slog.String("error", err.Error()))
 		return 1
 	}
 
-	log.Info("hgmx project initialized successfully in ./" + viewsDir + " and ./" + mainFile)
+	log.Info("hgmx project initialized", slog.String("files", strings.Join(moved, " ")), slog.String("templ", templ.Version()))
 	return 0
 }
 
