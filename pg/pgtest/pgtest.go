@@ -27,6 +27,8 @@ import (
 type server struct {
 	dir   string
 	admin *sql.DB
+	owner string
+	lease *os.File
 }
 
 var cluster = sync.OnceValues(start)
@@ -36,7 +38,6 @@ var unavailable = errors.New("Postgres unavailable")
 // Open creates a test database and non-superuser role, cleaned up with t.
 // Missing executables or a socket bind failure skip unless HGMX_PGTEST=require.
 // Other startup failures fail the test.
-// Names include the owning PID; later runs reclaim them once that PID is dead.
 // The per-user cluster lives in $TMPDIR/hgmx-pgtest-<uid> and stays running.
 func Open(t testing.TB) *gorm.DB {
 	t.Helper()
@@ -47,7 +48,7 @@ func Open(t testing.TB) *gorm.DB {
 		}
 		t.Skipf("pgtest: %v", err)
 	}
-	name := fmt.Sprintf("hgmx_%d_%016x", os.Getpid(), rand.Uint64())
+	name := fmt.Sprintf("hgmx_%s_%016x", s.owner, rand.Uint64())
 	admin := func(stmt string) error {
 		_, err := s.admin.ExecContext(context.Background(), stmt)
 		return err
@@ -114,7 +115,16 @@ func start() (*server, error) {
 	} else if err != nil {
 		return nil, err
 	}
-	if exec.Command("pg_ctl", "status", "-D", data).Run() != nil {
+	running := exec.Command("pg_ctl", "status", "-D", data).Run() == nil
+	if !running {
+		probe, err := sql.Open("pgx", dsn(dir, "postgres"))
+		if err != nil {
+			return nil, err
+		}
+		running = probe.PingContext(context.Background()) == nil
+		probe.Close()
+	}
+	if !running {
 		logfile := filepath.Join(dir, "log")
 		if err := os.WriteFile(logfile, nil, 0o600); err != nil {
 			return nil, err
@@ -134,15 +144,57 @@ func start() (*server, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := reclaim(admin); err != nil {
+	if err := reclaim(dir, admin); err != nil {
 		admin.Close()
 		return nil, err
 	}
-	return &server{dir: dir, admin: admin}, nil
+	owner := fmt.Sprintf("o%016x", rand.Uint64())
+	lease, err := os.OpenFile(filepath.Join(dir, "lease-"+owner), os.O_CREATE|os.O_EXCL|os.O_RDWR, 0o600)
+	if err != nil {
+		admin.Close()
+		return nil, err
+	}
+	if err := syscall.Flock(int(lease.Fd()), syscall.LOCK_EX); err != nil {
+		lease.Close()
+		admin.Close()
+		return nil, err
+	}
+	return &server{dir: dir, admin: admin, owner: owner, lease: lease}, nil
 }
 
-func reclaim(admin *sql.DB) error {
-	rows, err := admin.QueryContext(context.Background(), "SELECT rolname FROM pg_roles WHERE rolname ~ '^hgmx_[1-9][0-9]*_[0-9a-f]{16}$'")
+func reclaim(dir string, admin *sql.DB) error {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		id, ok := strings.CutPrefix(entry.Name(), "lease-o")
+		if !ok || len(id) != 16 {
+			continue
+		}
+		if _, err := strconv.ParseUint(id, 16, 64); err != nil {
+			continue
+		}
+		if err := reclaimOwner(admin, filepath.Join(dir, entry.Name()), "o"+id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func reclaimOwner(admin *sql.DB, path, owner string) error {
+	lease, err := os.OpenFile(path, os.O_RDWR, 0)
+	if err != nil {
+		return err
+	}
+	defer lease.Close()
+	if err := syscall.Flock(int(lease.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		if errors.Is(err, syscall.EWOULDBLOCK) {
+			return nil
+		}
+		return err
+	}
+	rows, err := admin.QueryContext(context.Background(), "SELECT rolname FROM pg_roles WHERE rolname ~ $1", "^hgmx_"+owner+"_[0-9a-f]{16}$")
 	if err != nil {
 		return err
 	}
@@ -159,10 +211,6 @@ func reclaim(admin *sql.DB) error {
 		return err
 	}
 	for _, name := range names {
-		pid, err := strconv.Atoi(strings.Split(name, "_")[1])
-		if err != nil || !errors.Is(syscall.Kill(pid, 0), syscall.ESRCH) {
-			continue
-		}
 		if _, err := admin.ExecContext(context.Background(), "DROP DATABASE IF EXISTS "+name+" WITH (FORCE)"); err != nil {
 			return err
 		}
@@ -170,7 +218,7 @@ func reclaim(admin *sql.DB) error {
 			return err
 		}
 	}
-	return nil
+	return os.Remove(path)
 }
 
 func initdb(dir, data string) error {
