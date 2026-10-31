@@ -30,8 +30,16 @@ jobs:
       - name: Verify Vendored Scripts
         run: go run ./scripts/fetch -check scripts
 
+      - name: Put Postgres on PATH
+        run: |
+          bin=$(ls -d /usr/lib/postgresql/*/bin | sort -V | tail -n 1)
+          test -x "$bin/initdb"
+          echo "$bin" >> "$GITHUB_PATH"
+
       - name: Test
         run: go test ./...
+        env:
+          HGMX_PGTEST: require
 
       - name: Set up Cosign
         uses: sigstore/cosign-installer@v3.7.0
