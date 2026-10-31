@@ -1,0 +1,1 @@
+views/page_templ.go:18:2 [slog/context] slog.Info drops the context; ctx is in scope

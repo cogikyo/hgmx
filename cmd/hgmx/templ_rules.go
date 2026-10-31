@@ -3,10 +3,12 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"go/format"
 	"os"
 	"regexp"
 	"strings"
 
+	"github.com/a-h/templ"
 	"github.com/a-h/templ/generator"
 	parser "github.com/a-h/templ/parser/v2"
 	"github.com/a-h/templ/parser/v2/visitor"
@@ -128,13 +130,18 @@ func inlineScript(n *parser.ScriptElement) bool {
 
 func (a *audit) overlayTempl(t *parser.TemplateFile, rel string) error {
 	gen := strings.TrimSuffix(rel, ".templ") + "_templ.go"
-	if _, err := os.Stat(a.site.path(gen)); err != nil {
+	disk, err := os.ReadFile(a.site.path(gen))
+	if err != nil {
 		return nil
 	}
 	var raw bytes.Buffer
-	out, err := generator.Generate(t, &raw, generator.WithFileName(rel))
+	out, err := generator.Generate(t, &raw, generator.WithVersion(templ.Version()), generator.WithFileName(rel))
 	if err != nil {
 		return fmt.Errorf("generate %s: %w", rel, err)
+	}
+	formatted, err := format.Source(raw.Bytes())
+	if err != nil || !bytes.Equal(formatted, disk) {
+		return nil
 	}
 	a.overlay[a.site.path(gen)] = raw.Bytes()
 	a.maps[gen] = out.SourceMap

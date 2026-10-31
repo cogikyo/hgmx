@@ -1,0 +1,14 @@
+package views
+
+import (
+	"context"
+	"log/slog"
+)
+
+func record(ctx context.Context) {
+	slog.InfoContext(ctx, "event")
+}
+
+templ Page() {
+	<p>page</p>
+}
