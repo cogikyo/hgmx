@@ -121,8 +121,12 @@ func start() (*server, error) {
 		if err != nil {
 			return nil, err
 		}
-		running = probe.PingContext(context.Background()) == nil
+		err = probe.PingContext(context.Background())
 		probe.Close()
+		if err != nil && !errors.Is(err, syscall.ECONNREFUSED) && !errors.Is(err, syscall.ENOENT) {
+			return nil, err
+		}
+		running = err == nil
 	}
 	if !running {
 		logfile := filepath.Join(dir, "log")
