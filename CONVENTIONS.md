@@ -292,8 +292,8 @@ mux.Handle(webapp.Path, app)
   - The telemetry beacon needs `script-src 'self'` and `connect-src 'self'`.
 - **Use `server.New` and `server.Run(ctx, srv, hooks...)`** for the server lifecycle.
   - `New` sets header and idle timeouts; read and write timeouts stay unset for uploads and streams.
-  - `Run` drains for up to 10 seconds, then closes on drain failure and runs shutdown hooks.
-  - All hooks share a fresh 5-second context; they run even after bind failure.
+  - `Run` drains for up to 5 seconds, then closes on drain failure and runs shutdown hooks.
+  - All hooks share a context ending 8 seconds after shutdown starts; after bind failure they get the full 8 seconds.
   - After a drain timeout, handlers may outlive `Run`; closing their resources can race them.
 - **`telemetry.FromEnv(local)` never returns nil**, even with export disabled or invalid configuration.
   - Log its configuration error through `Logger()`; local logs and access lines still work.

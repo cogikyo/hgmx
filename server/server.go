@@ -14,9 +14,9 @@ import (
 	"github.com/cogikyo/hgmx/telemetry"
 )
 
-var drainTimeout = 10 * time.Second
+var drainTimeout = 5 * time.Second
 
-const afterTimeout = 5 * time.Second // Fresh cleanup budget after the HTTP drain.
+const stopTimeout = 8 * time.Second
 
 // Site configures the root handler around an application mux.
 type Site struct {
@@ -71,14 +71,15 @@ func New(addr string, h http.Handler, log *slog.Logger) *http.Server {
 }
 
 // Run binds synchronously, then serves until failure, shutdown, or ctx cancellation.
-// After a successful bind, it drains for up to 10 seconds before the hooks.
+// After a successful bind, it drains for up to 5 seconds before the hooks.
 // On drain failure it closes connections; handlers may still outlive Run.
 // Closing their resources after Run returns can race those handlers.
-// The after hooks share a fresh 5-second context and run even if binding fails.
+// The after hooks share a deadline 8 seconds after shutdown starts.
+// They run even if binding fails, with the full 8 seconds.
 // Run returns all errors joined.
 func Run(ctx context.Context, srv *http.Server, after ...func(context.Context) error) error {
-	err := serve(ctx, srv)
-	hooks, cancel := context.WithTimeout(context.WithoutCancel(ctx), afterTimeout)
+	stop, err := serve(ctx, srv)
+	hooks, cancel := context.WithDeadline(context.WithoutCancel(ctx), stop.Add(stopTimeout))
 	defer cancel()
 	for _, f := range after {
 		err = errors.Join(err, f(hooks))
@@ -86,10 +87,10 @@ func Run(ctx context.Context, srv *http.Server, after ...func(context.Context) e
 	return err
 }
 
-func serve(ctx context.Context, srv *http.Server) error {
+func serve(ctx context.Context, srv *http.Server) (stop time.Time, err error) {
 	ln, err := net.Listen("tcp", cmp.Or(srv.Addr, ":http"))
 	if err != nil {
-		return err
+		return time.Now(), err
 	}
 	served := make(chan error, 1)
 	go func() { served <- srv.Serve(ln) }()
@@ -100,7 +101,8 @@ func serve(ctx context.Context, srv *http.Server) error {
 	case <-ctx.Done():
 	}
 
-	drain, cancel := context.WithTimeout(context.WithoutCancel(ctx), drainTimeout)
+	stop = time.Now()
+	drain, cancel := context.WithDeadline(context.WithoutCancel(ctx), stop.Add(drainTimeout))
 	defer cancel()
 	if err = srv.Shutdown(drain); err != nil {
 		err = errors.Join(err, srv.Close())
@@ -111,7 +113,7 @@ func serve(ctx context.Context, srv *http.Server) error {
 	if !errors.Is(serr, http.ErrServerClosed) {
 		err = errors.Join(serr, err)
 	}
-	return err
+	return stop, err
 }
 
 func health(version string) http.Handler {
