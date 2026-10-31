@@ -24,7 +24,7 @@ func TestRenderFailure(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := &pages{views: v, version: "v1"}
+	p := &pages{views: v}
 	broken := templ.ComponentFunc(func(context.Context, io.Writer) error { return errors.New("broken") })
 	page := p.page(http.StatusOK, "Broken", broken)
 	mux := http.NewServeMux()
@@ -35,9 +35,9 @@ func TestRenderFailure(t *testing.T) {
 	})
 	var logged bytes.Buffer
 	h := server.Site{
-		Version:   "v1",
-		Fallback:  http.HandlerFunc(InternalError),
-		Telemetry: telemetry.Disabled(slog.NewTextHandler(&logged, &slog.HandlerOptions{Level: slog.LevelWarn})),
+		Version:       "v1",
+		InternalError: http.HandlerFunc(InternalError),
+		Telemetry:     telemetry.Disabled(slog.NewTextHandler(&logged, &slog.HandlerOptions{Level: slog.LevelWarn})),
 	}.Handler(mux)
 
 	for _, method := range []string{"GET", "HEAD"} {

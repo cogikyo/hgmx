@@ -17,6 +17,7 @@ import (
 	"github.com/cogikyo/hgmx/library/routes"
 	"github.com/cogikyo/hgmx/library/store"
 	"github.com/cogikyo/hgmx/library/store/migrations"
+	"github.com/cogikyo/hgmx/library/views"
 )
 
 var version = "dev"
@@ -51,21 +52,17 @@ func run(p *telemetry.Pipeline, addr, dir string) error {
 	if err != nil {
 		return err
 	}
-	mux, err := routes.New(routes.Config{
-		Store:   store.New(db),
-		Version: version,
-		Static:  dir,
-		Head:    p.Beacon().Head(),
-	})
+	v, err := views.New(views.Config{Version: version, Static: dir, Head: p.Beacon().Head()})
 	if err != nil {
 		return err
 	}
+	mux := routes.New(store.New(db), v)
 	// Site owns health, the beacon, and the application middleware chain.
 	h := server.Site{
-		Version:   version,
-		CSP:       csp,
-		Fallback:  http.HandlerFunc(routes.InternalError),
-		Telemetry: p,
+		Version:       version,
+		CSP:           csp,
+		InternalError: http.HandlerFunc(routes.InternalError),
+		Telemetry:     p,
 	}.Handler(mux)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

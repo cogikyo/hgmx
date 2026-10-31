@@ -25,12 +25,12 @@ type Config struct {
 type Site struct {
 	Static  *static.Server
 	Scripts *scripts.Handler
+	Version string
 	head    template.HTML
-	version string
 }
 
 func New(c Config) (*Site, error) {
-	s := &Site{Scripts: scripts.New(scripts.Navigation), head: c.Head, version: c.Version}
+	s := &Site{Scripts: scripts.New(scripts.Navigation), Version: c.Version, head: c.Head}
 	if c.Static != "" {
 		s.Static = static.Dev(Assets, os.DirFS(c.Static))
 		return s, nil

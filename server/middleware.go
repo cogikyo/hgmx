@@ -2,10 +2,13 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"maps"
 	"net/http"
 	"runtime/debug"
+	"slices"
+	"strings"
 )
 
 type response struct {
@@ -72,13 +75,28 @@ func recovery(log *slog.Logger, fallback, h http.Handler) http.Handler {
 var headers = map[string]string{
 	"X-Content-Type-Options":     "nosniff",
 	"Referrer-Policy":            "same-origin",
-	"Permissions-Policy":         "accelerometer=(), browsing-topics=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()",
 	"Cross-Origin-Opener-Policy": "same-origin",
 }
 
+var features = []string{"accelerometer", "browsing-topics", "camera", "geolocation", "gyroscope", "magnetometer", "microphone", "payment", "usb"}
+
 // security sets default headers that h may override; the caller owns the CSP.
 // An empty csp leaves Content-Security-Policy unset by this middleware.
-func security(csp string, h http.Handler) http.Handler {
+func security(csp string, allow []string, h http.Handler) http.Handler {
+	for _, name := range allow {
+		if !slices.Contains(features, name) {
+			panic(fmt.Sprintf("server: unknown Site.Allow feature %q", name))
+		}
+	}
+	policy := make([]string, len(features))
+	for i, name := range features {
+		value := "()"
+		if slices.Contains(allow, name) {
+			value = "(self)"
+		}
+		policy[i] = name + "=" + value
+	}
+	permissions := strings.Join(policy, ", ")
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		header := w.Header()
 		if csp != "" {
@@ -87,6 +105,7 @@ func security(csp string, h http.Handler) http.Handler {
 		for k, v := range headers {
 			header.Set(k, v)
 		}
+		header.Set("Permissions-Policy", permissions)
 		h.ServeHTTP(w, r)
 	})
 }

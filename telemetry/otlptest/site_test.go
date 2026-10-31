@@ -40,7 +40,7 @@ func TestSite(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 		io.WriteString(w, "fallback")
 	})
-	h := server.Site{Version: "v1", CSP: "default-src 'self'", Fallback: fallback, Telemetry: p}.Handler(mux)
+	h := server.Site{Version: "v1", CSP: "default-src 'self'", InternalError: fallback, Telemetry: p}.Handler(mux)
 
 	serve := func(r *http.Request) *httptest.ResponseRecorder {
 		w := httptest.NewRecorder()

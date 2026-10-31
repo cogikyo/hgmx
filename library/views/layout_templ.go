@@ -101,7 +101,7 @@ func layout(s *Site, path, title string, content templ.Component) templ.Componen
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var6 string
-		templ_7745c5c3_Var6, templ_7745c5c3_Err = templruntime.NewAttributeExpression(server.VersionConfig(s.version)).Resolve(ctx)
+		templ_7745c5c3_Var6, templ_7745c5c3_Err = templruntime.NewAttributeExpression(server.VersionConfig(s.Version)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
 			return templ.Error{Err: templ_7745c5c3_Err, FileName: `library/views/layout.templ`, Line: 25, Col: 56}
 		}

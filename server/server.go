@@ -1,8 +1,4 @@
 // Package server assembles and runs HTTP sites behind Cloudflare.
-// Given an application mux, a fallback handler, and a telemetry pipeline:
-//
-//	h := server.Site{Version: version, CSP: csp, Fallback: fallback, Telemetry: p}.Handler(mux)
-//	err := server.Run(ctx, server.New(":8080", h, p.Logger()), p.Shutdown)
 package server
 
 import (
@@ -24,21 +20,20 @@ const afterTimeout = 5 * time.Second // Fresh cleanup budget after the HTTP drai
 
 // Site configures the root handler around an application mux.
 type Site struct {
-	Version   string
-	CSP       string
-	Fallback  http.Handler
-	Telemetry *telemetry.Pipeline
+	Version       string
+	CSP           string
+	Allow         []string
+	InternalError http.Handler
+	Telemetry     *telemetry.Pipeline
 }
 
 // Handler wraps mux with telemetry, security headers, and panic recovery.
 // The mux type rejects outer wrappers that can hide r.Pattern from telemetry.
 // StripPrefix, nested muxes, and route wrappers can still coarsen http.route.
 // Cross-origin protection runs last, before mux.
-// It serves /healthz and the telemetry beacon outside that chain.
-// It panics if Fallback or Telemetry is nil; use [telemetry.Disabled] to opt out.
 func (s Site) Handler(mux *http.ServeMux) http.Handler {
-	if s.Fallback == nil {
-		panic("server: Site.Fallback is nil")
+	if s.InternalError == nil {
+		panic("server: Site.InternalError is nil")
 	}
 	if s.Telemetry == nil {
 		panic("server: Site.Telemetry is nil; use telemetry.Disabled for a site without telemetry")
@@ -46,9 +41,11 @@ func (s Site) Handler(mux *http.ServeMux) http.Handler {
 	p := s.Telemetry
 	root := http.NewServeMux()
 	root.Handle("GET /healthz", health(s.Version))
-	root.Handle(telemetry.Path, p.Beacon())
-	root.Handle("/", p.Handler(security(s.CSP, recovery(p.Logger(), s.Fallback, http.NewCrossOriginProtection().Handler(mux)))))
-	return root
+	if b := p.Beacon(); b.Head() != "" {
+		root.Handle(telemetry.Path, b)
+	}
+	root.Handle("/", p.Handler(recovery(p.Logger(), s.InternalError, http.NewCrossOriginProtection().Handler(mux))))
+	return security(s.CSP, s.Allow, root)
 }
 
 // New configures a server for use behind Cloudflare.
@@ -107,7 +104,6 @@ func serve(ctx context.Context, srv *http.Server) error {
 	return err
 }
 
-// health serves an uncached health response; mount it outside the middleware.
 func health(version string) http.Handler {
 	body := "ok " + version
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

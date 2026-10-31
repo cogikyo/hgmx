@@ -22,7 +22,7 @@ templ layout(s *Site, path, title string, content templ.Component) {
 		<body
 			hx-boost:inherited="target:#main select:#main swap:'innerHTML strip show:top showTarget:body' transition:true"
 			hx-select-oob:inherited="#nav-links:outerMorph"
-			hx-config:inherited={ server.VersionConfig(s.version) }
+			hx-config:inherited={ server.VersionConfig(s.Version) }
 		>
 			@nav.Nav(path)
 			<main id="main" hx-history-elt>

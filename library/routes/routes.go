@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"html/template"
 	"net/http"
 
 	"github.com/cogikyo/hgmx/scripts"
@@ -13,19 +12,8 @@ import (
 	"github.com/cogikyo/hgmx/library/views/pages/notfound"
 )
 
-type Config struct {
-	Store   *store.Store
-	Version string
-	Static  string
-	Head    template.HTML
-}
-
-func New(c Config) (*http.ServeMux, error) {
-	v, err := views.New(views.Config{Version: c.Version, Static: c.Static, Head: c.Head})
-	if err != nil {
-		return nil, err
-	}
-	p := &pages{store: c.Store, views: v, version: c.Version}
+func New(st *store.Store, v *views.Site) *http.ServeMux {
+	p := &pages{store: st, views: v}
 
 	mux := http.NewServeMux()
 	mux.Handle("GET "+views.Assets, v.Static)
@@ -33,5 +21,5 @@ func New(c Config) (*http.ServeMux, error) {
 	mux.Handle("GET /{$}", p.page(http.StatusOK, "Home", home.Page()))
 	mux.Handle("GET /about", p.page(http.StatusOK, "About", about.Page()))
 	mux.Handle("GET /", p.page(http.StatusNotFound, "Not Found", notfound.Page()))
-	return mux, nil
+	return mux
 }
