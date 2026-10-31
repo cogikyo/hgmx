@@ -11,11 +11,11 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"runtime"
 	"slices"
 	"strings"
 
 	"github.com/a-h/templ"
+	"github.com/cogikyo/hgmx"
 	"golang.org/x/mod/modfile"
 )
 
@@ -38,7 +38,7 @@ var (
 	}
 	ruleGoVersion = &rule{
 		"layout/go-version",
-		"sites stay on the Go release hgmx is built with",
+		"sites stay on at least the Go release hgmx requires",
 		"raise the go directive",
 	}
 	ruleTemplVersion = &rule{
@@ -147,7 +147,9 @@ func runRules(s site) ([]finding, error) {
 	if err := a.tree(); err != nil {
 		return nil, err
 	}
-	a.gomod()
+	if err := a.gomod(); err != nil {
+		return nil, err
+	}
 	if err := a.templRules(); err != nil {
 		return nil, err
 	}
@@ -180,20 +182,23 @@ func (a *audit) tree() error {
 	})
 }
 
-func (a *audit) gomod() {
+func (a *audit) gomod() error {
+	own, err := modfile.Parse("go.mod", hgmx.GoMod, nil)
+	if err != nil {
+		return err
+	}
 	f := a.site.mod
-	if lang := version.Lang(runtime.Version()); lang != "" && f.Go != nil && version.Compare("go"+f.Go.Version, lang) < 0 {
-		want := strings.TrimPrefix(lang, "go")
+	if f.Go != nil && version.Compare("go"+f.Go.Version, "go"+own.Go.Version) < 0 {
 		a.report(finding{
 			file: "go.mod", line: f.Go.Syntax.Start.Line, col: f.Go.Syntax.Start.LineRune,
 			rule: ruleGoVersion,
-			msg:  fmt.Sprintf("go %s is older than go %s, which hgmx is built with", f.Go.Version, want),
-			fix:  fmt.Sprintf("run go mod edit -go=%s, then go mod tidy", want),
+			msg:  fmt.Sprintf("go %s is older than hgmx's go %s", f.Go.Version, own.Go.Version),
+			fix:  fmt.Sprintf("run go mod edit -go=%s, then go mod tidy", own.Go.Version),
 		})
 	}
 	r := a.site.templ()
 	if r == nil || r.Mod.Version == templ.Version() {
-		return
+		return nil
 	}
 	fix := fmt.Sprintf("run go get %s@%s", templPath, templ.Version())
 	if version.Compare(goVersion(r.Mod.Version), goVersion(templ.Version())) > 0 {
@@ -205,6 +210,7 @@ func (a *audit) gomod() {
 		msg:  fmt.Sprintf("site requires templ %s; hgmx generates with %s", r.Mod.Version, templ.Version()),
 		fix:  fix,
 	})
+	return nil
 }
 
 func goVersion(semver string) string {
