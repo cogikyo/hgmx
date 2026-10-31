@@ -59,301 +59,314 @@ func Explorer(v View) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\"></script><section class=\"theme-explorer\" aria-label=\"Palette explorer\"><form class=\"tx-controls\" action=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\"></script><section class=\"theme-explorer\" style=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var4 string
-		templ_7745c5c3_Var4, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.URL(v.Action)).ResolveURL(ctx)
+		templ_7745c5c3_Var4, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(v.style())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 16, Col: 31}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 13, Col: 50}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\" method=\"get\" hx-get=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\" aria-label=\"Palette explorer\"><form class=\"tx-controls\" action=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var5 string
-		templ_7745c5c3_Var5, templ_7745c5c3_Err = templruntime.NewAttributeExpression(string(templ.URL(v.Action))).Resolve(ctx)
+		templ_7745c5c3_Var5, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.URL(v.Action)).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 18, Col: 39}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 16, Col: 31}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var5)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\" hx-trigger=\"input delay:150ms, submit\" hx-select=\"#tx-view\" hx-target=\"#tx-results\" hx-swap=\"innerHTML\" hx-sync=\"queue last\" hx-select-oob=\"\" hx-replace-url=\"true\"><label><span>Base</span> <input type=\"color\" name=\"base\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\" method=\"get\" hx-get=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var6 string
-		templ_7745c5c3_Var6, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.Seed.Base.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var6, templ_7745c5c3_Err = templruntime.NewAttributeExpression(string(templ.URL(v.Action))).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 29, Col: 61}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 18, Col: 39}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var6)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\"></label> <label><span>Primary</span> <input type=\"color\" name=\"primary\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\" hx-trigger=\"input delay:150ms, submit\" hx-select=\"#tx-view\" hx-target=\"#tx-results\" hx-swap=\"innerHTML\" hx-sync=\"queue last\" hx-select-oob=\"\" hx-replace-url=\"true\"><label><span>Base</span> <input type=\"color\" name=\"base\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var7 string
-		templ_7745c5c3_Var7, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.Seed.Primary.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var7, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.Seed.Base.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 33, Col: 67}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 29, Col: 61}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var7)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\"></label> <label><span>Accent</span> <input type=\"text\" name=\"accent\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "\"></label> <label><span>Primary</span> <input type=\"color\" name=\"primary\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var8 string
-		templ_7745c5c3_Var8, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.Accent()).Resolve(ctx)
+		templ_7745c5c3_Var8, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.Seed.Primary.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 37, Col: 55}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 33, Col: 67}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var8)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\" placeholder=\"derived\" pattern=\"#[0-9a-fA-F]{6}\" size=\"8\" spellcheck=\"false\" autocomplete=\"off\"></label> <button type=\"submit\">Generate</button> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\"></label> <label><span>Accent</span> <input type=\"text\" name=\"accent\" value=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var9 string
+		templ_7745c5c3_Var9, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.Accent()).Resolve(ctx)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 37, Col: 55}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\" placeholder=\"derived\" pattern=\"#[0-9a-fA-F]{6}\" size=\"8\" spellcheck=\"false\" autocomplete=\"off\"></label> <button type=\"submit\">Generate</button> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if len(v.Presets) > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<nav class=\"tx-presets\" aria-label=\"Presets\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<nav class=\"tx-presets\" aria-label=\"Presets\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			for _, p := range v.Presets {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<a href=\"")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				var templ_7745c5c3_Var9 string
-				templ_7745c5c3_Var9, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.URL(v.Link(p.Seed))).ResolveURL(ctx)
-				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 43, Col: 41}
-				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var9)
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\"><svg viewBox=\"0 0 20 20\" aria-hidden=\"true\"><rect width=\"20\" height=\"20\" rx=\"4\" fill=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<a href=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var10 string
-				templ_7745c5c3_Var10, templ_7745c5c3_Err = templruntime.NewAttributeExpression(p.Seed.Base.Hex()).Resolve(ctx)
+				templ_7745c5c3_Var10, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.URL(v.Link(p.Seed))).ResolveURL(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 45, Col: 68}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 43, Col: 41}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var10)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\"></rect> <circle cx=\"10\" cy=\"10\" r=\"5\" fill=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\"><svg viewBox=\"0 0 20 20\" aria-hidden=\"true\"><rect width=\"20\" height=\"20\" rx=\"4\" fill=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var11 string
-				templ_7745c5c3_Var11, templ_7745c5c3_Err = templruntime.NewAttributeExpression(p.Seed.Primary.Hex()).Resolve(ctx)
+				templ_7745c5c3_Var11, templ_7745c5c3_Err = templruntime.NewAttributeExpression(p.Seed.Base.Hex()).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 46, Col: 65}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 45, Col: 68}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var11)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "\"></circle></svg> ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "\"></rect> <circle cx=\"10\" cy=\"10\" r=\"5\" fill=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var12 string
-				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(p.Name)
+				templ_7745c5c3_Var12, templ_7745c5c3_Err = templruntime.NewAttributeExpression(p.Seed.Primary.Hex()).Resolve(ctx)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 48, Col: 15}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 46, Col: 65}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var12)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</a>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\"></circle></svg> ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var13 string
+				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(p.Name)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 48, Col: 15}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</a>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</nav>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</nav>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</form><div id=\"tx-results\"><div id=\"tx-view\" class=\"tx-view\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</form><div id=\"tx-results\"><div id=\"tx-view\" class=\"tx-view\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if v.Err != nil {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<p class=\"tx-error\" role=\"alert\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<p class=\"tx-error\" role=\"alert\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var13 string
-			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(v.Err.Error())
+			var templ_7745c5c3_Var14 string
+			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(v.Err.Error())
 			if templ_7745c5c3_Err != nil {
 				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 57, Col: 53}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<header class=\"tx-summary\"><p><strong>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var14 string
-		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(v.Palette.Scheme())
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 61, Col: 34}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</strong> base <code>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<header class=\"tx-summary\"><p><strong>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var15 string
-		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(v.Seed.Base.Hex())
+		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(v.Palette.Scheme())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 62, Col: 36}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 61, Col: 34}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</code> primary <code>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</strong> base <code>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var16 string
-		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(v.Seed.Primary.Hex())
+		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(v.Seed.Base.Hex())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 63, Col: 42}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 62, Col: 36}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</code> accent <code>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</code> primary <code>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var17 string
-		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(v.scale("accent").Fill.Hex())
+		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(v.Seed.Primary.Hex())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 64, Col: 49}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 63, Col: 42}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</code> ")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		if v.Seed.Accent == nil {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "<span>(derived)</span>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</p><div class=\"tx-actions\" role=\"group\" aria-label=\"Use or download this palette\"><button type=\"button\" data-theme-live=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</code> accent <code>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var18 string
-		templ_7745c5c3_Var18, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.Live()).Resolve(ctx)
+		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(v.scale("accent").Fill.Hex())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 70, Col: 54}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 64, Col: 49}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var18)
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "\">Use on this page</button> <a href=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</code> ")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if v.Seed.Accent == nil {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<span>(derived)</span>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</p><div class=\"tx-actions\" role=\"group\" aria-label=\"Use or download this palette\"><button type=\"button\" data-theme-live=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var19 string
-		templ_7745c5c3_Var19, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.URL(v.download("css"))).ResolveURL(ctx)
+		templ_7745c5c3_Var19, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.Live()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 71, Col: 44}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 70, Col: 54}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var19)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "\" download>Download CSS</a> <a href=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "\">Use on this page</button> <a href=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var20 string
-		templ_7745c5c3_Var20, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.URL(v.download("tailwind"))).ResolveURL(ctx)
+		templ_7745c5c3_Var20, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.URL(v.download("css"))).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 72, Col: 49}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 71, Col: 44}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var20)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "\" download>Download Tailwind theme</a></div></header>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "\" download>Download CSS</a> <a href=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var21 string
+		templ_7745c5c3_Var21, templ_7745c5c3_Err = templruntime.NewAttributeExpression(templ.URL(v.download("tailwind"))).ResolveURL(ctx)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 72, Col: 49}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var21)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "\" download>Download Tailwind theme</a></div></header>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if clashes := v.Palette.Clashes(); len(clashes) > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "<ul class=\"tx-clashes\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<ul class=\"tx-clashes\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			for _, c := range clashes {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<li>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "<li>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var21 string
-				templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(c.String())
+				var templ_7745c5c3_Var22 string
+				templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(c.String())
 				if templ_7745c5c3_Err != nil {
 					return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 78, Col: 23}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, ".</li>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, ".</li>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "</ul>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "</ul>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "<div class=\"tx-row\"><figure class=\"tx-mockfig\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<div class=\"tx-row\"><figure class=\"tx-mockfig\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -361,7 +374,7 @@ func Explorer(v View) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<figcaption>Roles and control states in use</figcaption></figure><figure class=\"tx-rolefig\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<figcaption>Roles and control states in use</figcaption></figure><figure class=\"tx-rolefig\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -369,7 +382,7 @@ func Explorer(v View) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<figcaption>Roles and fills</figcaption></figure></div><div class=\"tx-row\"><figure class=\"tx-gridfig\"><div class=\"tx-scrollwrap\"><div class=\"tx-scroll\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<figcaption>Roles and fills</figcaption></figure></div><div class=\"tx-row\"><figure class=\"tx-gridfig\"><div class=\"tx-scrollwrap\"><div class=\"tx-scroll\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -377,7 +390,7 @@ func Explorer(v View) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "</div></div><figcaption>Every scale by step; select a swatch, then use the arrow keys<span class=\"tx-more\">. Scroll sideways for the rest of the steps.</span></figcaption></figure>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "</div></div><figcaption>Every scale by step; select a swatch, then use the arrow keys<span class=\"tx-more\">. Scroll sideways for the rest of the steps.</span></figcaption></figure>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -385,7 +398,7 @@ func Explorer(v View) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "</div><div class=\"tx-row\"><figure class=\"tx-plotfig\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</div><div class=\"tx-row\"><figure class=\"tx-plotfig\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -393,20 +406,20 @@ func Explorer(v View) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "<figcaption>Hue and chroma (the a–b plane)</figcaption></figure><figure class=\"tx-plotfig\"><canvas class=\"tx-space\" data-oklab=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<figcaption>Hue and chroma (the a–b plane)</figcaption></figure><figure class=\"tx-plotfig\"><canvas class=\"tx-space\" data-oklab=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var22 string
-		templ_7745c5c3_Var22, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.space()).Resolve(ctx)
+		var templ_7745c5c3_Var23 string
+		templ_7745c5c3_Var23, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.space()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
 			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 109, Col: 53}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var22)
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var23)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "\" tabindex=\"0\" role=\"img\" aria-label=\"Palette in OKLab space with the sRGB gamut; drag or use the arrow keys to rotate\"></canvas><figcaption>OKLab, a and b doubled · drag or use the arrow keys to rotate</figcaption></figure></div></div></div></section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "\" tabindex=\"0\" role=\"img\" aria-label=\"Palette in OKLab space with the sRGB gamut; drag or use the arrow keys to rotate\"></canvas><figcaption>OKLab, a and b doubled · drag or use the arrow keys to rotate</figcaption></figure></div></div></div></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -431,124 +444,124 @@ func readout(s swatch) templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "<aside class=\"tx-readout\" aria-label=\"Selected colour\"><svg viewBox=\"0 0 48 48\" aria-hidden=\"true\"><rect width=\"48\" height=\"48\" rx=\"8\" fill=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var24 string
-		templ_7745c5c3_Var24, templ_7745c5c3_Err = templruntime.NewAttributeExpression(s.Color.Hex()).Resolve(ctx)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 121, Col: 59}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var24)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "\" data-readout=\"swatch\"></rect></svg><dl aria-live=\"polite\"><dt>Token</dt><dd data-readout=\"token\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "<aside class=\"tx-readout\" aria-label=\"Selected colour\"><svg viewBox=\"0 0 48 48\" aria-hidden=\"true\"><rect width=\"48\" height=\"48\" rx=\"8\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var25 string
-		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(s.Detail.Token)
+		templ_7745c5c3_Var25, templ_7745c5c3_Err = templruntime.NewAttributeExpression(s.Color.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 125, Col: 44}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 121, Col: 59}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var25)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "</dd><dt>Hex</dt><dd data-readout=\"hex\"><code>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "\" data-readout=\"swatch\"></rect></svg><dl aria-live=\"polite\"><dt>Token</dt><dd data-readout=\"token\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var26 string
-		templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(s.Detail.Hex)
+		templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(s.Detail.Token)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 127, Col: 46}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 125, Col: 44}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "</code></dd><dt>OKLCH</dt><dd data-readout=\"oklch\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "</dd><dt>Hex</dt><dd data-readout=\"hex\"><code>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var27 string
-		templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(s.Detail.OKLCH)
+		templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(s.Detail.Hex)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 129, Col: 44}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 127, Col: 46}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "</dd><dt>On base</dt><dd data-readout=\"base\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "</code></dd><dt>OKLCH</dt><dd data-readout=\"oklch\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var28 string
-		templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(s.Detail.Base)
+		templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(s.Detail.OKLCH)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 131, Col: 42}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 129, Col: 44}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "</dd><dt>On surface</dt><dd data-readout=\"surface\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "</dd><dt>On base</dt><dd data-readout=\"base\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var29 string
-		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(s.Detail.Surface)
+		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(s.Detail.Base)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 133, Col: 48}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 131, Col: 42}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "</dd><dt>On inset</dt><dd data-readout=\"inset\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "</dd><dt>On surface</dt><dd data-readout=\"surface\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var30 string
-		templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(s.Detail.Inset)
+		templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(s.Detail.Surface)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 135, Col: 44}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 133, Col: 48}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "</dd><dt>ΔL from base</dt><dd data-readout=\"dl\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "</dd><dt>On inset</dt><dd data-readout=\"inset\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var31 string
-		templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(s.Detail.DL)
+		templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(s.Detail.Inset)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 137, Col: 38}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 135, Col: 44}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "</dd><dt>Note</dt><dd data-readout=\"note\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "</dd><dt>ΔL from base</dt><dd data-readout=\"dl\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var32 string
-		templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(s.Detail.Note)
+		templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(s.Detail.DL)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 139, Col: 42}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 137, Col: 38}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "</dd></dl></aside>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "</dd><dt>Note</dt><dd data-readout=\"note\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var33 string
+		templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(s.Detail.Note)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 139, Col: 42}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "</dd></dl></aside>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -573,360 +586,360 @@ func swatchCell(s swatch, row, col int, x, y float64, tab, ink, muted string) te
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "<g class=\"tx-swatch\" role=\"button\" tabindex=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var34 string
-		templ_7745c5c3_Var34, templ_7745c5c3_Err = templruntime.NewAttributeExpression(tab).Resolve(ctx)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 148, Col: 16}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var34)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "\" aria-label=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "<g class=\"tx-swatch\" role=\"button\" tabindex=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var35 string
-		templ_7745c5c3_Var35, templ_7745c5c3_Err = templruntime.NewAttributeExpression(s.Token + " " + s.Color.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var35, templ_7745c5c3_Err = templruntime.NewAttributeExpression(tab).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 149, Col: 44}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 148, Col: 16}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var35)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "\" data-family=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "\" aria-label=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var36 string
-		templ_7745c5c3_Var36, templ_7745c5c3_Err = templruntime.NewAttributeExpression(s.Family).Resolve(ctx)
+		templ_7745c5c3_Var36, templ_7745c5c3_Err = templruntime.NewAttributeExpression(s.Token + " " + s.Color.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 150, Col: 24}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 149, Col: 44}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var36)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "\" data-row=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "\" data-family=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var37 string
-		templ_7745c5c3_Var37, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprint(row)).Resolve(ctx)
+		templ_7745c5c3_Var37, templ_7745c5c3_Err = templruntime.NewAttributeExpression(s.Family).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 151, Col: 28}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 150, Col: 24}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var37)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "\" data-col=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "\" data-row=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var38 string
-		templ_7745c5c3_Var38, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprint(col)).Resolve(ctx)
+		templ_7745c5c3_Var38, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprint(row)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 152, Col: 28}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 151, Col: 28}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var38)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "\" data-detail=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "\" data-col=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var39 string
-		templ_7745c5c3_Var39, templ_7745c5c3_Err = templruntime.NewAttributeExpression(s.Detail.JSON()).Resolve(ctx)
+		templ_7745c5c3_Var39, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprint(col)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 153, Col: 31}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 152, Col: 28}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var39)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "\" data-detail=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var40 string
+		templ_7745c5c3_Var40, templ_7745c5c3_Err = templruntime.NewAttributeExpression(s.Detail.JSON()).Resolve(ctx)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 153, Col: 31}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var40)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if s.Short {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "<rect x=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var40 string
-			templ_7745c5c3_Var40, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(x + 1)).Resolve(ctx)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 156, Col: 23}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var40)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "\" y=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "<rect x=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var41 string
-			templ_7745c5c3_Var41, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(y + 1)).Resolve(ctx)
+			templ_7745c5c3_Var41, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(x + 1)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 156, Col: 40}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 156, Col: 23}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var41)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "\" width=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "\" y=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var42 string
-			templ_7745c5c3_Var42, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(cellW - 2)).Resolve(ctx)
+			templ_7745c5c3_Var42, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(y + 1)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 156, Col: 65}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 156, Col: 40}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var42)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "\" height=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "\" width=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var43 string
-			templ_7745c5c3_Var43, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(cellH - 2)).Resolve(ctx)
+			templ_7745c5c3_Var43, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(cellW - 2)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 156, Col: 91}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 156, Col: 65}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var43)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "\" rx=\"4\" fill=\"none\" stroke=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "\" height=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var44 string
-			templ_7745c5c3_Var44, templ_7745c5c3_Err = templruntime.NewAttributeExpression(muted).Resolve(ctx)
+			templ_7745c5c3_Var44, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(cellH - 2)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 156, Col: 127}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 156, Col: 91}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var44)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, "\" stroke-dasharray=\"3 3\"></rect> <line x1=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, "\" rx=\"4\" fill=\"none\" stroke=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var45 string
-			templ_7745c5c3_Var45, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(x + 6)).Resolve(ctx)
+			templ_7745c5c3_Var45, templ_7745c5c3_Err = templruntime.NewAttributeExpression(muted).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 157, Col: 24}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 156, Col: 127}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var45)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "\" y1=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "\" stroke-dasharray=\"3 3\"></rect> <line x1=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var46 string
-			templ_7745c5c3_Var46, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(y + cellH - 6)).Resolve(ctx)
+			templ_7745c5c3_Var46, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(x + 6)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 157, Col: 50}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 157, Col: 24}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var46)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, "\" x2=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, "\" y1=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var47 string
-			templ_7745c5c3_Var47, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(x + cellW - 6)).Resolve(ctx)
+			templ_7745c5c3_Var47, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(y + cellH - 6)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 157, Col: 76}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 157, Col: 50}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var47)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "\" y2=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "\" x2=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var48 string
-			templ_7745c5c3_Var48, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(y + 6)).Resolve(ctx)
+			templ_7745c5c3_Var48, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(x + cellW - 6)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 157, Col: 94}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 157, Col: 76}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var48)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "\" stroke=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "\" y2=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var49 string
-			templ_7745c5c3_Var49, templ_7745c5c3_Err = templruntime.NewAttributeExpression(muted).Resolve(ctx)
+			templ_7745c5c3_Var49, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(y + 6)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 157, Col: 111}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 157, Col: 94}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var49)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "\"></line> ")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 68, "<rect x=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "\" stroke=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var50 string
-			templ_7745c5c3_Var50, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(x)).Resolve(ctx)
+			templ_7745c5c3_Var50, templ_7745c5c3_Err = templruntime.NewAttributeExpression(muted).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 159, Col: 19}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 157, Col: 111}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var50)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "\" y=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 68, "\"></line> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 69, "<rect x=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var51 string
-			templ_7745c5c3_Var51, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(y)).Resolve(ctx)
+			templ_7745c5c3_Var51, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(x)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 159, Col: 32}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 159, Col: 19}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var51)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "\" width=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 70, "\" y=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var52 string
-			templ_7745c5c3_Var52, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(cellW)).Resolve(ctx)
+			templ_7745c5c3_Var52, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(y)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 159, Col: 53}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 159, Col: 32}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var52)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "\" height=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 71, "\" width=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var53 string
-			templ_7745c5c3_Var53, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(cellH)).Resolve(ctx)
+			templ_7745c5c3_Var53, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(cellW)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 159, Col: 75}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 159, Col: 53}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var53)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 72, "\" rx=\"4\" fill=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 72, "\" height=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var54 string
-			templ_7745c5c3_Var54, templ_7745c5c3_Err = templruntime.NewAttributeExpression(s.Color.Hex()).Resolve(ctx)
+			templ_7745c5c3_Var54, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(cellH)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 159, Col: 105}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 159, Col: 75}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var54)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 73, "\"></rect> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 73, "\" rx=\"4\" fill=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var55 string
+			templ_7745c5c3_Var55, templ_7745c5c3_Err = templruntime.NewAttributeExpression(s.Color.Hex()).Resolve(ctx)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 159, Col: 105}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var55)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 74, "\"></rect> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 74, "<rect x=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var55 string
-		templ_7745c5c3_Var55, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(x - 2)).Resolve(ctx)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 161, Col: 22}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var55)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 75, "\" y=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 75, "<rect x=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var56 string
-		templ_7745c5c3_Var56, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(y - 2)).Resolve(ctx)
+		templ_7745c5c3_Var56, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(x - 2)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 161, Col: 39}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 161, Col: 22}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var56)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 76, "\" width=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 76, "\" y=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var57 string
-		templ_7745c5c3_Var57, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(cellW + 4)).Resolve(ctx)
+		templ_7745c5c3_Var57, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(y - 2)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 161, Col: 64}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 161, Col: 39}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var57)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 77, "\" height=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 77, "\" width=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var58 string
-		templ_7745c5c3_Var58, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(cellH + 4)).Resolve(ctx)
+		templ_7745c5c3_Var58, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(cellW + 4)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 161, Col: 90}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 161, Col: 64}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var58)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 78, "\" rx=\"6\" fill=\"none\" stroke=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 78, "\" height=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var59 string
-		templ_7745c5c3_Var59, templ_7745c5c3_Err = templruntime.NewAttributeExpression(ink).Resolve(ctx)
+		templ_7745c5c3_Var59, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(cellH + 4)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 161, Col: 124}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 161, Col: 90}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var59)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 79, "\" stroke-width=\"2\" class=\"tx-ring\"></rect></g>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 79, "\" rx=\"6\" fill=\"none\" stroke=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var60 string
+		templ_7745c5c3_Var60, templ_7745c5c3_Err = templruntime.NewAttributeExpression(ink).Resolve(ctx)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 161, Col: 124}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var60)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 80, "\" stroke-width=\"2\" class=\"tx-ring\"></rect></g>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -953,122 +966,122 @@ func swatches(v View) templ.Component {
 		ctx = templ.ClearChildren(ctx)
 		rows := v.rows()
 		fg, muted := v.role("fg").Hex(), v.role("muted").Hex()
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 80, "<svg class=\"tx-swatches\" viewBox=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var61 string
-		templ_7745c5c3_Var61, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprintf("0 0 %d %d", gridW, gridH(len(rows)))).Resolve(ctx)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 168, Col: 85}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var61)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 81, "\" role=\"group\" aria-label=\"Every scale by step\" data-swatches><rect width=\"100%\" height=\"100%\" rx=\"10\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 81, "<svg class=\"tx-swatches\" viewBox=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var62 string
-		templ_7745c5c3_Var62, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.Seed.Base.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var62, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprintf("0 0 %d %d", gridW, gridH(len(rows)))).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 169, Col: 67}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 168, Col: 85}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var62)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 82, "\"></rect> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 82, "\" role=\"group\" aria-label=\"Every scale by step\" data-swatches><rect width=\"100%\" height=\"100%\" rx=\"10\" fill=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var63 string
+		templ_7745c5c3_Var63, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.Seed.Base.Hex()).Resolve(ctx)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 169, Col: 67}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var63)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 83, "\"></rect> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		for i, step := range palette.Steps {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 83, "<text x=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var63 string
-			templ_7745c5c3_Var63, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(colX(i) + cellW/2)).Resolve(ctx)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 171, Col: 35}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var63)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 84, "\" y=\"18\" fill=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 84, "<text x=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var64 string
-			templ_7745c5c3_Var64, templ_7745c5c3_Err = templruntime.NewAttributeExpression(muted).Resolve(ctx)
+			templ_7745c5c3_Var64, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(colX(i) + cellW/2)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 171, Col: 57}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 171, Col: 35}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var64)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 85, "\" font-size=\"12\" text-anchor=\"middle\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 85, "\" y=\"18\" fill=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var65 string
-			templ_7745c5c3_Var65, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(step))
+			templ_7745c5c3_Var65, templ_7745c5c3_Err = templruntime.NewAttributeExpression(muted).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 171, Col: 114}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 171, Col: 57}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var65))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var65)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 86, "</text> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 86, "\" font-size=\"12\" text-anchor=\"middle\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var66 string
+			templ_7745c5c3_Var66, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprint(step))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 171, Col: 114}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var66))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 87, "</text> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
 		for r, row := range rows {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 87, "<text x=\"10\" y=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var66 string
-			templ_7745c5c3_Var66, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(rowY(r) + cellH/2 + 4)).Resolve(ctx)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 174, Col: 46}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var66)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 88, "\" fill=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 88, "<text x=\"10\" y=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var67 string
-			templ_7745c5c3_Var67, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fg).Resolve(ctx)
+			templ_7745c5c3_Var67, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(rowY(r) + cellH/2 + 4)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 174, Col: 58}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 174, Col: 46}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var67)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 89, "\" font-size=\"12\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 89, "\" fill=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var68 string
-			templ_7745c5c3_Var68, templ_7745c5c3_Err = templ.JoinStringErrs(row.Label)
+			templ_7745c5c3_Var68, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fg).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 174, Col: 87}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 174, Col: 58}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var68))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var68)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 90, "</text> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 90, "\" font-size=\"12\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var69 string
+			templ_7745c5c3_Var69, templ_7745c5c3_Err = templ.JoinStringErrs(row.Label)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 174, Col: 87}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var69))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 91, "</text> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1086,7 +1099,7 @@ func swatches(v View) templ.Component {
 				}
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 91, "</svg>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 92, "</svg>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1113,238 +1126,238 @@ func roleStrip(v View) templ.Component {
 		ctx = templ.ClearChildren(ctx)
 		items := v.roles()
 		base := v.Seed.Base.Hex()
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 92, "<svg class=\"tx-roles\" viewBox=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var70 string
-		templ_7745c5c3_Var70, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprintf("0 0 200 %d", rolesH(len(items)))).Resolve(ctx)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 189, Col: 78}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var70)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 93, "\" role=\"group\" aria-label=\"Roles and fills\" data-swatches><rect width=\"200\" height=\"100%\" rx=\"10\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 93, "<svg class=\"tx-roles\" viewBox=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var71 string
-		templ_7745c5c3_Var71, templ_7745c5c3_Err = templruntime.NewAttributeExpression(base).Resolve(ctx)
+		templ_7745c5c3_Var71, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprintf("0 0 200 %d", rolesH(len(items)))).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 190, Col: 53}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 189, Col: 78}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var71)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 94, "\"></rect> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 94, "\" role=\"group\" aria-label=\"Roles and fills\" data-swatches><rect width=\"200\" height=\"100%\" rx=\"10\" fill=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var72 string
+		templ_7745c5c3_Var72, templ_7745c5c3_Err = templruntime.NewAttributeExpression(base).Resolve(ctx)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 190, Col: 53}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var72)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 95, "\"></rect> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		for i, s := range items {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 95, "<g class=\"tx-swatch\" role=\"button\" tabindex=\"-1\" aria-label=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var72 string
-			templ_7745c5c3_Var72, templ_7745c5c3_Err = templruntime.NewAttributeExpression(s.Token + " " + s.Color.Hex()).Resolve(ctx)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 196, Col: 46}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var72)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 96, "\" data-family=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 96, "<g class=\"tx-swatch\" role=\"button\" tabindex=\"-1\" aria-label=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var73 string
-			templ_7745c5c3_Var73, templ_7745c5c3_Err = templruntime.NewAttributeExpression(s.Family).Resolve(ctx)
+			templ_7745c5c3_Var73, templ_7745c5c3_Err = templruntime.NewAttributeExpression(s.Token + " " + s.Color.Hex()).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 197, Col: 26}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 196, Col: 46}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var73)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 97, "\" data-row=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 97, "\" data-family=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var74 string
-			templ_7745c5c3_Var74, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprint(i)).Resolve(ctx)
+			templ_7745c5c3_Var74, templ_7745c5c3_Err = templruntime.NewAttributeExpression(s.Family).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 198, Col: 28}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 197, Col: 26}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var74)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 98, "\" data-col=\"0\" data-detail=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 98, "\" data-row=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var75 string
-			templ_7745c5c3_Var75, templ_7745c5c3_Err = templruntime.NewAttributeExpression(s.Detail.JSON()).Resolve(ctx)
+			templ_7745c5c3_Var75, templ_7745c5c3_Err = templruntime.NewAttributeExpression(fmt.Sprint(i)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 200, Col: 33}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 198, Col: 28}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var75)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 99, "\"><rect x=\"10\" y=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 99, "\" data-col=\"0\" data-detail=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var76 string
-			templ_7745c5c3_Var76, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(roleY(i))).Resolve(ctx)
+			templ_7745c5c3_Var76, templ_7745c5c3_Err = templruntime.NewAttributeExpression(s.Detail.JSON()).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 202, Col: 34}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 200, Col: 33}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var76)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 100, "\" width=\"40\" height=\"24\" rx=\"4\" fill=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 100, "\"><rect x=\"10\" y=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var77 string
-			templ_7745c5c3_Var77, templ_7745c5c3_Err = templruntime.NewAttributeExpression(s.Color.Hex()).Resolve(ctx)
+			templ_7745c5c3_Var77, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(roleY(i))).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 202, Col: 87}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 202, Col: 34}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var77)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 101, "\" stroke=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 101, "\" width=\"40\" height=\"24\" rx=\"4\" fill=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var78 string
-			templ_7745c5c3_Var78, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.role("line").Hex()).Resolve(ctx)
+			templ_7745c5c3_Var78, templ_7745c5c3_Err = templruntime.NewAttributeExpression(s.Color.Hex()).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 202, Col: 119}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 202, Col: 87}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var78)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 102, "\"></rect> <rect x=\"6\" y=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 102, "\" stroke=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var79 string
-			templ_7745c5c3_Var79, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(roleY(i) - 3)).Resolve(ctx)
+			templ_7745c5c3_Var79, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.role("line").Hex()).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 203, Col: 37}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 202, Col: 119}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var79)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 103, "\" width=\"188\" height=\"30\" rx=\"6\" fill=\"none\" stroke=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 103, "\"></rect> <rect x=\"6\" y=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var80 string
-			templ_7745c5c3_Var80, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.role("fg").Hex()).Resolve(ctx)
+			templ_7745c5c3_Var80, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(roleY(i) - 3)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 203, Col: 110}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 203, Col: 37}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var80)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 104, "\" stroke-width=\"2\" class=\"tx-ring\"></rect> <text x=\"60\" y=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 104, "\" width=\"188\" height=\"30\" rx=\"6\" fill=\"none\" stroke=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var81 string
-			templ_7745c5c3_Var81, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(roleY(i) + 16)).Resolve(ctx)
+			templ_7745c5c3_Var81, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.role("fg").Hex()).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 204, Col: 39}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 203, Col: 110}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var81)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 105, "\" fill=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 105, "\" stroke-width=\"2\" class=\"tx-ring\"></rect> <text x=\"60\" y=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var82 string
-			templ_7745c5c3_Var82, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.role("fg").Hex()).Resolve(ctx)
+			templ_7745c5c3_Var82, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(roleY(i) + 16)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 204, Col: 67}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 204, Col: 39}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var82)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 106, "\" font-size=\"12\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 106, "\" fill=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var83 string
-			templ_7745c5c3_Var83, templ_7745c5c3_Err = templ.JoinStringErrs(s.Token)
+			templ_7745c5c3_Var83, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.role("fg").Hex()).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 204, Col: 94}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 204, Col: 67}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var83))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var83)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 107, "</text> <text x=\"186\" y=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 107, "\" font-size=\"12\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var84 string
-			templ_7745c5c3_Var84, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(roleY(i) + 16)).Resolve(ctx)
+			templ_7745c5c3_Var84, templ_7745c5c3_Err = templ.JoinStringErrs(s.Token)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 205, Col: 40}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 204, Col: 94}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var84)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var84))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 108, "\" fill=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 108, "</text> <text x=\"186\" y=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var85 string
-			templ_7745c5c3_Var85, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.role("muted").Hex()).Resolve(ctx)
+			templ_7745c5c3_Var85, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(roleY(i) + 16)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 205, Col: 71}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 205, Col: 40}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var85)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 109, "\" font-size=\"11\" text-anchor=\"end\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 109, "\" fill=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var86 string
-			templ_7745c5c3_Var86, templ_7745c5c3_Err = templ.JoinStringErrs(s.Color.Hex())
+			templ_7745c5c3_Var86, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.role("muted").Hex()).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 205, Col: 122}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 205, Col: 71}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var86))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var86)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 110, "</text></g>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 110, "\" font-size=\"11\" text-anchor=\"end\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var87 string
+			templ_7745c5c3_Var87, templ_7745c5c3_Err = templ.JoinStringErrs(s.Color.Hex())
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 205, Col: 122}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var87))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 111, "</text></g>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 111, "</svg>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 112, "</svg>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1369,602 +1382,602 @@ func mockup(m mock) templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 112, "<svg class=\"tx-mock\" viewBox=\"0 0 340 560\" role=\"img\" aria-label=\"Sample interface drawn with the palette, showing roles and control states\"><rect width=\"340\" height=\"560\" rx=\"10\" fill=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var88 string
-		templ_7745c5c3_Var88, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Base.Hex()).Resolve(ctx)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 213, Col: 60}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var88)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 113, "\"></rect> <path d=\"M10 0 H330 A10 10 0 0 1 340 10 V40 H0 V10 A10 10 0 0 1 10 0 Z\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 113, "<svg class=\"tx-mock\" viewBox=\"0 0 340 560\" role=\"img\" aria-label=\"Sample interface drawn with the palette, showing roles and control states\"><rect width=\"340\" height=\"560\" rx=\"10\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var89 string
-		templ_7745c5c3_Var89, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Inset.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var89, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Base.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 214, Col: 94}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 213, Col: 60}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var89)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 114, "\"></path> <text x=\"16\" y=\"26\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 114, "\"></rect> <path d=\"M10 0 H330 A10 10 0 0 1 340 10 V40 H0 V10 A10 10 0 0 1 10 0 Z\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var90 string
-		templ_7745c5c3_Var90, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Strong.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var90, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Inset.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 215, Col: 43}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 214, Col: 94}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var90)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 115, "\" font-size=\"14\" font-weight=\"600\">Pier</text> <text x=\"324\" y=\"26\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 115, "\"></path> <text x=\"16\" y=\"26\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var91 string
-		templ_7745c5c3_Var91, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Muted.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var91, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Strong.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 216, Col: 43}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 215, Col: 43}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var91)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 116, "\" font-size=\"12\" text-anchor=\"end\">inset app bar</text> <rect x=\"10\" y=\"52\" width=\"320\" height=\"372\" rx=\"8\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 116, "\" font-size=\"14\" font-weight=\"600\">Pier</text> <text x=\"324\" y=\"26\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var92 string
-		templ_7745c5c3_Var92, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Surface.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var92, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Muted.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 217, Col: 76}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 216, Col: 43}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var92)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 117, "\" stroke=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 117, "\" font-size=\"12\" text-anchor=\"end\">inset app bar</text> <rect x=\"10\" y=\"52\" width=\"320\" height=\"372\" rx=\"8\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var93 string
-		templ_7745c5c3_Var93, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Line.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var93, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Surface.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 217, Col: 100}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 217, Col: 76}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var93)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 118, "\"></rect> <text x=\"24\" y=\"78\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 118, "\" stroke=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var94 string
-		templ_7745c5c3_Var94, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Strong.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var94, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Line.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 218, Col: 43}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 217, Col: 100}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var94)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 119, "\" font-size=\"15\" font-weight=\"600\">Leads</text> <text x=\"24\" y=\"98\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 119, "\"></rect> <text x=\"24\" y=\"78\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var95 string
-		templ_7745c5c3_Var95, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Fg.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var95, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Strong.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 219, Col: 39}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 218, Col: 43}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var95)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 120, "\" font-size=\"12\">Body text sits on the surface.</text> <text x=\"24\" y=\"116\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 120, "\" font-size=\"15\" font-weight=\"600\">Leads</text> <text x=\"24\" y=\"98\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var96 string
-		templ_7745c5c3_Var96, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Muted.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var96, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Fg.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 220, Col: 43}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 219, Col: 39}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var96)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 121, "\" font-size=\"12\">Muted text carries detail.</text> <text x=\"24\" y=\"136\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 121, "\" font-size=\"12\">Body text sits on the surface.</text> <text x=\"24\" y=\"116\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var97 string
-		templ_7745c5c3_Var97, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Link.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var97, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Muted.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 221, Col: 42}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 220, Col: 43}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var97)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 122, "\" font-size=\"12\" text-decoration=\"underline\">primary-600 link</text> <text x=\"170\" y=\"136\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 122, "\" font-size=\"12\">Muted text carries detail.</text> <text x=\"24\" y=\"136\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var98 string
-		templ_7745c5c3_Var98, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.LinkHover.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var98, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Link.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 222, Col: 48}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 221, Col: 42}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var98)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 123, "\" font-size=\"12\" text-decoration=\"underline\">601 on hover</text> <rect x=\"24\" y=\"148\" width=\"292\" height=\"28\" rx=\"6\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 123, "\" font-size=\"12\" text-decoration=\"underline\">primary-600 link</text> <text x=\"170\" y=\"136\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var99 string
-		templ_7745c5c3_Var99, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Base.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var99, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.LinkHover.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 223, Col: 73}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 222, Col: 48}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var99)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 124, "\" stroke=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 124, "\" font-size=\"12\" text-decoration=\"underline\">601 on hover</text> <rect x=\"24\" y=\"148\" width=\"292\" height=\"28\" rx=\"6\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var100 string
-		templ_7745c5c3_Var100, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Border.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var100, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Base.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 223, Col: 99}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 223, Col: 73}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var100)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 125, "\"></rect> <text x=\"34\" y=\"167\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 125, "\" stroke=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var101 string
-		templ_7745c5c3_Var101, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Muted.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var101, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Border.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 224, Col: 43}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 223, Col: 99}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var101)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 126, "\" font-size=\"12\">Search leads (placeholder)</text> <text x=\"34\" y=\"203\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 126, "\"></rect> <text x=\"34\" y=\"167\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var102 string
-		templ_7745c5c3_Var102, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Fg.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var102, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Muted.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 225, Col: 40}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 224, Col: 43}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var102)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 127, "\" font-size=\"12\">Rest</text> <rect x=\"24\" y=\"214\" width=\"292\" height=\"24\" rx=\"5\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 127, "\" font-size=\"12\">Search leads (placeholder)</text> <text x=\"34\" y=\"203\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var103 string
-		templ_7745c5c3_Var103, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Hover.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var103, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Fg.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 226, Col: 74}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 225, Col: 40}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var103)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 128, "\"></rect> <text x=\"34\" y=\"231\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 128, "\" font-size=\"12\">Rest</text> <rect x=\"24\" y=\"214\" width=\"292\" height=\"24\" rx=\"5\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var104 string
-		templ_7745c5c3_Var104, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Fg.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var104, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Hover.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 227, Col: 40}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 226, Col: 74}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var104)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 129, "\" font-size=\"12\">Hover · ink/5</text> <rect x=\"24\" y=\"242\" width=\"292\" height=\"24\" rx=\"5\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 129, "\"></rect> <text x=\"34\" y=\"231\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var105 string
-		templ_7745c5c3_Var105, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Pressed.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var105, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Fg.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 228, Col: 76}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 227, Col: 40}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var105)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 130, "\"></rect> <text x=\"34\" y=\"259\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 130, "\" font-size=\"12\">Hover · ink/5</text> <rect x=\"24\" y=\"242\" width=\"292\" height=\"24\" rx=\"5\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var106 string
-		templ_7745c5c3_Var106, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Fg.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var106, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Pressed.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 229, Col: 40}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 228, Col: 76}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var106)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 131, "\" font-size=\"12\">Pressed · ink/10</text> <rect x=\"24\" y=\"270\" width=\"292\" height=\"24\" rx=\"5\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 131, "\"></rect> <text x=\"34\" y=\"259\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var107 string
-		templ_7745c5c3_Var107, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Selected.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var107, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Fg.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 230, Col: 77}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 229, Col: 40}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var107)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 132, "\"></rect> <rect x=\"24\" y=\"270\" width=\"4\" height=\"24\" rx=\"2\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 132, "\" font-size=\"12\">Pressed · ink/10</text> <rect x=\"24\" y=\"270\" width=\"292\" height=\"24\" rx=\"5\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var108 string
-		templ_7745c5c3_Var108, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Focus.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var108, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Selected.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 231, Col: 72}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 230, Col: 77}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var108)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 133, "\"></rect> <text x=\"34\" y=\"287\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 133, "\"></rect> <rect x=\"24\" y=\"270\" width=\"4\" height=\"24\" rx=\"2\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var109 string
-		templ_7745c5c3_Var109, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.OnSelected.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var109, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Focus.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 232, Col: 48}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 231, Col: 72}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var109)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 134, "\" font-size=\"12\" font-weight=\"600\">Selected · accent wash</text> <text x=\"34\" y=\"315\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 134, "\"></rect> <text x=\"34\" y=\"287\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var110 string
-		templ_7745c5c3_Var110, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Disabled.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var110, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.OnSelected.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 233, Col: 46}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 232, Col: 48}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var110)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 135, "\" font-size=\"12\">Disabled · neutral-400</text> <rect x=\"25\" y=\"327\" width=\"290\" height=\"22\" rx=\"5\" fill=\"none\" stroke=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 135, "\" font-size=\"12\" font-weight=\"600\">Selected · accent wash</text> <text x=\"34\" y=\"315\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var111 string
-		templ_7745c5c3_Var111, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Focus.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var111, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Disabled.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 234, Col: 88}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 233, Col: 46}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var111)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 136, "\" stroke-width=\"2\"></rect> <text x=\"34\" y=\"343\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 136, "\" font-size=\"12\">Disabled · neutral-400</text> <rect x=\"25\" y=\"327\" width=\"290\" height=\"22\" rx=\"5\" fill=\"none\" stroke=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var112 string
-		templ_7745c5c3_Var112, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Fg.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var112, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Focus.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 235, Col: 40}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 234, Col: 88}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var112)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 137, "\" font-size=\"12\">Keyboard focus · accent-500 ring</text> <rect x=\"24\" y=\"362\" width=\"292\" height=\"50\" rx=\"6\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 137, "\" stroke-width=\"2\"></rect> <text x=\"34\" y=\"343\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var113 string
-		templ_7745c5c3_Var113, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Raised.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var113, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Fg.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 236, Col: 75}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 235, Col: 40}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var113)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 138, "\"></rect> <text x=\"34\" y=\"382\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 138, "\" font-size=\"12\">Keyboard focus · accent-500 ring</text> <rect x=\"24\" y=\"362\" width=\"292\" height=\"50\" rx=\"6\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var114 string
-		templ_7745c5c3_Var114, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Fg.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var114, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Raised.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 237, Col: 40}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 236, Col: 75}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var114)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 139, "\" font-size=\"12\">Nested panel on raised</text> <text x=\"34\" y=\"401\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 139, "\"></rect> <text x=\"34\" y=\"382\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var115 string
 		templ_7745c5c3_Var115, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Fg.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 238, Col: 40}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 237, Col: 40}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var115)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 140, "\" font-size=\"12\">Overlays and menus use raised too.</text> <rect x=\"10\" y=\"436\" width=\"100\" height=\"32\" rx=\"6\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 140, "\" font-size=\"12\">Nested panel on raised</text> <text x=\"34\" y=\"401\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var116 string
-		templ_7745c5c3_Var116, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Primary.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var116, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Fg.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 239, Col: 76}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 238, Col: 40}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var116)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 141, "\"></rect> <text x=\"60\" y=\"456\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 141, "\" font-size=\"12\">Overlays and menus use raised too.</text> <rect x=\"10\" y=\"436\" width=\"100\" height=\"32\" rx=\"6\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var117 string
-		templ_7745c5c3_Var117, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.OnPrimary.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var117, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Primary.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 240, Col: 47}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 239, Col: 76}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var117)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 142, "\" font-size=\"12\" font-weight=\"600\" text-anchor=\"middle\">primary</text> <rect x=\"118\" y=\"436\" width=\"104\" height=\"32\" rx=\"6\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 142, "\"></rect> <text x=\"60\" y=\"456\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var118 string
-		templ_7745c5c3_Var118, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Interface.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var118, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.OnPrimary.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 241, Col: 79}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 240, Col: 47}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var118)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 143, "\"></rect> <text x=\"170\" y=\"456\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 143, "\" font-size=\"12\" font-weight=\"600\" text-anchor=\"middle\">primary</text> <rect x=\"118\" y=\"436\" width=\"104\" height=\"32\" rx=\"6\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var119 string
-		templ_7745c5c3_Var119, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.White.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var119, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Interface.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 242, Col: 44}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 241, Col: 79}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var119)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 144, "\" font-size=\"12\" font-weight=\"600\" text-anchor=\"middle\">interface fill</text> <rect x=\"230\" y=\"436\" width=\"100\" height=\"32\" rx=\"6\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 144, "\"></rect> <text x=\"170\" y=\"456\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var120 string
-		templ_7745c5c3_Var120, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Secondary.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var120, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.White.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 243, Col: 79}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 242, Col: 44}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var120)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 145, "\"></rect> <text x=\"280\" y=\"456\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 145, "\" font-size=\"12\" font-weight=\"600\" text-anchor=\"middle\">interface fill</text> <rect x=\"230\" y=\"436\" width=\"100\" height=\"32\" rx=\"6\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var121 string
-		templ_7745c5c3_Var121, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.OnSecondary.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var121, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Secondary.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 244, Col: 50}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 243, Col: 79}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var121)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 146, "\" font-size=\"12\" font-weight=\"600\" text-anchor=\"middle\">secondary</text> <rect x=\"10\" y=\"478\" width=\"150\" height=\"32\" rx=\"6\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 146, "\"></rect> <text x=\"280\" y=\"456\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var122 string
-		templ_7745c5c3_Var122, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Error.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var122, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.OnSecondary.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 245, Col: 74}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 244, Col: 50}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var122)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 147, "\"></rect> <text x=\"85\" y=\"498\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 147, "\" font-size=\"12\" font-weight=\"600\" text-anchor=\"middle\">secondary</text> <rect x=\"10\" y=\"478\" width=\"150\" height=\"32\" rx=\"6\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var123 string
-		templ_7745c5c3_Var123, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.OnError.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var123, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Error.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 246, Col: 45}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 245, Col: 74}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var123)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 148, "\" font-size=\"12\" font-weight=\"600\" text-anchor=\"middle\">✕ Delete</text> <rect x=\"170.5\" y=\"478.5\" width=\"159\" height=\"31\" rx=\"6\" fill=\"none\" stroke=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 148, "\"></rect> <text x=\"85\" y=\"498\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var124 string
-		templ_7745c5c3_Var124, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Border.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var124, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.OnError.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 247, Col: 94}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 246, Col: 45}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var124)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 149, "\"></rect> <text x=\"250\" y=\"498\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 149, "\" font-size=\"12\" font-weight=\"600\" text-anchor=\"middle\">✕ Delete</text> <rect x=\"170.5\" y=\"478.5\" width=\"159\" height=\"31\" rx=\"6\" fill=\"none\" stroke=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var125 string
-		templ_7745c5c3_Var125, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Fg.Hex()).Resolve(ctx)
+		templ_7745c5c3_Var125, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Border.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 248, Col: 41}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 247, Col: 94}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var125)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 150, "\" font-size=\"12\" text-anchor=\"middle\">Ghost</text> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 150, "\"></rect> <text x=\"250\" y=\"498\" fill=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var126 string
+		templ_7745c5c3_Var126, templ_7745c5c3_Err = templruntime.NewAttributeExpression(m.Fg.Hex()).Resolve(ctx)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 248, Col: 41}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var126)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 151, "\" font-size=\"12\" text-anchor=\"middle\">Ghost</text> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		for i, c := range m.Chips {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 151, "<rect x=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var126 string
-			templ_7745c5c3_Var126, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(10 + float64(i)*81)).Resolve(ctx)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 250, Col: 36}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var126)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 152, "\" y=\"522\" width=\"76\" height=\"26\" rx=\"13\" fill=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 152, "<rect x=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var127 string
-			templ_7745c5c3_Var127, templ_7745c5c3_Err = templruntime.NewAttributeExpression(c.Bg.Hex()).Resolve(ctx)
+			templ_7745c5c3_Var127, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(10 + float64(i)*81)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 250, Col: 95}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 250, Col: 36}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var127)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 153, "\" stroke=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 153, "\" y=\"522\" width=\"76\" height=\"26\" rx=\"13\" fill=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var128 string
-			templ_7745c5c3_Var128, templ_7745c5c3_Err = templruntime.NewAttributeExpression(c.Edge.Hex()).Resolve(ctx)
+			templ_7745c5c3_Var128, templ_7745c5c3_Err = templruntime.NewAttributeExpression(c.Bg.Hex()).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 250, Col: 119}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 250, Col: 95}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var128)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 154, "\"></rect> <text x=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 154, "\" stroke=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var129 string
-			templ_7745c5c3_Var129, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(48 + float64(i)*81)).Resolve(ctx)
+			templ_7745c5c3_Var129, templ_7745c5c3_Err = templruntime.NewAttributeExpression(c.Edge.Hex()).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 251, Col: 36}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 250, Col: 119}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var129)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 155, "\" y=\"539\" fill=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 155, "\"></rect> <text x=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var130 string
-			templ_7745c5c3_Var130, templ_7745c5c3_Err = templruntime.NewAttributeExpression(c.Text.Hex()).Resolve(ctx)
+			templ_7745c5c3_Var130, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(48 + float64(i)*81)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 251, Col: 66}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 251, Col: 36}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var130)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 156, "\" font-size=\"12\" text-anchor=\"middle\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 156, "\" y=\"539\" fill=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var131 string
-			templ_7745c5c3_Var131, templ_7745c5c3_Err = templ.JoinStringErrs(c.Glyph)
+			templ_7745c5c3_Var131, templ_7745c5c3_Err = templruntime.NewAttributeExpression(c.Text.Hex()).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 251, Col: 114}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 251, Col: 66}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var131))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var131)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 157, " ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 157, "\" font-size=\"12\" text-anchor=\"middle\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var132 string
-			templ_7745c5c3_Var132, templ_7745c5c3_Err = templ.JoinStringErrs(c.Name)
+			templ_7745c5c3_Var132, templ_7745c5c3_Err = templ.JoinStringErrs(c.Glyph)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 251, Col: 125}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 251, Col: 114}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var132))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 158, "</text>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 158, " ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var133 string
+			templ_7745c5c3_Var133, templ_7745c5c3_Err = templ.JoinStringErrs(c.Name)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 251, Col: 125}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var133))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 159, "</text>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 159, "</svg>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 160, "</svg>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -1990,278 +2003,278 @@ func hexField(v View) templ.Component {
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
 		line, muted := v.role("line").Hex(), v.role("muted").Hex()
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 160, "<svg class=\"tx-hex\" viewBox=\"-110 -110 220 220\" role=\"img\" aria-label=\"Palette colours by hue angle and chroma\"><rect x=\"-110\" y=\"-110\" width=\"220\" height=\"220\" rx=\"10\" fill=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var134 string
-		templ_7745c5c3_Var134, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.Seed.Base.Hex()).Resolve(ctx)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 259, Col: 83}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var134)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 161, "\"></rect> <polygon points=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 161, "<svg class=\"tx-hex\" viewBox=\"-110 -110 220 220\" role=\"img\" aria-label=\"Palette colours by hue angle and chroma\"><rect x=\"-110\" y=\"-110\" width=\"220\" height=\"220\" rx=\"10\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var135 string
-		templ_7745c5c3_Var135, templ_7745c5c3_Err = templruntime.NewAttributeExpression(hexagon(0, 0, 98)).Resolve(ctx)
+		templ_7745c5c3_Var135, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.Seed.Base.Hex()).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 260, Col: 37}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 259, Col: 83}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var135)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 162, "\" fill=\"none\" stroke=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 162, "\"></rect> <polygon points=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var136 string
-		templ_7745c5c3_Var136, templ_7745c5c3_Err = templruntime.NewAttributeExpression(line).Resolve(ctx)
+		templ_7745c5c3_Var136, templ_7745c5c3_Err = templruntime.NewAttributeExpression(hexagon(0, 0, 98)).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 260, Col: 65}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 260, Col: 37}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var136)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 163, "\"></polygon> <line x1=\"-98\" y1=\"0\" x2=\"98\" y2=\"0\" stroke=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 163, "\" fill=\"none\" stroke=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var137 string
 		templ_7745c5c3_Var137, templ_7745c5c3_Err = templruntime.NewAttributeExpression(line).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 261, Col: 52}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 260, Col: 65}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var137)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 164, "\" stroke-dasharray=\"2 3\"></line> <line x1=\"0\" y1=\"-98\" x2=\"0\" y2=\"98\" stroke=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 164, "\"></polygon> <line x1=\"-98\" y1=\"0\" x2=\"98\" y2=\"0\" stroke=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var138 string
 		templ_7745c5c3_Var138, templ_7745c5c3_Err = templruntime.NewAttributeExpression(line).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 262, Col: 52}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 261, Col: 52}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var138)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 165, "\" stroke-dasharray=\"2 3\"></line> <text x=\"100\" y=\"-4\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 165, "\" stroke-dasharray=\"2 3\"></line> <line x1=\"0\" y1=\"-98\" x2=\"0\" y2=\"98\" stroke=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var139 string
-		templ_7745c5c3_Var139, templ_7745c5c3_Err = templruntime.NewAttributeExpression(muted).Resolve(ctx)
+		templ_7745c5c3_Var139, templ_7745c5c3_Err = templruntime.NewAttributeExpression(line).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 263, Col: 35}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 262, Col: 52}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var139)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 166, "\" font-size=\"8\" text-anchor=\"end\">+a</text> <text x=\"4\" y=\"-100\" fill=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 166, "\" stroke-dasharray=\"2 3\"></line> <text x=\"100\" y=\"-4\" fill=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var140 string
 		templ_7745c5c3_Var140, templ_7745c5c3_Err = templruntime.NewAttributeExpression(muted).Resolve(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 264, Col: 35}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 263, Col: 35}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var140)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 167, "\" font-size=\"8\">+b</text>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 167, "\" font-size=\"8\" text-anchor=\"end\">+a</text> <text x=\"4\" y=\"-100\" fill=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var141 string
+		templ_7745c5c3_Var141, templ_7745c5c3_Err = templruntime.NewAttributeExpression(muted).Resolve(ctx)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 264, Col: 35}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var141)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 168, "\" font-size=\"8\">+b</text>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		dots := v.dots()
 		rings := rings(dots)
 		for _, r := range rings {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 168, "<polygon points=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var141 string
-			templ_7745c5c3_Var141, templ_7745c5c3_Err = templruntime.NewAttributeExpression(hexagon(0, 0, r.R)).Resolve(ctx)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 268, Col: 39}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var141)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 169, "\" fill=\"none\" stroke=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 169, "<polygon points=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var142 string
-			templ_7745c5c3_Var142, templ_7745c5c3_Err = templruntime.NewAttributeExpression(line).Resolve(ctx)
+			templ_7745c5c3_Var142, templ_7745c5c3_Err = templruntime.NewAttributeExpression(hexagon(0, 0, r.R)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 268, Col: 67}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 268, Col: 39}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var142)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 170, "\" stroke-dasharray=\"2 3\"></polygon> ")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		for _, d := range dots {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 171, "<polygon class=\"tx-dot\" data-family=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 170, "\" fill=\"none\" stroke=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var143 string
-			templ_7745c5c3_Var143, templ_7745c5c3_Err = templruntime.NewAttributeExpression(d.Families).Resolve(ctx)
+			templ_7745c5c3_Var143, templ_7745c5c3_Err = templruntime.NewAttributeExpression(line).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 271, Col: 51}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 268, Col: 67}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var143)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 172, "\" points=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 171, "\" stroke-dasharray=\"2 3\"></polygon> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		for _, d := range dots {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 172, "<polygon class=\"tx-dot\" data-family=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var144 string
-			templ_7745c5c3_Var144, templ_7745c5c3_Err = templruntime.NewAttributeExpression(hexagon(d.X, d.Y, dotRadius)).Resolve(ctx)
+			templ_7745c5c3_Var144, templ_7745c5c3_Err = templruntime.NewAttributeExpression(d.Families).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 271, Col: 91}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 271, Col: 51}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var144)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 173, "\" fill=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 173, "\" points=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var145 string
-			templ_7745c5c3_Var145, templ_7745c5c3_Err = templruntime.NewAttributeExpression(d.Color.Hex()).Resolve(ctx)
+			templ_7745c5c3_Var145, templ_7745c5c3_Err = templruntime.NewAttributeExpression(hexagon(d.X, d.Y, dotRadius)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 271, Col: 114}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 271, Col: 91}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var145)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 174, "\" stroke=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 174, "\" fill=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var146 string
-			templ_7745c5c3_Var146, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.Seed.Base.Hex()).Resolve(ctx)
+			templ_7745c5c3_Var146, templ_7745c5c3_Err = templruntime.NewAttributeExpression(d.Color.Hex()).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 271, Col: 143}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 271, Col: 114}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var146)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 175, "\" stroke-width=\"0.6\"><title>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 175, "\" stroke=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var147 string
-			templ_7745c5c3_Var147, templ_7745c5c3_Err = templ.JoinStringErrs(d.Title)
+			templ_7745c5c3_Var147, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.Seed.Base.Hex()).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 272, Col: 20}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 271, Col: 143}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var147))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var147)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 176, "</title></polygon> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 176, "\" stroke-width=\"0.6\"><title>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var148 string
+			templ_7745c5c3_Var148, templ_7745c5c3_Err = templ.JoinStringErrs(d.Title)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 272, Col: 20}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var148))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 177, "</title></polygon> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
 		for _, r := range rings {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 177, "<text class=\"tx-ringlabel\" x=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var148 string
-			templ_7745c5c3_Var148, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(r.X)).Resolve(ctx)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 276, Col: 42}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var148)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 178, "\" y=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 178, "<text class=\"tx-ringlabel\" x=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var149 string
-			templ_7745c5c3_Var149, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(r.Y)).Resolve(ctx)
+			templ_7745c5c3_Var149, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(r.X)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 276, Col: 57}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 276, Col: 42}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var149)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 179, "\" fill=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 179, "\" y=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var150 string
-			templ_7745c5c3_Var150, templ_7745c5c3_Err = templruntime.NewAttributeExpression(muted).Resolve(ctx)
+			templ_7745c5c3_Var150, templ_7745c5c3_Err = templruntime.NewAttributeExpression(num(r.Y)).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 276, Col: 72}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 276, Col: 57}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var150)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 180, "\" stroke=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 180, "\" fill=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var151 string
-			templ_7745c5c3_Var151, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.Seed.Base.Hex()).Resolve(ctx)
+			templ_7745c5c3_Var151, templ_7745c5c3_Err = templruntime.NewAttributeExpression(muted).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 276, Col: 101}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 276, Col: 72}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var151)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 181, "\" stroke-width=\"2.5\" stroke-linejoin=\"round\" paint-order=\"stroke\" font-size=\"7.5\" text-anchor=\"middle\" dominant-baseline=\"central\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 181, "\" stroke=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var152 string
-			templ_7745c5c3_Var152, templ_7745c5c3_Err = templ.JoinStringErrs(r.Label)
+			templ_7745c5c3_Var152, templ_7745c5c3_Err = templruntime.NewAttributeExpression(v.Seed.Base.Hex()).Resolve(ctx)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 276, Col: 242}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 276, Col: 101}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var152))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var152)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 182, "</text>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 182, "\" stroke-width=\"2.5\" stroke-linejoin=\"round\" paint-order=\"stroke\" font-size=\"7.5\" text-anchor=\"middle\" dominant-baseline=\"central\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var153 string
+			templ_7745c5c3_Var153, templ_7745c5c3_Err = templ.JoinStringErrs(r.Label)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `theme/explorer.templ`, Line: 276, Col: 242}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var153))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 183, "</text>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 183, "</svg>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 184, "</svg>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -79,6 +79,16 @@ func (v View) download(format string) string {
 	return Sheet(exportName, v.Seed) + "&download=" + format
 }
 
+func (v View) style() string {
+	primary := v.scale("primary")
+	return fmt.Sprintf(
+		"--tx-base:%s;--tx-fg:%s;--tx-muted:%s;--tx-line:%s;--tx-surface:%s;--tx-accent:%s;--tx-on-accent:%s;--tx-focus:%s;--tx-error:%s",
+		v.Seed.Base.Hex(), v.role("fg").Hex(), v.role("muted").Hex(),
+		v.role("line").Hex(), v.role("surface").Hex(), primary.Fill.Hex(),
+		primary.On.Hex(), v.scale("accent").Steps[palette.FillStep].Hex(), v.scale("error").Steps[7].Hex(),
+	)
+}
+
 func (v View) scale(name string) palette.Scale {
 	s, _ := v.Palette.Scale(name)
 	return s

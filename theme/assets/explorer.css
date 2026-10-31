@@ -1,15 +1,8 @@
 .theme-explorer {
-  --tx-fg: var(--fg, CanvasText);
-  --tx-muted: var(--muted, GrayText);
-  --tx-line: var(--line, color-mix(in srgb, CanvasText 20%, transparent));
-  --tx-surface: var(--surface, Canvas);
-  --tx-accent: var(--primary, AccentColor);
-  --tx-on-accent: var(--on-primary, AccentColorText);
-  --tx-focus: var(--accent-500, AccentColor);
-  --tx-error: var(--error-700, #b00020);
   display: grid;
   gap: 1.25rem;
   min-inline-size: 0;
+  background: var(--tx-base);
   color: var(--tx-fg);
 }
 

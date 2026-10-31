@@ -10,7 +10,7 @@ import (
 templ Explorer(v View) {
 	<link rel="stylesheet" href={ v.assets.css }/>
 	<script type="module" src={ v.assets.js }></script>
-	<section class="theme-explorer" aria-label="Palette explorer">
+	<section class="theme-explorer" style={ v.style() } aria-label="Palette explorer">
 		<form
 			class="tx-controls"
 			action={ templ.URL(v.Action) }
