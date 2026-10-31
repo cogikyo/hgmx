@@ -1,10 +1,18 @@
 package main
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"go/scanner"
+	"go/token"
+	"io/fs"
+	"os"
 	"regexp"
+	"slices"
 	"strings"
 
+	"github.com/a-h/templ/generator"
 	parser "github.com/a-h/templ/parser/v2"
 	"github.com/a-h/templ/parser/v2/visitor"
 )
@@ -118,4 +126,74 @@ func inlineScript(n *parser.ScriptElement) bool {
 		}
 	}
 	return true
+}
+
+type templMap struct {
+	src       string
+	sm        *parser.SourceMap
+	raw, disk *token.File
+	rawToks   []int
+	diskToks  []int
+}
+
+func (a *audit) templMap(rel string) (*templMap, error) {
+	if m, ok := a.maps[rel]; ok {
+		return m, nil
+	}
+	if a.maps == nil {
+		a.maps = map[string]*templMap{}
+	}
+	m := &templMap{src: strings.TrimSuffix(rel, "_templ.go") + ".templ"}
+	a.maps[rel] = m
+	t, err := parser.Parse(a.site.path(m.src))
+	if errors.Is(err, fs.ErrNotExist) {
+		return m, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("parse %s: %w", m.src, err)
+	}
+	var raw bytes.Buffer
+	out, err := generator.Generate(t, &raw, generator.WithFileName(m.src))
+	if err != nil {
+		return nil, fmt.Errorf("generate %s: %w", m.src, err)
+	}
+	disk, err := os.ReadFile(a.site.path(rel))
+	if err != nil {
+		return nil, err
+	}
+	m.raw, m.rawToks = goTokens(raw.Bytes())
+	m.disk, m.diskToks = goTokens(disk)
+	if len(m.rawToks) == len(m.diskToks) {
+		m.sm = out.SourceMap
+	}
+	return m, nil
+}
+
+func goTokens(src []byte) (*token.File, []int) {
+	f := token.NewFileSet().AddFile("", -1, len(src))
+	var s scanner.Scanner
+	s.Init(f, src, nil, 0)
+	var offs []int
+	for {
+		pos, tok, lit := s.Scan()
+		if tok == token.EOF {
+			return f, offs
+		}
+		if tok != token.SEMICOLON || lit != "\n" {
+			offs = append(offs, f.Offset(pos))
+		}
+	}
+}
+
+func (m *templMap) source(line, col int) (int, int, bool) {
+	if m.sm == nil || line > m.disk.LineCount() {
+		return 0, 0, false
+	}
+	i, ok := slices.BinarySearch(m.diskToks, m.disk.Offset(m.disk.LineStart(line))+col-1)
+	if !ok {
+		return 0, 0, false
+	}
+	p := m.raw.Position(m.raw.Pos(m.rawToks[i]))
+	src, ok := m.sm.SourcePositionFromTarget(uint32(p.Line-1), uint32(p.Column-1))
+	return int(src.Line) + 1, int(src.Col) + 1, ok
 }

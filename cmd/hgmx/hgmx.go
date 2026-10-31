@@ -37,19 +37,14 @@ func init() {
 	rootCmd.AddCommand(migrateCobraCmd)
 	paletteCobraCmd.Flags().StringVarP(&paletteFormat, "format", "f", "tailwind", "Output format [tailwind, css, lua]")
 	paletteCobraCmd.Flags().StringVarP(&paletteOut, "out", "o", "", "Write to this file instead of stdout")
-	genCobraCmd.Flags().BoolVar(&genCheckOnly, "check", false, "Report stale generated files without writing")
 }
-
-var genCheckOnly bool
 
 var genCobraCmd = &cobra.Command{
 	Use:   "gen",
 	Short: "Generates templ Go code and the minified Tailwind CSS",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		if code := genCmd(genCheckOnly); code != 0 {
-			os.Exit(code)
-		}
+		os.Exit(genCmd())
 	},
 }
 
@@ -58,9 +53,7 @@ var fmtCobraCmd = &cobra.Command{
 	Short: "Formats the site's templ and Go files",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		if code := fmtCmd(); code != 0 {
-			os.Exit(code)
-		}
+		os.Exit(fmtCmd())
 	},
 }
 
@@ -68,9 +61,7 @@ var devCobraCmd = &cobra.Command{
 	Use:   "dev [-- site flags...]",
 	Short: "Regenerates on change and restarts the site",
 	Run: func(cmd *cobra.Command, args []string) {
-		if code := devCmd(args); code != 0 {
-			os.Exit(code)
-		}
+		os.Exit(devCmd(args))
 	},
 }
 
@@ -79,9 +70,7 @@ var checkCobraCmd = &cobra.Command{
 	Short: "Runs the site rules, generation and format checks, vet, build and tests",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		if code := checkCmd(); code != 0 {
-			os.Exit(code)
-		}
+		os.Exit(checkCmd())
 	},
 }
 
@@ -90,9 +79,7 @@ var migrateCobraCmd = &cobra.Command{
 	Short:              "Runs the site's migrate command",
 	DisableFlagParsing: true,
 	Run: func(cmd *cobra.Command, args []string) {
-		if code := migrateCmd(args); code != 0 {
-			os.Exit(code)
-		}
+		os.Exit(migrateCmd(args))
 	},
 }
 
@@ -100,17 +87,16 @@ var infoCobraCmd = &cobra.Command{
 	Use:   "info",
 	Short: "Displays information about the hgmx environment",
 	Run: func(cmd *cobra.Command, args []string) {
-		infoCmd()
+		os.Exit(infoCmd())
 	},
 }
 
 var initCobraCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initializes a new hgmx project",
+	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		if code := initCmd(args); code != 0 {
-			os.Exit(code)
-		}
+		os.Exit(initCmd())
 	},
 }
 
@@ -119,8 +105,6 @@ var paletteCobraCmd = &cobra.Command{
 	Short: "Generates semantic palette themes from a base and a primary colour",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		if code := paletteCmd(args); code != 0 {
-			os.Exit(code)
-		}
+		os.Exit(paletteCmd(args))
 	},
 }

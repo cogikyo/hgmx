@@ -17,7 +17,6 @@ import (
 	"github.com/a-h/templ/cmd/templ/generatecmd"
 	"github.com/cogikyo/hgmx"
 	"github.com/cogikyo/hgmx/palette"
-	"golang.org/x/mod/modfile"
 )
 
 // --- info command ---
@@ -37,11 +36,16 @@ func infoCmd() (code int) {
 
 // --- init command ---
 
-func initCmd(args []string) (code int) {
+func initCmd() (code int) {
 	log := newLogger(logLevel, os.Stderr)
 
-	const root, prefix = "library", "github.com/cogikyo/hgmx/library"
-	entries, err := fs.ReadDir(hgmx.LibraryFS, root)
+	const prefix = "github.com/cogikyo/hgmx/library"
+	library, err := fs.Sub(hgmx.LibraryFS, "library")
+	if err != nil {
+		log.Error("Failed to read scaffold", slog.String("error", err.Error()))
+		return 1
+	}
+	entries, err := fs.ReadDir(library, ".")
 	if err != nil {
 		log.Error("Failed to read scaffold", slog.String("error", err.Error()))
 		return 1
@@ -56,28 +60,19 @@ func initCmd(args []string) (code int) {
 		}
 	}
 
-	data, err := os.ReadFile("go.mod")
+	s, err := loadSite(".")
 	if err != nil {
 		log.Error("Failed to read go.mod; run go mod init first", slog.String("error", err.Error()))
 		return 1
 	}
-	gomod, err := modfile.Parse("go.mod", data, nil)
-	if err != nil {
-		log.Error("Failed to parse go.mod", slog.String("error", err.Error()))
-		return 1
-	}
-	if gomod.Module == nil {
-		log.Error("go.mod declares no module path")
-		return 1
-	}
-	module := gomod.Module.Mod.Path
-	if err := gomod.AddRequire(templPath, templ.Version()); err != nil {
+	module := s.mod.Module.Mod.Path
+	if err := s.mod.AddRequire(templPath, templ.Version()); err != nil {
 		log.Error("Failed to require templ", slog.String("error", err.Error()))
 		return 1
 	}
-	gomod.Cleanup()
-	gomod.SortBlocks()
-	updated, err := gomod.Format()
+	s.mod.Cleanup()
+	s.mod.SortBlocks()
+	gomod, err := s.mod.Format()
 	if err != nil {
 		log.Error("Failed to format go.mod", slog.String("error", err.Error()))
 		return 1
@@ -90,16 +85,24 @@ func initCmd(args []string) (code int) {
 	}
 	defer os.RemoveAll(tmp)
 
-	rewrite := func(name string, data []byte) ([]byte, bool) {
-		switch {
-		case strings.HasSuffix(name, "_templ.go"):
-			return nil, false
-		case strings.HasSuffix(name, ".go") || strings.HasSuffix(name, ".templ"):
-			return bytes.ReplaceAll(data, []byte(prefix), []byte(module)), true
+	err = fs.WalkDir(library, ".", func(name string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
 		}
-		return data, true
-	}
-	if err := copyFS(hgmx.LibraryFS, root, tmp, rewrite); err != nil {
+		out := filepath.Join(tmp, filepath.FromSlash(name))
+		if d.IsDir() {
+			return os.MkdirAll(out, 0o755)
+		}
+		data, err := fs.ReadFile(library, name)
+		if err != nil {
+			return err
+		}
+		if strings.HasSuffix(name, ".go") || strings.HasSuffix(name, ".templ") {
+			data = bytes.ReplaceAll(data, []byte(prefix), []byte(module))
+		}
+		return os.WriteFile(out, data, 0o644)
+	})
+	if err != nil {
 		log.Error("Failed to copy scaffold", slog.String("error", err.Error()))
 		return 1
 	}
@@ -119,7 +122,7 @@ func initCmd(args []string) (code int) {
 		}
 		moved = append(moved, e.Name())
 	}
-	if err := writeAtomic("go.mod", updated); err != nil {
+	if err := writeAtomic("go.mod", gomod); err != nil {
 		log.Error("Failed to write go.mod", slog.String("error", err.Error()))
 		return 1
 	}

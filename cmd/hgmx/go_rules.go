@@ -11,83 +11,81 @@ import (
 	"strconv"
 	"strings"
 
-	"golang.org/x/tools/go/analysis"
-	"golang.org/x/tools/go/analysis/checker"
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/types/typeutil"
 )
 
-const gormPath = "gorm.io/gorm"
-
-type layer string
-
 const (
-	layerMain       layer = "main"
-	layerRoutes     layer = "routes"
-	layerMiddleware layer = "middleware"
-	layerStore      layer = "store"
-	layerMigrations layer = "store/migrations"
-	layerViews      layer = "views"
-	layerPages      layer = "views/pages"
+	gormPath = "gorm.io/gorm"
+	domain   = "domain packages"
 )
 
-var allowed = map[layer]struct {
-	to   []layer
-	rule string
+var layers = []struct {
+	dir string
+	may []string
 }{
-	layerRoutes:     {[]layer{layerRoutes, layerMiddleware, layerStore, layerViews, layerPages}, "routes may import middleware, store, views and domain packages"},
-	layerMiddleware: {[]layer{layerMiddleware, layerStore}, "middleware may import store and domain packages"},
-	layerStore:      {[]layer{layerStore}, "store may import only store/..."},
-	layerMigrations: {[]layer{layerMigrations}, "store/migrations may import only store/migrations/..."},
-	layerViews:      {[]layer{layerViews}, "views and its components may import only views/... (not views/pages) and hgmx"},
-	layerPages:      {[]layer{layerViews, layerPages}, "views/pages may import only views/... and hgmx"},
+	{"routes", []string{"routes", "middleware", "store", "views", "views/pages", domain}},
+	{"middleware", []string{"middleware", "store", domain}},
+	{"store/migrations", []string{"store/migrations"}},
+	{"store", []string{"store"}},
+	{"views/pages", []string{"views", "views/pages"}},
+	{"views", []string{"views"}},
 }
 
 type sitePkg struct {
-	pkg   *packages.Package
-	rel   string
-	layer layer
+	pkg    *packages.Package
+	rel    string
+	layer  string
+	may    []string
+	domain bool
 }
 
-func (a *audit) layerOf(p *packages.Package) (string, layer) {
+func (a *audit) classify(p *packages.Package) sitePkg {
 	mod := a.site.mod.Module.Mod.Path
+	rel := strings.TrimPrefix(strings.TrimPrefix(p.PkgPath, mod), "/")
+	sp := sitePkg{pkg: p, rel: rel}
 	if p.Name == "main" {
-		return strings.TrimPrefix(strings.TrimPrefix(p.PkgPath, mod), "/"), layerMain
+		sp.layer = "main"
+		return sp
 	}
-	rel := strings.TrimPrefix(p.PkgPath, mod+"/")
-	switch {
-	case under(rel, "routes"):
-		return rel, layerRoutes
-	case under(rel, "middleware"):
-		return rel, layerMiddleware
-	case under(rel, "store/migrations"):
-		return rel, layerMigrations
-	case under(rel, "store"):
-		return rel, layerStore
-	case under(rel, "views/pages"):
-		return rel, layerPages
-	case under(rel, "views"):
-		return rel, layerViews
+	for _, l := range layers {
+		if rel == l.dir || strings.HasPrefix(rel, l.dir+"/") {
+			sp.layer, sp.may = l.dir, l.may
+			return sp
+		}
 	}
-	return rel, layer("domain " + strings.SplitN(rel, "/", 2)[0])
+	sp.layer, _, _ = strings.Cut(rel, "/")
+	sp.may = []string{sp.layer, "store"}
+	sp.domain = true
+	return sp
 }
 
-func under(rel, dir string) bool {
-	return rel == dir || strings.HasPrefix(rel, dir+"/")
+func (sp sitePkg) allows(to sitePkg) bool {
+	return sp.layer == "main" || slices.Contains(sp.may, to.layer) || to.domain && slices.Contains(sp.may, domain)
 }
 
-func (l layer) domain() bool {
-	return strings.HasPrefix(string(l), "domain ")
+func (sp sitePkg) policy() string {
+	may := strings.Join(sp.may, ", ")
+	if i := strings.LastIndex(may, ", "); i >= 0 {
+		may = may[:i] + " and " + may[i+2:]
+	}
+	return fmt.Sprintf("%s may import site packages only from %s", sp.layer, may)
+}
+
+func (sp sitePkg) String() string {
+	if sp.rel == sp.layer || sp.domain {
+		return sp.rel
+	}
+	return fmt.Sprintf("%s (%s)", sp.rel, sp.layer)
 }
 
 func (a *audit) goRules() error {
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedImports | packages.NeedTypes |
-			packages.NeedTypesSizes | packages.NeedSyntax | packages.NeedTypesInfo,
-		Dir:        a.site.dir,
-		Env:        a.site.env(),
-		BuildFlags: a.site.flags(),
-		Tests:      true,
+			packages.NeedSyntax | packages.NeedTypesInfo,
+		Dir:   a.site.dir,
+		Env:   a.site.env(),
+		Tests: true,
 	}
 	pkgs, err := packages.Load(cfg, "./...")
 	if err != nil {
@@ -105,59 +103,45 @@ func (a *audit) goRules() error {
 
 	mod := a.site.mod.Module.Mod.Path
 	site := map[string]sitePkg{}
-	var roots []*packages.Package
 	for _, p := range pkgs {
 		if strings.HasSuffix(p.ID, ".test") {
 			continue
 		}
-		roots = append(roots, p)
+		if err := a.typeRules(p); err != nil {
+			return err
+		}
 		if p.ID == p.PkgPath && (p.PkgPath == mod || strings.HasPrefix(p.PkgPath, mod+"/")) {
-			rel, l := a.layerOf(p)
-			site[p.PkgPath] = sitePkg{p, rel, l}
+			site[p.PkgPath] = a.classify(p)
 		}
 	}
 	for _, sp := range site {
-		a.imports(sp, site)
-	}
-
-	graph, err := checker.Analyze([]*analysis.Analyzer{siteAnalyzer}, roots, nil)
-	if err != nil {
-		return err
-	}
-	for act := range graph.All() {
-		if !act.IsRoot {
-			continue
-		}
-		if act.Err != nil {
-			return act.Err
-		}
-		for _, d := range act.Diagnostics {
-			r := ruleByName(d.Category)
-			pos := act.Package.Fset.Position(d.Pos)
-			fix := ""
-			if len(d.SuggestedFixes) > 0 {
-				fix = d.SuggestedFixes[0].Message
-			}
-			a.goReport(pos, r, d.Message, fix)
+		if err := a.imports(sp, site); err != nil {
+			return err
 		}
 	}
 	return nil
 }
 
-func ruleByName(name string) *rule {
-	i := slices.IndexFunc(rules, func(r *rule) bool { return r.name == name })
-	return rules[i]
-}
-
-func (a *audit) goReport(pos token.Position, r *rule, msg, fix string) {
+func (a *audit) goReport(pos token.Position, r *rule, msg, fix string) error {
 	rel, err := filepath.Rel(a.site.dir, pos.Filename)
 	if err != nil || strings.HasPrefix(rel, "..") {
-		return
+		return nil
 	}
-	a.report(finding{file: filepath.ToSlash(rel), line: pos.Line, col: pos.Column, rule: r, msg: msg, fix: fix})
+	f := finding{file: filepath.ToSlash(rel), line: pos.Line, col: pos.Column, rule: r, msg: msg, fix: fix}
+	if strings.HasSuffix(f.file, "_templ.go") {
+		m, err := a.templMap(f.file)
+		if err != nil {
+			return err
+		}
+		if line, col, ok := m.source(f.line, f.col); ok {
+			f.file, f.line, f.col = m.src, line, col
+		}
+	}
+	a.report(f)
+	return nil
 }
 
-func (a *audit) imports(sp sitePkg, site map[string]sitePkg) {
+func (a *audit) imports(sp sitePkg, site map[string]sitePkg) error {
 	p := sp.pkg
 	for _, f := range p.Syntax {
 		for _, spec := range f.Imports {
@@ -165,49 +149,38 @@ func (a *audit) imports(sp sitePkg, site map[string]sitePkg) {
 			if err != nil {
 				continue
 			}
-			pos := p.Fset.Position(spec.Pos())
+			report := func(r *rule, msg string) error {
+				return a.goReport(p.Fset.Position(spec.Pos()), r, msg, "")
+			}
 			to, internal := site[path]
+			var chain []string
+			if internal && sp.layer == "store/migrations" {
+				chain = storeChain(to, site, map[string]bool{})
+			}
 			switch {
-			case path == gormPath || strings.HasPrefix(path, "gorm.io/"):
-				if sp.layer != layerStore && sp.layer != layerMigrations {
-					a.goReport(pos, ruleStoreOnly, fmt.Sprintf("%s imports %s; gorm stays inside store/", sp.rel, path), "")
+			case strings.HasPrefix(path, "gorm.io/"):
+				if sp.layer != "store" && sp.layer != "store/migrations" {
+					err = report(ruleStoreOnly, fmt.Sprintf("%s imports %s; gorm stays inside store/", sp.rel, path))
 				}
 			case path == "net/http":
-				if sp.layer == layerViews || sp.layer == layerPages {
-					a.goReport(pos, ruleDirection, fmt.Sprintf("%s imports net/http; views render, and handlers live in routes", sp.rel), "")
+				if sp.layer == "views" || sp.layer == "views/pages" {
+					err = report(ruleDirection, fmt.Sprintf("%s imports net/http; views render, and handlers live in routes", sp.rel))
 				}
-			case internal && sp.layer == layerMigrations:
-				if chain := storeChain(to, site, map[string]bool{}); chain != nil {
-					msg := fmt.Sprintf("%s imports %s", sp.rel, strings.Join(chain, ", which imports "))
-					a.goReport(pos, ruleLiveModels, msg, "")
-				} else if to.layer != layerMigrations {
-					a.goReport(pos, ruleDirection, fmt.Sprintf("%s imports %s; %s", sp.rel, to.rel, allowed[sp.layer].rule), "")
-				}
-			case internal && !edgeAllowed(sp.layer, to.layer):
-				desc := allowed[sp.layer].rule
-				if sp.layer.domain() {
-					desc = "a domain package may import only itself and store"
-				}
-				a.goReport(pos, ruleDirection, fmt.Sprintf("%s imports %s; %s", sp.rel, to.rel, desc), "")
+			case chain != nil:
+				err = report(ruleLiveModels, fmt.Sprintf("%s imports %s", sp.rel, strings.Join(chain, ", which imports ")))
+			case internal && !sp.allows(to):
+				err = report(ruleDirection, fmt.Sprintf("%s imports %s; %s", sp.rel, to, sp.policy()))
+			}
+			if err != nil {
+				return err
 			}
 		}
 	}
-}
-
-func edgeAllowed(from, to layer) bool {
-	switch {
-	case from == layerMain:
-		return true
-	case from.domain():
-		return to == from || to == layerStore
-	case to.domain():
-		return from == layerRoutes || from == layerMiddleware
-	}
-	return slices.Contains(allowed[from].to, to)
+	return nil
 }
 
 func storeChain(p sitePkg, site map[string]sitePkg, seen map[string]bool) []string {
-	if p.layer == layerStore {
+	if p.layer == "store" {
 		return []string{p.rel}
 	}
 	seen[p.pkg.PkgPath] = true
@@ -223,97 +196,83 @@ func storeChain(p sitePkg, site map[string]sitePkg, seen map[string]bool) []stri
 	return nil
 }
 
-var siteAnalyzer = &analysis.Analyzer{
-	Name: "hgmx",
-	Doc:  "reports hgmx site rules that need type information",
-	Run:  analyze,
-}
-
-func analyze(pass *analysis.Pass) (any, error) {
-	for _, f := range pass.Files {
-		test := strings.HasSuffix(pass.Fset.File(f.Pos()).Name(), "_test.go")
+func (a *audit) typeRules(p *packages.Package) error {
+	var err error
+	report := func(pos token.Pos, r *rule, msg, fix string) {
+		if err == nil {
+			err = a.goReport(p.Fset.Position(pos), r, msg, fix)
+		}
+	}
+	for _, f := range p.Syntax {
+		test := strings.HasSuffix(p.Fset.File(f.Pos()).Name(), "_test.go")
 		for _, decl := range f.Decls {
 			switch d := decl.(type) {
 			case *ast.GenDecl:
-				if !test && d.Tok == token.VAR {
-					globals(pass, d)
+				if test || d.Tok != token.VAR {
+					continue
+				}
+				for _, spec := range d.Specs {
+					for _, name := range spec.(*ast.ValueSpec).Names {
+						obj := p.TypesInfo.Defs[name]
+						if obj != nil && isNamed(deref(obj.Type()), gormPath, "DB") {
+							report(name.Pos(), ruleGlobal, fmt.Sprintf("package-level %s holds a %s", name.Name, types.TypeString(obj.Type(), (*types.Package).Name)), "")
+						}
+					}
 				}
 			case *ast.FuncDecl:
 				if d.Body == nil {
 					continue
 				}
-				exitOK := d.Recv == nil && (d.Name.Name == "main" && pass.Pkg.Name() == "main" || d.Name.Name == "TestMain" && test)
+				exitOK := d.Recv == nil && (d.Name.Name == "main" && p.Name == "main" || d.Name.Name == "TestMain" && test)
 				ast.Inspect(d.Body, func(n ast.Node) bool {
 					if call, ok := n.(*ast.CallExpr); ok {
-						calls(pass, call, exitOK)
+						if r, msg, fix := callRule(p, call, exitOK); r != nil {
+							report(call.Pos(), r, msg, fix)
+						}
 					}
 					return true
 				})
 			}
 		}
 	}
-	return nil, nil
+	return err
 }
 
-func globals(pass *analysis.Pass, d *ast.GenDecl) {
-	for _, spec := range d.Specs {
-		for _, name := range spec.(*ast.ValueSpec).Names {
-			obj := pass.TypesInfo.Defs[name]
-			if obj != nil && isNamed(deref(obj.Type()), gormPath, "DB") {
-				pass.Report(analysis.Diagnostic{Pos: name.Pos(), Category: ruleGlobal.name,
-					Message: fmt.Sprintf("package-level %s holds a %s", name.Name, types.TypeString(obj.Type(), (*types.Package).Name))})
-			}
-		}
-	}
-}
-
-func calls(pass *analysis.Pass, call *ast.CallExpr, exitOK bool) {
-	fn, ok := typeutil.Callee(pass.TypesInfo, call).(*types.Func)
+func callRule(p *packages.Package, call *ast.CallExpr, exitOK bool) (r *rule, msg, fix string) {
+	fn, ok := typeutil.Callee(p.TypesInfo, call).(*types.Func)
 	if !ok || fn.Pkg() == nil {
-		return
+		return nil, "", ""
 	}
-	name := fn.Name()
+	name, callee := fn.Name(), types.ExprString(call.Fun)
 	switch fn.Pkg().Path() {
 	case gormPath:
 		if name == "AutoMigrate" {
-			pass.Report(analysis.Diagnostic{Pos: call.Pos(), Category: ruleAutoMigrate.name, Message: "AutoMigrate changes the schema outside a migration"})
+			return ruleAutoMigrate, "AutoMigrate changes the schema outside a migration", ""
 		}
 	case "os":
 		if name == "Exit" && !exitOK {
-			pass.Report(analysis.Diagnostic{Pos: call.Pos(), Category: ruleExit.name, Message: "os.Exit outside main"})
+			return ruleExit, "os.Exit outside main", ""
 		}
 	case "log":
 		if strings.HasPrefix(name, "Fatal") && !exitOK {
-			pass.Report(analysis.Diagnostic{Pos: call.Pos(), Category: ruleExit.name, Message: fmt.Sprintf("%s outside main", callName(call))})
+			return ruleExit, callee + " outside main", ""
 		}
 	case "log/slog":
 		switch name {
 		case "Debug", "Info", "Warn", "Error":
-		default:
-			return
+			if ctx := contextInScope(p.Types, call.Pos()); ctx != "" {
+				return ruleSlogContext,
+					fmt.Sprintf("%s drops the context; %s is in scope", callee, strings.TrimSuffix(ctx, ".Context()")),
+					fmt.Sprintf("call %sContext(%s, ...)", callee, ctx)
+			}
 		}
-		ctx := contextInScope(pass, call.Pos())
-		if ctx == "" {
-			return
-		}
-		pass.Report(analysis.Diagnostic{
-			Pos:      call.Pos(),
-			Category: ruleSlogContext.name,
-			Message:  fmt.Sprintf("%s drops the context; %s is in scope", callName(call), strings.TrimSuffix(ctx, ".Context()")),
-			SuggestedFixes: []analysis.SuggestedFix{{
-				Message: fmt.Sprintf("call %sContext(%s, ...)", callName(call), ctx),
-			}},
-		})
 	}
+	return nil, "", ""
 }
 
-func callName(call *ast.CallExpr) string {
-	return types.ExprString(call.Fun)
-}
-
-func contextInScope(pass *analysis.Pass, pos token.Pos) string {
-	pkg := pass.Pkg.Scope()
-	for s := pkg.Innermost(pos); s != nil && s != pkg; s = s.Parent() {
+func contextInScope(pkg *types.Package, pos token.Pos) string {
+	top := pkg.Scope()
+	for s := top.Innermost(pos); s != nil && s != top; s = s.Parent() {
 		for _, name := range s.Names() {
 			v, ok := s.Lookup(name).(*types.Var)
 			if !ok || v.Pos() >= pos {

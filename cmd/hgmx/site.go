@@ -18,9 +18,8 @@ const (
 )
 
 type site struct {
-	dir    string
-	mod    *modfile.File
-	vendor bool
+	dir string
+	mod *modfile.File
 }
 
 func loadSite(dir string) (site, error) {
@@ -39,8 +38,7 @@ func loadSite(dir string) (site, error) {
 	if mod.Module == nil {
 		return site{}, errors.New("go.mod declares no module path")
 	}
-	_, err = os.Stat(filepath.Join(dir, "vendor"))
-	return site{dir: dir, mod: mod, vendor: err == nil}, nil
+	return site{dir: dir, mod: mod}, nil
 }
 
 func (s site) path(rel string) string {
@@ -65,15 +63,8 @@ func (s site) env() []string {
 	return append(os.Environ(), "GOWORK=off")
 }
 
-func (s site) flags() []string {
-	if s.vendor {
-		return []string{"-mod=vendor"}
-	}
-	return nil
-}
-
 func (s site) gocmd(sub string, args ...string) *exec.Cmd {
-	cmd := exec.Command("go", append(append([]string{sub}, s.flags()...), args...)...)
+	cmd := exec.Command("go", append([]string{sub}, args...)...)
 	cmd.Dir = s.dir
 	cmd.Env = s.env()
 	cmd.Stdout = os.Stdout

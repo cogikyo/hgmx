@@ -9,18 +9,10 @@ import (
 // Local builds can report "(devel)" instead of a release tag.
 func Version() string {
 	info, ok := debug.ReadBuildInfo()
-	if !ok {
+	if !ok || info.Main.Path != "github.com/cogikyo/hgmx" {
 		return ""
 	}
-	if info.Main.Path == "github.com/cogikyo/hgmx" {
-		return info.Main.Version
-	}
-	for _, d := range info.Deps {
-		if d.Path == "github.com/cogikyo/hgmx" {
-			return d.Version
-		}
-	}
-	return ""
+	return info.Main.Version
 }
 
 // GoMod is hgmx's module file, used to check the site's minimum Go version.

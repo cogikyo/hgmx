@@ -1,0 +1,15 @@
+package views
+
+import (
+	"context"
+	"log/slog"
+)
+
+func logVisit(ctx context.Context, path string) {
+	//hgmx:ignore slog/context the visit log is detached from the request
+	slog.Info("visit", "path", path)
+}
+
+templ Visit(path string) {
+	<p>{ path }</p>
+}

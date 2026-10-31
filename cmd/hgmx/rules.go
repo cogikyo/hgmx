@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bufio"
-	"bytes"
 	"cmp"
 	"fmt"
 	"go/ast"
@@ -17,6 +15,7 @@ import (
 	"github.com/a-h/templ"
 	"github.com/cogikyo/hgmx"
 	"golang.org/x/mod/modfile"
+	"golang.org/x/mod/semver"
 )
 
 type rule struct {
@@ -136,6 +135,7 @@ type audit struct {
 	findings []finding
 	ignores  []*ignore
 	templs   []string
+	maps     map[string]*templMap
 }
 
 func (a *audit) report(f finding) {
@@ -201,7 +201,7 @@ func (a *audit) gomod() error {
 		return nil
 	}
 	fix := fmt.Sprintf("run go get %s@%s", templPath, templ.Version())
-	if version.Compare(goVersion(r.Mod.Version), goVersion(templ.Version())) > 0 {
+	if semver.Compare(r.Mod.Version, templ.Version()) > 0 {
 		fix = fmt.Sprintf("install an hgmx built with templ %s, or run go get %s@%s", r.Mod.Version, templPath, templ.Version())
 	}
 	a.report(finding{
@@ -211,10 +211,6 @@ func (a *audit) gomod() error {
 		fix:  fix,
 	})
 	return nil
-}
-
-func goVersion(semver string) string {
-	return "go" + strings.TrimPrefix(semver, "v")
 }
 
 func modCol(l *modfile.Line) int {
@@ -229,10 +225,10 @@ func (a *audit) directives(rel string) error {
 	if err != nil {
 		return err
 	}
-	sc := bufio.NewScanner(bytes.NewReader(data))
-	sc.Buffer(nil, len(data)+1)
-	for n := 1; sc.Scan(); n++ {
-		line := sc.Text()
+	n := 0
+	for line := range strings.Lines(string(data)) {
+		n++
+		line = strings.TrimRight(line, "\r\n")
 		i := strings.Index(line, "//hgmx:")
 		if i < 0 || strings.TrimLeft(line[:i], " \t") != "" && !strings.ContainsAny(line[i-1:i], " \t") {
 			continue
@@ -256,7 +252,7 @@ func (a *audit) directives(rel string) error {
 		}
 		a.ignores = append(a.ignores, ig)
 	}
-	return sc.Err()
+	return nil
 }
 
 func (a *audit) resolve() []finding {

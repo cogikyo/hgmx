@@ -40,11 +40,13 @@ func checkCmd() (code int) {
 			return nil
 		}},
 		{"gen", func() error {
-			stale, err := genCheck(ctx, s)
+			stale, err := staleOutputs(ctx, s)
 			if err != nil {
 				return err
 			}
-			printStale(os.Stdout, stale, "hgmx gen")
+			for _, line := range stale {
+				fmt.Fprintf(os.Stdout, "%s; run hgmx gen\n", line)
+			}
 			if len(stale) > 0 {
 				return fmt.Errorf("stale files: %d", len(stale))
 			}

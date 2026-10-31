@@ -19,7 +19,7 @@ import (
 	"github.com/a-h/templ/cmd/templ/generatecmd"
 )
 
-func genCmd(check bool) (code int) {
+func genCmd() (code int) {
 	log := newLogger(logLevel, os.Stderr)
 	s, err := loadSite(".")
 	if err != nil {
@@ -28,19 +28,6 @@ func genCmd(check bool) (code int) {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-
-	if check {
-		stale, err := genCheck(ctx, s)
-		if err != nil {
-			log.Error("Generation check failed", slog.String("error", err.Error()))
-			return 1
-		}
-		if len(stale) > 0 {
-			printStale(os.Stdout, stale, "hgmx gen")
-			return 1
-		}
-		return 0
-	}
 
 	if s.templ() != nil {
 		if err := generatecmd.Run(ctx, os.Stdout, os.Stderr, []string{"-path", s.dir}); err != nil {
@@ -65,7 +52,7 @@ func tailwind(s site, out string, args ...string) *exec.Cmd {
 	return cmd
 }
 
-func genCheck(ctx context.Context, s site) ([]string, error) {
+func staleOutputs(ctx context.Context, s site) ([]string, error) {
 	var stale []string
 	if s.templ() != nil {
 		args, log, _, err := generatecmd.NewArguments(io.Discard, os.Stderr, []string{"-path", s.dir, "-keep-orphaned-files", "-log-level", "warn"})
@@ -125,12 +112,6 @@ func genCheck(ctx context.Context, s site) ([]string, error) {
 	return stale, nil
 }
 
-func printStale(w io.Writer, stale []string, fix string) {
-	for _, line := range stale {
-		fmt.Fprintf(w, "%s; run %s\n", line, fix)
-	}
-}
-
 func fmtCmd() (code int) {
 	log := newLogger(logLevel, os.Stderr)
 	s, err := loadSite(".")
@@ -153,30 +134,25 @@ func formatSite(s site, write bool) ([]string, error) {
 	quiet := slog.New(slog.DiscardHandler)
 	var changed []string
 	err := s.walk(func(rel string, d fs.DirEntry) error {
-		if d.IsDir() {
+		goFile := strings.HasSuffix(rel, ".go")
+		if d.IsDir() || !goFile && !strings.HasSuffix(rel, ".templ") {
 			return nil
 		}
 		path := s.path(rel)
-		var formatted []byte
-		switch {
-		case strings.HasSuffix(rel, ".go"):
-		case strings.HasSuffix(rel, ".templ"):
-			var buf bytes.Buffer
-			if err := fmtcmd.Run(quiet, nil, &buf, fmtcmd.Arguments{ToStdout: true, Files: []string{path}, WorkerCount: 1}); err != nil {
-				return fmt.Errorf("%s: %w", rel, err)
-			}
-			formatted = buf.Bytes()
-		default:
-			return nil
-		}
 		src, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
-		if formatted == nil {
-			if formatted, err = format.Source(src); err != nil {
-				return fmt.Errorf("%s: %w", rel, err)
-			}
+		var formatted []byte
+		if goFile {
+			formatted, err = format.Source(src)
+		} else {
+			var buf bytes.Buffer
+			err = fmtcmd.Run(quiet, nil, &buf, fmtcmd.Arguments{ToStdout: true, Files: []string{path}, WorkerCount: 1})
+			formatted = buf.Bytes()
+		}
+		if err != nil {
+			return fmt.Errorf("%s: %w", rel, err)
 		}
 		if bytes.Equal(src, formatted) {
 			return nil
@@ -202,26 +178,25 @@ func devCmd(args []string) (code int) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	var tw *exec.Cmd
+	exited := make(chan error, 1)
 	if s.css() {
-		tw := tailwind(s, s.path(cssOutput), "--watch=always")
+		tw = tailwind(s, s.path(cssOutput), "--watch=always")
 		tw.Stdout, tw.Stderr = os.Stderr, os.Stderr
-		tw.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+		ownGroup(tw)
 		if err := tw.Start(); err != nil {
 			log.Error("Failed to start tailwindcss", slog.String("error", err.Error()))
 			return 1
 		}
-		done := make(chan struct{})
 		go func() {
 			err := tw.Wait()
 			if ctx.Err() == nil {
-				log.Error("tailwindcss exited", slog.Any("error", err))
+				err = fmt.Errorf("exited: %v", err)
+			} else {
+				err = nil
 			}
 			cancel()
-			close(done)
-		}()
-		defer func() {
-			syscall.Kill(-tw.Process.Pid, syscall.SIGTERM)
-			<-done
+			exited <- err
 		}()
 	}
 
@@ -230,8 +205,19 @@ func devCmd(args []string) (code int) {
 		run += " '" + strings.ReplaceAll(a, "'", `'\''`) + "'"
 	}
 	err = generatecmd.Run(ctx, os.Stdout, os.Stderr, []string{"-path", s.dir, "-watch", "-open-browser=false", "-cmd", run})
-	if err != nil && ctx.Err() == nil {
+	failed := err != nil && ctx.Err() == nil
+	if failed {
 		log.Error("templ watch failed", slog.String("error", err.Error()))
+	}
+	cancel()
+	if tw != nil {
+		killGroup(tw.Process)
+		if err := <-exited; err != nil {
+			log.Error("tailwindcss failed", slog.String("error", err.Error()))
+			failed = true
+		}
+	}
+	if failed {
 		return 1
 	}
 	return 0
