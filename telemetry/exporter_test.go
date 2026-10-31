@@ -96,6 +96,8 @@ func TestShutdownAbortsInFlightExport(t *testing.T) {
 		return nil, r.Context().Err()
 	}}
 	p := offline(rt)
+	var out bytes.Buffer
+	p.local = slog.NewTextHandler(&out, nil)
 	go p.run()
 	spans(p, batch)
 	select {
@@ -109,11 +111,14 @@ func TestShutdownAbortsInFlightExport(t *testing.T) {
 	begin := time.Now()
 	err := p.Shutdown(ctx)
 	took := time.Since(begin)
-	if !errors.Is(err, context.DeadlineExceeded) || took > time.Second {
-		t.Errorf("Shutdown with an export in flight: %v after %v", err, took)
+	if err != nil || !errors.Is(ctx.Err(), context.DeadlineExceeded) || took > time.Second {
+		t.Errorf("Shutdown with an export in flight: %v after %v (context: %v)", err, took, ctx.Err())
 	}
 	if d := dropped(p, sigTraces); d != batch {
 		t.Errorf("dropped %d spans, want the in-flight %d", d, batch)
+	}
+	if !strings.Contains(out.String(), `level=WARN msg="telemetry shutdown dropped" signal=spans items=`+strconv.Itoa(batch)) {
+		t.Errorf("shutdown warning does not name the dropped spans: %s", out.String())
 	}
 }
 

@@ -96,7 +96,6 @@ type Pipeline struct {
 	stop   chan struct{}
 	loop   chan struct{}
 	done   chan struct{}
-	err    error
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -262,6 +261,9 @@ func resource(name, env string) ([]slog.Attr, error) {
 
 func (p *Pipeline) drop(s signal, n int) {
 	p.meters.dropped.add(int64(n), slog.String("signal", signals[s]))
+	if p.off() {
+		slog.New(p.local).Warn("telemetry shutdown dropped", "signal", signals[s], "items", n)
+	}
 }
 
 func (p *Pipeline) run() {
@@ -427,14 +429,12 @@ func (p *Pipeline) Shutdown(ctx context.Context) error {
 		p.collect(now, true)
 		release()
 		p.cancel()
-		p.err = ctx.Err()
 		close(p.done)
-		return p.err
+		return nil
 	}
 	select {
 	case <-p.done:
-		return p.err
 	case <-ctx.Done():
-		return ctx.Err()
 	}
+	return nil
 }
