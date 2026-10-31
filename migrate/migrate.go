@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strconv"
 	"text/tabwriter"
 	"time"
 
@@ -28,22 +27,12 @@ type Step struct {
 	NoTx bool
 }
 
-const usage = "usage: migrate up | down | down-to VERSION | status"
+const usage = "usage: migrate up | down | status"
 
-// Command runs up, down (one step), down-to VERSION or status and writes to out.
 // It requires PGDATABASE and pings db, even when steps is empty.
 // With steps registered, all commands take the session lock, including status.
 func Command(ctx context.Context, db *gorm.DB, steps []Step, args []string, out io.Writer) error {
-	var to int64
-	switch {
-	case len(args) == 1 && (args[0] == "up" || args[0] == "down" || args[0] == "status"):
-	case len(args) == 2 && args[0] == "down-to":
-		v, err := strconv.ParseInt(args[1], 10, 64)
-		if err != nil || v < 0 {
-			return fmt.Errorf("down-to %q: want a version of 0 or more", args[1])
-		}
-		to = v
-	default:
+	if len(args) != 1 || (args[0] != "up" && args[0] != "down" && args[0] != "status") {
 		return errors.New(usage)
 	}
 	for i, s := range steps {
@@ -77,15 +66,10 @@ func Command(ctx context.Context, db *gorm.DB, steps []Step, args []string, out 
 	if err != nil {
 		return err
 	}
-	names := make(map[int64]string, len(steps))
-	for _, s := range steps {
-		names[s.Version] = s.Name
-	}
-
 	switch args[0] {
 	case "up":
 		rs, err := p.Up(ctx)
-		report(out, names, rs, err)
+		report(out, steps, rs, err)
 		if err == nil && len(rs) == 0 {
 			fmt.Fprintln(out, "no pending migrations")
 		}
@@ -99,15 +83,8 @@ func Command(ctx context.Context, db *gorm.DB, steps []Step, args []string, out 
 		if err != nil {
 			return err
 		}
-		report(out, names, []*goose.MigrationResult{r}, nil)
+		report(out, steps, []*goose.MigrationResult{r}, nil)
 		return nil
-	case "down-to":
-		rs, err := p.DownTo(ctx, to)
-		report(out, names, rs, err)
-		if err == nil && len(rs) == 0 {
-			fmt.Fprintln(out, "nothing to roll back")
-		}
-		return err
 	}
 	ss, err := p.Status(ctx)
 	if err != nil {
@@ -119,17 +96,17 @@ func Command(ctx context.Context, db *gorm.DB, steps []Step, args []string, out 
 		if s.State == goose.StateApplied {
 			applied = s.AppliedAt.UTC().Format(time.DateTime)
 		}
-		fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", s.Source.Version, s.State, applied, names[s.Source.Version])
+		fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", s.Source.Version, s.State, applied, steps[s.Source.Version-1].Name)
 	}
 	return w.Flush()
 }
 
-func report(out io.Writer, names map[int64]string, rs []*goose.MigrationResult, err error) {
+func report(out io.Writer, steps []Step, rs []*goose.MigrationResult, err error) {
 	if pe, ok := errors.AsType[*goose.PartialError](err); ok {
 		rs = pe.Applied
 	}
 	for _, r := range rs {
-		fmt.Fprintf(out, "%s %d %s (%s)\n", r.Direction, r.Source.Version, names[r.Source.Version], r.Duration.Round(time.Millisecond))
+		fmt.Fprintf(out, "%s %d %s (%s)\n", r.Direction, r.Source.Version, steps[r.Source.Version-1].Name, r.Duration.Round(time.Millisecond))
 	}
 }
 
