@@ -2,15 +2,9 @@ package main
 
 import (
 	"bytes"
-	"cmp"
-	"errors"
 	"fmt"
-	"go/scanner"
-	"go/token"
-	"io/fs"
 	"os"
 	"regexp"
-	"slices"
 	"strings"
 
 	"github.com/a-h/templ/generator"
@@ -31,6 +25,9 @@ func (a *audit) templRules() error {
 		t, err := parser.Parse(a.site.path(rel))
 		if err != nil {
 			return fmt.Errorf("parse %s: %w", rel, err)
+		}
+		if err := a.overlayTempl(t, rel); err != nil {
+			return err
 		}
 		report := func(r parser.Range, msg string) {
 			a.report(finding{file: rel, line: int(r.From.Line) + 1, col: int(r.From.Col) + 1, rule: ruleInlineJS, msg: msg})
@@ -129,102 +126,17 @@ func inlineScript(n *parser.ScriptElement) bool {
 	return true
 }
 
-type templMap struct {
-	src       string
-	sm        *parser.SourceMap
-	raw, disk *token.File
-	rawToks   []goTok
-	diskToks  []goTok
-}
-
-type goTok struct {
-	off int
-	tok token.Token
-	lit string
-}
-
-func (a *audit) templMap(rel string) (*templMap, error) {
-	if m, ok := a.maps[rel]; ok {
-		return m, nil
-	}
-	if a.maps == nil {
-		a.maps = map[string]*templMap{}
-	}
-	m := &templMap{src: strings.TrimSuffix(rel, "_templ.go") + ".templ"}
-	a.maps[rel] = m
-	t, err := parser.Parse(a.site.path(m.src))
-	if errors.Is(err, fs.ErrNotExist) {
-		return m, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("parse %s: %w", m.src, err)
+func (a *audit) overlayTempl(t *parser.TemplateFile, rel string) error {
+	gen := strings.TrimSuffix(rel, ".templ") + "_templ.go"
+	if _, err := os.Stat(a.site.path(gen)); err != nil {
+		return nil
 	}
 	var raw bytes.Buffer
-	out, err := generator.Generate(t, &raw, generator.WithFileName(m.src))
+	out, err := generator.Generate(t, &raw, generator.WithFileName(rel))
 	if err != nil {
-		return nil, fmt.Errorf("generate %s: %w", m.src, err)
+		return fmt.Errorf("generate %s: %w", rel, err)
 	}
-	disk, err := os.ReadFile(a.site.path(rel))
-	if err != nil {
-		return nil, err
-	}
-	m.sm = out.SourceMap
-	m.raw, m.rawToks = goTokens(raw.Bytes())
-	m.disk, m.diskToks = goTokens(disk)
-	return m, nil
-}
-
-func goTokens(src []byte) (*token.File, []goTok) {
-	f := token.NewFileSet().AddFile("", -1, len(src))
-	var s scanner.Scanner
-	s.Init(f, src, nil, 0)
-	var toks []goTok
-	for {
-		pos, tok, lit := s.Scan()
-		if tok == token.EOF {
-			return f, toks
-		}
-		if tok != token.SEMICOLON {
-			toks = append(toks, goTok{f.Offset(pos), tok, lit})
-		}
-	}
-}
-
-func unique(toks []goTok, t goTok) int {
-	at := -1
-	for i, u := range toks {
-		if u.tok == t.tok && u.lit == t.lit {
-			if at >= 0 {
-				return -1
-			}
-			at = i
-		}
-	}
-	return at
-}
-
-func (m *templMap) source(line, col int) (int, int, bool) {
-	if m.sm == nil || line > m.disk.LineCount() {
-		return 0, 0, false
-	}
-	off := m.disk.Offset(m.disk.LineStart(line)) + col - 1
-	i, ok := slices.BinarySearchFunc(m.diskToks, off, func(t goTok, off int) int { return cmp.Compare(t.off, off) })
-	if !ok {
-		return 0, 0, false
-	}
-	t, j := m.diskToks[i], -1
-	switch {
-	case t.tok == token.STRING:
-		if unique(m.diskToks, t) >= 0 {
-			j = unique(m.rawToks, t)
-		}
-	case len(m.rawToks) == len(m.diskToks) && m.rawToks[i].tok == t.tok && m.rawToks[i].lit == t.lit:
-		j = i
-	}
-	if j < 0 {
-		return 0, 0, false
-	}
-	p := m.raw.Position(m.raw.Pos(m.rawToks[j].off))
-	src, ok := m.sm.SourcePositionFromTarget(uint32(p.Line-1), uint32(p.Column-1))
-	return int(src.Line) + 1, int(src.Col) + 1, ok
+	a.overlay[a.site.path(gen)] = raw.Bytes()
+	a.maps[gen] = out.SourceMap
+	return nil
 }

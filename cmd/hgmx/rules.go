@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/a-h/templ"
+	parser "github.com/a-h/templ/parser/v2"
 	"github.com/cogikyo/hgmx"
 	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/semver"
@@ -135,7 +136,8 @@ type audit struct {
 	findings []finding
 	ignores  []*ignore
 	templs   []string
-	maps     map[string]*templMap
+	overlay  map[string][]byte
+	maps     map[string]*parser.SourceMap
 }
 
 func (a *audit) report(f finding) {
@@ -143,7 +145,7 @@ func (a *audit) report(f finding) {
 }
 
 func runRules(s site) ([]finding, error) {
-	a := &audit{site: s}
+	a := &audit{site: s, overlay: map[string][]byte{}, maps: map[string]*parser.SourceMap{}}
 	if err := a.tree(); err != nil {
 		return nil, err
 	}

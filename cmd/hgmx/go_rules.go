@@ -86,6 +86,7 @@ func (a *audit) goRules() error {
 		Dir:        a.site.dir,
 		Env:        a.site.env(),
 		BuildFlags: a.site.flags,
+		Overlay:    a.overlay,
 		Tests:      true,
 	}
 	pkgs, err := packages.Load(cfg, "./...")
@@ -108,41 +109,33 @@ func (a *audit) goRules() error {
 		if strings.HasSuffix(p.ID, ".test") {
 			continue
 		}
-		if err := a.typeRules(p); err != nil {
-			return err
-		}
+		a.typeRules(p)
 		if p.ID == p.PkgPath && (p.PkgPath == mod || strings.HasPrefix(p.PkgPath, mod+"/")) {
 			site[p.PkgPath] = a.classify(p)
 		}
 	}
 	for _, sp := range site {
-		if err := a.imports(sp, site); err != nil {
-			return err
-		}
+		a.imports(sp, site)
 	}
 	return nil
 }
 
-func (a *audit) goReport(pos token.Position, r *rule, msg, fix string) error {
+func (a *audit) goReport(pos token.Position, r *rule, msg, fix string) {
 	rel, err := filepath.Rel(a.site.dir, pos.Filename)
 	if err != nil || strings.HasPrefix(rel, "..") {
-		return nil
+		return
 	}
 	f := finding{file: filepath.ToSlash(rel), line: pos.Line, col: pos.Column, rule: r, msg: msg, fix: fix}
-	if strings.HasSuffix(f.file, "_templ.go") {
-		m, err := a.templMap(f.file)
-		if err != nil {
-			return err
-		}
-		if line, col, ok := m.source(f.line, f.col); ok {
-			f.file, f.line, f.col = m.src, line, col
+	if sm := a.maps[f.file]; sm != nil {
+		if src, ok := sm.SourcePositionFromTarget(uint32(f.line-1), uint32(f.col-1)); ok {
+			f.file = strings.TrimSuffix(f.file, "_templ.go") + ".templ"
+			f.line, f.col = int(src.Line)+1, int(src.Col)+1
 		}
 	}
 	a.report(f)
-	return nil
 }
 
-func (a *audit) imports(sp sitePkg, site map[string]sitePkg) error {
+func (a *audit) imports(sp sitePkg, site map[string]sitePkg) {
 	p := sp.pkg
 	for _, f := range p.Syntax {
 		for _, spec := range f.Imports {
@@ -150,8 +143,8 @@ func (a *audit) imports(sp sitePkg, site map[string]sitePkg) error {
 			if err != nil {
 				continue
 			}
-			report := func(r *rule, msg string) error {
-				return a.goReport(p.Fset.Position(spec.Path.Pos()), r, msg, "")
+			report := func(r *rule, msg string) {
+				a.goReport(p.Fset.Position(spec.Path.Pos()), r, msg, "")
 			}
 			to, internal := site[path]
 			var chain []string
@@ -161,23 +154,19 @@ func (a *audit) imports(sp sitePkg, site map[string]sitePkg) error {
 			switch {
 			case strings.HasPrefix(path, "gorm.io/"):
 				if sp.layer != "store" && sp.layer != "store/migrations" {
-					err = report(ruleStoreOnly, fmt.Sprintf("%s imports %s; gorm stays inside store/", sp.rel, path))
+					report(ruleStoreOnly, fmt.Sprintf("%s imports %s; gorm stays inside store/", sp.rel, path))
 				}
 			case path == "net/http":
 				if sp.layer == "views" || sp.layer == "views/pages" {
-					err = report(ruleDirection, fmt.Sprintf("%s imports net/http; views render, and handlers live in routes", sp.rel))
+					report(ruleDirection, fmt.Sprintf("%s imports net/http; views render, and handlers live in routes", sp.rel))
 				}
 			case chain != nil:
-				err = report(ruleLiveModels, fmt.Sprintf("%s imports %s", sp.rel, strings.Join(chain, ", which imports ")))
+				report(ruleLiveModels, fmt.Sprintf("%s imports %s", sp.rel, strings.Join(chain, ", which imports ")))
 			case internal && !sp.allows(to):
-				err = report(ruleDirection, fmt.Sprintf("%s imports %s; %s", sp.rel, to, sp.policy()))
-			}
-			if err != nil {
-				return err
+				report(ruleDirection, fmt.Sprintf("%s imports %s; %s", sp.rel, to, sp.policy()))
 			}
 		}
 	}
-	return nil
 }
 
 func storeChain(p sitePkg, site map[string]sitePkg, seen map[string]bool) []string {
@@ -197,12 +186,9 @@ func storeChain(p sitePkg, site map[string]sitePkg, seen map[string]bool) []stri
 	return nil
 }
 
-func (a *audit) typeRules(p *packages.Package) error {
-	var err error
+func (a *audit) typeRules(p *packages.Package) {
 	report := func(pos token.Pos, r *rule, msg, fix string) {
-		if err == nil {
-			err = a.goReport(p.Fset.Position(pos), r, msg, fix)
-		}
+		a.goReport(p.Fset.Position(pos), r, msg, fix)
 	}
 	for _, f := range p.Syntax {
 		test := strings.HasSuffix(p.Fset.File(f.Pos()).Name(), "_test.go")
@@ -236,7 +222,6 @@ func (a *audit) typeRules(p *packages.Package) error {
 			}
 		}
 	}
-	return err
 }
 
 func callRule(p *packages.Package, call *ast.CallExpr, exitOK bool) (r *rule, msg, fix string) {

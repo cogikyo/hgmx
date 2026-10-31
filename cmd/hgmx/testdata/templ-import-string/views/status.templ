@@ -1,0 +1,16 @@
+package views
+
+import (
+	"context"
+	//hgmx:ignore imports/direction status constants only
+	"net/http"
+)
+
+func label(ctx context.Context) string {
+	return http.StatusText(http.StatusOK)
+}
+
+templ A() {
+	<p>{ "net/http" }</p>
+	<p>{ label(ctx) }</p>
+}
