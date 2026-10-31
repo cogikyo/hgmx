@@ -48,8 +48,14 @@ func (s Site) Handler(mux *http.ServeMux) http.Handler {
 	if b := p.Beacon(); b.Head() != "" {
 		root.Handle(telemetry.Path, b)
 	}
-	root.Handle("/", p.Handler(recovery(p.Logger(), s.InternalError, http.NewCrossOriginProtection().Handler(mux))))
-	return security(s.CSP, s.Allow, root)
+	app := p.Handler(recovery(p.Logger(), s.InternalError, http.NewCrossOriginProtection().Handler(mux)))
+	return security(s.CSP, s.Allow, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if h, pattern := root.Handler(r); pattern != "" {
+			h.ServeHTTP(w, r)
+			return
+		}
+		app.ServeHTTP(w, r)
+	}))
 }
 
 // New configures a server for use behind Cloudflare.

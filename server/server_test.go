@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
@@ -8,9 +9,12 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/cogikyo/hgmx/telemetry"
 )
 
 var discard = slog.New(slog.DiscardHandler)
@@ -170,6 +174,23 @@ func TestRun(t *testing.T) {
 			t.Fatalf("Run on a bound address = %v after %d hook calls; want the bind and hook errors after one call", err, calls)
 		}
 	})
+}
+
+func TestHandlerAccess(t *testing.T) {
+	var log bytes.Buffer
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /a/{id}", func(w http.ResponseWriter, r *http.Request) {})
+	h := Site{InternalError: http.NotFoundHandler(), Telemetry: telemetry.Disabled(slog.NewTextHandler(&log, nil))}.Handler(mux)
+	for _, tc := range []struct{ target, want string }{
+		{"//a/7", `pattern="GET /a/{id}" path=//a/7 status=307`},
+		{"/a/7", `pattern="GET /a/{id}" path=/a/7 status=200`},
+	} {
+		log.Reset()
+		h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", tc.target, nil))
+		if !strings.Contains(log.String(), tc.want) {
+			t.Errorf("GET %s access line %q, want %s", tc.target, log.String(), tc.want)
+		}
+	}
 }
 
 var errGone = errors.New("client gone")

@@ -71,7 +71,7 @@ func (p *Pipeline) Handler(next http.Handler) http.Handler {
 			p.meters.active.add(1)
 		}
 		r = r.WithContext(ctx)
-		// Clear the outer mux's pattern so early rejections have no app route.
+		// Clear any outer mux pattern so early rejections have no app route.
 		r.Pattern = ""
 		served := false
 		defer func() {
