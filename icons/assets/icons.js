@@ -1,7 +1,7 @@
 import { record } from "./motion.js";
 
 const reduce = matchMedia("(prefers-reduced-motion: reduce)");
-const drawn = ["pathLength", "stroke-dasharray", "stroke-dashoffset"];
+const drawn = ["stroke-dasharray", "stroke-dashoffset"];
 const authored = new WeakMap();
 const latest = new WeakMap();
 const plays = new Map();

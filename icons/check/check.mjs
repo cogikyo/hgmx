@@ -10,10 +10,15 @@ const { values: args } = parseArgs({
     only: { type: "string", default: "" },
     browsers: { type: "string", default: "chromium,firefox" },
     swaps: { type: "string", default: "5" },
+    hovers: { type: "string", default: "2" },
     shots: { type: "string", default: "" },
     modules: { type: "string", default: process.env.NODE_MODULES ?? "node_modules" },
   },
 });
+if (!/^[1-9]\d*$/.test(args.hovers)) {
+  console.error(`--hovers must be a positive integer, got ${JSON.stringify(args.hovers)}`);
+  process.exit(2);
+}
 const require = createRequire(join(args.modules, "_"));
 const puppeteer = require("puppeteer-core");
 
@@ -23,12 +28,15 @@ const executables = {
 };
 const drift = new Set(["orbit"]);
 const snap = 16;
+const moments = [0.1, 0.22, 0.35];
 const viewport = { width: 1600, height: 1000 };
 
 const probe = () => {
   const calls = [];
   const pending = [];
+  const frozen = [];
   let run = null;
+  let at = null;
   let gate = Promise.resolve();
   let release = () => {};
   const wrap = (animate) =>
@@ -41,6 +49,11 @@ const probe = () => {
       const icon = list[0]?.closest?.("svg[data-icon]")?.dataset.icon ?? "?";
       calls.push({ icon, run: run.id, n: list.length });
       const controls = animate.call(this, targets, ...rest);
+      if (at !== null) {
+        controls.pause();
+        controls.time = at;
+        frozen.push(controls);
+      }
       const finished = controls.finished ?? Promise.resolve();
       pending.push(finished);
       const held = gate;
@@ -65,7 +78,15 @@ const probe = () => {
   const hold = () => {
     gate = new Promise((resolve) => (release = resolve));
   };
-  globalThis.__icons = { calls, pending, hold, release: () => release() };
+  const freeze = (t) => {
+    at = t;
+    for (const controls of frozen) controls.time = t;
+  };
+  const thaw = () => {
+    at = null;
+    for (const controls of frozen.splice(0)) controls.play();
+  };
+  globalThis.__icons = { calls, pending, hold, release: () => release(), freeze, thaw };
 };
 
 const snapshot = (names) => {
@@ -159,17 +180,27 @@ const pixels = async (a, b) => {
   return { changed, jumped, total: p.length / 4 };
 };
 
-async function hoverAll(page, names) {
+async function hoverAll(page, names, sample = false) {
   const points = await page.evaluate(centers, names);
   const mark = await page.evaluate(() => globalThis.__icons.calls.length);
+  if (sample) await page.evaluate((t) => globalThis.__icons.freeze(t), moments[0]);
   for (const [x, y] of points) {
     await page.mouse.move(x, y);
     await new Promise((r) => setTimeout(r, 15));
   }
   await page.mouse.move(1, 1);
+  const frames = [];
+  for (const t of sample ? moments : []) {
+    await page.evaluate(async (t) => {
+      globalThis.__icons.freeze(t);
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    }, t);
+    frames.push(await shots(page, names));
+  }
+  if (sample) await page.evaluate(() => globalThis.__icons.thaw());
   const settled = await page.evaluate(settle);
   const calls = await page.evaluate((m) => globalThis.__icons.calls.slice(m), mark);
-  return { settled, calls };
+  return { settled, calls, frames };
 }
 
 function runs(calls) {
@@ -219,8 +250,12 @@ async function check(name, url, wanted) {
     const names = await page.evaluate(() => [...document.querySelectorAll("svg[data-icon]")].map((s) => s.dataset.icon));
     for (const n of wanted ?? []) if (!names.includes(n)) fail(n, "not animated (no data-icon)");
 
-    for (let pass = 0; pass < 2; pass++) {
-      if (pass === 1) {
+    const hovers = Number(args.hovers);
+    let first = null;
+    let repeat = 0;
+    for (let pass = 0; pass <= hovers; pass++) {
+      const swapped = pass === hovers;
+      if (swapped) {
         for (let i = 0; i < Number(args.swaps); i++) {
           const to = i % 2 === 0 ? "/b" : "/a";
           await page.click(to === "/b" ? "#b" : "#a");
@@ -229,12 +264,29 @@ async function check(name, url, wanted) {
         await page.waitForFunction(() => globalThis._hyperscript && document.querySelector("svg[data-icon]"));
         await new Promise((r) => setTimeout(r, 300));
       }
-      const label = pass ? `after ${args.swaps} swaps` : "first load";
+      const label = swapped ? `after ${args.swaps} swaps` : `hover ${pass + 1}`;
       const before = await page.evaluate(snapshot, names);
       const look = await shots(page, names);
       await page.evaluate(() => globalThis.__icons.hold());
-      const { settled, calls } = await hoverAll(page, names);
+      const { settled, calls, frames } = await hoverAll(page, names, !swapped);
       if (!settled) fail("*", `${label}: animations did not finish within 4s`);
+      first ??= frames;
+      for (const n of pass && !swapped ? names : []) {
+        if (drift.has(n)) continue;
+        for (const [i, t] of moments.entries()) {
+          const { changed, total } = await helper.evaluate(pixels, first[i][n], frames[i][n]);
+          repeat = Math.max(repeat, changed);
+          if (!changed) continue;
+          fail(n, `${label}: differs from hover 1 at ${t}s: ${changed} of ${total} pixels`);
+          if (args.shots) {
+            mkdirSync(args.shots, { recursive: true });
+            const stem = join(args.shots, `${name}-${n}-pass${pass + 1}-${t}s`);
+            writeFileSync(`${stem}-first.png`, Buffer.from(first[i][n], "base64"));
+            writeFileSync(`${stem}-repeat.png`, Buffer.from(frames[i][n], "base64"));
+          }
+          break;
+        }
+      }
       const quiet = await page.evaluate(() => globalThis.__icons.calls.length);
       const end = await shots(page, names);
       await page.evaluate(async () => {
@@ -271,7 +323,8 @@ async function check(name, url, wanted) {
       }
       for (const icon of by.keys()) if (!names.includes(icon)) fail(icon, `${label}: animate() outside a known icon`);
     }
-    console.log(`${name}: ${names.length} icons hovered twice around ${args.swaps} boosted swaps; worst rest diff ${worst} pixels`);
+    console.log(`${name}: ${names.length} icons hovered ${hovers} times, then once after ${args.swaps} boosted swaps; worst rest diff ${worst} pixels`);
+    console.log(`${name}: worst repeat-hover diff at ${moments.join(", ")}s: ${repeat} pixels`);
     const top = [...jumps].sort((a, b) => b[1][0] - a[1][0] || b[1][1] - a[1][1]).slice(0, 5).map(([n, [j, b]]) => `${n} ${j} (${b} differ)`);
     console.log(`${name}: largest end-frame jumps (bound ${snap}): ${top.join(", ")}`);
   } finally {

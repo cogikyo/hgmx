@@ -123,7 +123,8 @@ Each verb has keyframes, timing and reference icons.
   - Concentric arcs burst like `wifi`; `rainbow` bursts because its bands draw in opposing directions.
 - **Rects:** drawing a `rect` is fine; the runtime removes the dash at hover end, leaving no seam.
   - Prefer a rise (`scaleY: [0, 1.1, 1]`) for a wall going up (`building`).
-- **Residue:** after the last animation ends, the runtime restores authored `pathLength`, `stroke-dasharray` and `stroke-dashoffset`.
+- **Residue:** after the last animation ends, the runtime restores authored `stroke-dasharray` and `stroke-dashoffset`.
+  - Keep Motion's `pathLength="1"`: Motion sets it only once per element, so removing it breaks later draws.
   - It also removes final inline transforms that are pure multiples of 90°, or a pure turn of a centred `circle`.
   - Section 6 limits the turns for which this cleanup is safe.
 
@@ -309,12 +310,14 @@ node icons/check/check.mjs --modules "$NODE_MODULES" --only plus,x,check
 
 Replace `--only` with your icon names; omit it to check the whole set.
 The checker defaults to Chromium at `/usr/bin/chromium` and Firefox at `/usr/bin/firefox-developer-edition`.
-`--base` changes the gallery URL, and `--shots <dir>` saves rest-difference screenshots for failures.
+`--base` changes the gallery URL; `--hovers N` sets the first-load hover count (default 2).
+`--shots <dir>` saves rest and first/repeat image pairs for failures.
 
 The checker enforces:
 
 - A module exists for every requested icon.
 - Each hover runs exactly once on first load and after five boosted swaps.
+- First-load hovers 2 onward match hover 1 pixel for pixel at 0.1, 0.22 and 0.35 s, except for `orbit`'s random turn.
 - Rest matches the authored screenshot with **0 differing pixels**, except for `orbit`'s carry.
 - The snap check compares authored rest with the end frame before cleanup, except for `orbit`.
   - At most 16 pixels may have a maximum RGB-channel delta greater than 128.
