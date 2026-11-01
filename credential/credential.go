@@ -9,6 +9,10 @@ import (
 	"strings"
 )
 
+// ErrMissing is wrapped by Read when the file and env fallback are missing.
+// Test with errors.Is to disable optional features; treat other errors as fatal.
+var ErrMissing = errors.New("credential missing")
+
 // Read reads $CREDENTIALS_DIRECTORY/<name>, trimming trailing CR and LF.
 // If the directory is unset or the file is missing, it reads an env var.
 // The env name is HGMX_ plus name uppercased with hyphens changed to _.
@@ -31,5 +35,5 @@ func Read(name string) (string, error) {
 	if v := os.Getenv(env); v != "" {
 		return strings.TrimRight(v, "\r\n"), nil
 	}
-	return "", fmt.Errorf("credential %q missing (or env %s)", name, env)
+	return "", fmt.Errorf("%w: %q (or env %s)", ErrMissing, name, env)
 }
