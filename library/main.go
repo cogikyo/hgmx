@@ -81,7 +81,7 @@ func migrateMain(args []string) int {
 
 	db, err := pg.Open(log)
 	if err == nil {
-		err = migrate.Command(ctx, db, migrations.All, args, os.Stdout)
+		err = migrate.Command(ctx, db, []migrate.Track{{Steps: migrations.All}}, args, os.Stdout)
 	}
 	if err != nil {
 		log.ErrorContext(ctx, "migrate", "err", err)

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"text/tabwriter"
 	"time"
 
@@ -16,7 +17,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Step is a schema change; versions must run 1, 2, 3, ... in list order.
+// Step is a schema change; versions run 1, 2, 3, ... per track in list order.
 // Steps run in transactions with a 5-second lock_timeout unless NoTx is set.
 type Step struct {
 	Version int64
@@ -27,25 +28,63 @@ type Step struct {
 	NoTx bool
 }
 
-const usage = "usage: migrate up | down | status"
+// Track groups steps under an independent migration history.
+// An empty Name uses goose_db_version; other names use hgmx_<name>_migrations.
+// Names must match [a-z][a-z0-9_]{0,46} unless empty.
+type Track struct {
+	Name  string
+	Steps []Step
+}
 
-// Command runs up, down (one step) or status and writes to out.
-// It requires PGDATABASE and pings db only when steps is nonempty.
-// With steps registered, all commands take the session lock, including status.
-func Command(ctx context.Context, db *gorm.DB, steps []Step, args []string, out io.Writer) error {
-	if len(args) != 1 || (args[0] != "up" && args[0] != "down" && args[0] != "status") {
+const usage = "usage: migrate up | down [track] | status"
+
+var trackName = regexp.MustCompile(`^[a-z][a-z0-9_]{0,46}$`)
+
+// Command runs up in track order, down by one step, or status for every track.
+// Down defaults to the unnamed site track; pass a name to target another.
+// With steps, PGDATABASE is required and one session lock covers the command.
+// The pool needs two open connections, or three when running NoTx steps.
+func Command(ctx context.Context, db *gorm.DB, tracks []Track, args []string, out io.Writer) (retErr error) {
+	if len(args) == 0 || len(args) > 2 || (args[0] != "up" && args[0] != "down" && args[0] != "status") || (len(args) == 2 && args[0] != "down") {
 		return errors.New(usage)
 	}
-	for i, s := range steps {
-		if s.Version != int64(i+1) {
-			return fmt.Errorf("step %d (%s) has version %d; versions run 1, 2, 3, … in list order", i+1, s.Name, s.Version)
-		}
-		if s.Up == nil {
-			return fmt.Errorf("step %d (%s) has no Up", s.Version, s.Name)
-		}
+	target := ""
+	if len(args) == 2 {
+		target = args[1]
 	}
-	if len(steps) == 0 {
-		if args[0] == "up" || args[0] == "status" {
+	names := make(map[string]bool, len(tracks))
+	count := 0
+	noTx := false
+	for _, track := range tracks {
+		if track.Name != "" && !trackName.MatchString(track.Name) {
+			return fmt.Errorf("invalid track name %q; want [a-z][a-z0-9_]{0,46}", track.Name)
+		}
+		if names[track.Name] {
+			return fmt.Errorf("duplicate track name %q", track.Name)
+		}
+		names[track.Name] = true
+		for i, s := range track.Steps {
+			if s.Version != int64(i+1) {
+				return fmt.Errorf("track %q: step %d (%s) has version %d; versions run 1, 2, 3, … in list order", track.Name, i+1, s.Name, s.Version)
+			}
+			if s.Up == nil {
+				return fmt.Errorf("track %q: step %d (%s) has no Up", track.Name, s.Version, s.Name)
+			}
+			if s.NoTx && (args[0] == "up" || (args[0] == "down" && track.Name == target)) {
+				noTx = true
+			}
+		}
+		count += len(track.Steps)
+	}
+	if len(args) == 2 && !names[target] {
+		return fmt.Errorf("unknown track %q", target)
+	}
+	if count == 0 {
+		if args[0] == "status" && len(tracks) > 0 {
+			for _, track := range tracks {
+				fmt.Fprintf(out, "track %q\nno migrations\n", track.Name)
+			}
+		} else if args[0] == "up" || args[0] == "status" {
 			fmt.Fprintln(out, "no migrations")
 		} else {
 			fmt.Fprintln(out, "nothing to roll back")
@@ -63,43 +102,89 @@ func Command(ctx context.Context, db *gorm.DB, steps []Step, args []string, out 
 		return err
 	}
 
-	p, err := provider(db, conn, steps)
+	minConns := 2
+	if noTx {
+		minConns = 3
+	}
+	if max := conn.Stats().MaxOpenConnections; max > 0 && max < minConns {
+		return fmt.Errorf("migrations require at least %d open connections for the session lock and migration work", minConns)
+	}
+	locker, err := lock.NewPostgresSessionLocker()
 	if err != nil {
 		return err
 	}
-	switch args[0] {
-	case "up":
-		rs, err := p.Up(ctx)
-		report(out, steps, rs, err)
-		if err == nil && len(rs) == 0 {
-			fmt.Fprintln(out, "no pending migrations")
-		}
+	locked, err := conn.Conn(ctx)
+	if err != nil {
 		return err
-	case "down":
-		r, err := p.Down(ctx)
-		if errors.Is(err, goose.ErrNoNextVersion) {
-			fmt.Fprintln(out, "nothing to roll back")
-			return nil
+	}
+	defer locked.Close()
+	if err := locker.SessionLock(ctx, locked); err != nil {
+		return err
+	}
+	defer func() {
+		retErr = errors.Join(retErr, locker.SessionUnlock(context.WithoutCancel(ctx), locked))
+	}()
+
+	if args[0] == "down" && !names[target] {
+		fmt.Fprintln(out, "nothing to roll back")
+		return nil
+	}
+	for _, track := range tracks {
+		if args[0] == "down" && track.Name != target {
+			continue
 		}
+		fmt.Fprintf(out, "track %q\n", track.Name)
+		if len(track.Steps) == 0 {
+			if args[0] == "down" {
+				fmt.Fprintln(out, "nothing to roll back")
+			} else {
+				fmt.Fprintln(out, "no migrations")
+			}
+			continue
+		}
+		p, err := provider(db, conn, track)
 		if err != nil {
 			return err
 		}
-		report(out, steps, []*goose.MigrationResult{r}, nil)
-		return nil
-	}
-	ss, err := p.Status(ctx)
-	if err != nil {
-		return err
-	}
-	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	for _, s := range ss {
-		applied := "-"
-		if s.State == goose.StateApplied {
-			applied = s.AppliedAt.UTC().Format(time.DateTime)
+		switch args[0] {
+		case "up":
+			rs, err := p.Up(ctx)
+			report(out, track.Steps, rs, err)
+			if err != nil {
+				return err
+			}
+			if len(rs) == 0 {
+				fmt.Fprintln(out, "no pending migrations")
+			}
+		case "down":
+			r, err := p.Down(ctx)
+			if errors.Is(err, goose.ErrNoNextVersion) {
+				fmt.Fprintln(out, "nothing to roll back")
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			report(out, track.Steps, []*goose.MigrationResult{r}, nil)
+		case "status":
+			ss, err := p.Status(ctx)
+			if err != nil {
+				return err
+			}
+			w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
+			for _, s := range ss {
+				applied := "-"
+				if s.State == goose.StateApplied {
+					applied = s.AppliedAt.UTC().Format(time.DateTime)
+				}
+				fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", s.Source.Version, s.State, applied, track.Steps[s.Source.Version-1].Name)
+			}
+			if err := w.Flush(); err != nil {
+				return err
+			}
 		}
-		fmt.Fprintf(w, "%d\t%s\t%s\t%s\n", s.Source.Version, s.State, applied, steps[s.Source.Version-1].Name)
 	}
-	return w.Flush()
+	return nil
 }
 
 func report(out io.Writer, steps []Step, rs []*goose.MigrationResult, err error) {
@@ -111,11 +196,12 @@ func report(out io.Writer, steps []Step, rs []*goose.MigrationResult, err error)
 	}
 }
 
-func provider(db *gorm.DB, conn *sql.DB, steps []Step) (*goose.Provider, error) {
-	locker, err := lock.NewPostgresSessionLocker()
-	if err != nil {
-		return nil, err
+func provider(db *gorm.DB, conn *sql.DB, track Track) (*goose.Provider, error) {
+	table := goose.DefaultTablename
+	if track.Name != "" {
+		table = "hgmx_" + track.Name + "_migrations"
 	}
+	steps := track.Steps
 	ms := make([]*goose.Migration, len(steps))
 	for i, s := range steps {
 		down := s.Down
@@ -127,7 +213,7 @@ func provider(db *gorm.DB, conn *sql.DB, steps []Step) (*goose.Provider, error) 
 		ms[i] = goose.NewGoMigration(s.Version, run(db, s.NoTx, s.Up), run(db, s.NoTx, down))
 	}
 	return goose.NewProvider(goose.DialectPostgres, conn, nil,
-		goose.WithSessionLocker(locker),
+		goose.WithTableName(table),
 		goose.WithDisableGlobalRegistry(true),
 		goose.WithGoMigrations(ms...),
 	)

@@ -28,7 +28,7 @@ The scaffold serves Home, About and a full-page 404, with system-ui and OFL-lice
 `server.Site.InternalError` is the panic (500) page, not the application's 404 page.
 The database pool is lazy: the scaffold serves without Postgres.
 Set `PGHOST`, `PGDATABASE` and `PGUSER` for the site's database and `OTEL_*` for telemetry export.
-Serving never migrates; the site binary accepts only `migrate up`, `down` and `status`.
+Serving never migrates; use `migrate up`, `down [track]` or `status`.
 See [the deploy contract](CONVENTIONS.md#deploy-contract) before deploying schema changes.
 
 ## Site Commands

@@ -386,8 +386,11 @@ The check exempts test files.
 
 ### Gorm: No AutoMigrate
 
-**Schema changes are `migrate.Step` entries in `store/migrations.All`.** Never call `AutoMigrate` or migrate at server startup.
-Versions must be exactly **1, 2, 3, … in list order**; append steps without deleting or reordering applied ones.
+**Site schema changes are `migrate.Step` entries in `store/migrations.All`.** Never call `AutoMigrate` or migrate at server startup.
+Versions must be exactly **1, 2, 3, … in list order within each track**; append steps without deleting or reordering applied ones.
+
+Pass `migrate.Track{Steps: migrations.All}` as the unnamed site track in the `[]migrate.Track` passed to `migrate.Command`, after any named library tracks.
+The site track keeps `goose_db_version`; named tracks use `hgmx_<name>_migrations`.
 
 - **`Up` is required.** A nil `Down` makes rollback fail and leaves the history row in place.
 - **Each step runs in a transaction** with a 5-second `lock_timeout`, unless `NoTx` is set.
@@ -395,11 +398,13 @@ Versions must be exactly **1, 2, 3, … in list order**; append steps without de
   - Keep one concurrent statement per step, plus the cleanup needed to retry it.
   - For an index, run `DROP INDEX CONCURRENTLY IF EXISTS`, then `CREATE INDEX CONCURRENTLY`.
   - Use separate `Exec` calls; a multi-statement call cannot run these outside a transaction.
-- **`migrate.Command`** accepts only `up`, `down` and `status`.
-  - `down` rolls back one step.
+- **`migrate.Command`** accepts `up`, `down [track]` and `status`.
+  - `up` runs tracks in slice order; `status` lists every track.
+  - `down` rolls back one site step; `down auth` rolls back one step in the named `auth` track.
   - With steps registered, all commands require `PGDATABASE` and ping the database.
-  - With steps registered, all commands take the session lock, including `status`.
+  - With steps registered, one session lock covers the whole command, including `status`.
   - `status` can wait behind a deploy; it is not a lock-free probe.
+  - The pool needs at least two open connections, or three when running `NoTx` steps.
 
 ### Migrate: No Live Models
 
