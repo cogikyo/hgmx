@@ -108,6 +108,8 @@ This spelling was verified with htmx 4.0.0 in Chromium and Firefox; WebKit is un
   - Emit `server.VersionConfig(version)` on `<body>` and wrap page handlers with `PageVersion`.
   - A GET or HEAD carrying a different build version gets a full reload; requests without the header pass through.
   - `scripts.Navigation` re-sends the config headers on history restores.
+  - Auth mounts `/auth/*` without `PageVersion`, so per-route wrappers leave those pages without version reloads.
+    Wrap the root handler returned by `Site.Handler` with `PageVersion` to cover them too.
 - **Per-page regions outside `#main`**, such as a breadcrumb, are listed in `hx-select-oob` and morphed.
   - Morph only regions whose attributes only the server writes.
   - Morph strips classes and inline styles that JS set.
@@ -470,6 +472,11 @@ For package loading and Go commands, `check` sets `GOWORK=off` and, when `vendor
 - **`OTEL_*`** configures telemetry; export uses HTTP/protobuf.
   - Set `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` as needed.
   - An unset endpoint or `OTEL_SDK_DISABLED=true` disables export; local logging still works.
+- **`HGMX_TRUSTED_PROXY`** is the one proxy IP allowed to supply `CF-Connecting-IP`.
+  - `clientip.From` reads it once at startup; auth's per-IP limits use that address.
+  - Unset or invalid settings use the connection's peer address instead.
+- **`HGMX_AUTH_KEY`** is the development fallback for `credential.Read("auth-key")`.
+  - `$CREDENTIALS_DIRECTORY/auth-key` takes priority; use a per-site key of at least 32 bytes.
 
 ## Tests
 

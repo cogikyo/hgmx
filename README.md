@@ -48,6 +48,21 @@ Generation and formatting use templ in-process; the site's templ version must ma
 Database tests use `pgtest.Open(t)`; put `initdb` and `pg_ctl` on PATH.
 Missing executables or a socket bind failure skip the test unless `HGMX_PGTEST=require`; other startup failures fail.
 
+## Accounts
+
+`auth` provides per-site passwordless accounts with passkeys, email codes and revocable sessions.
+See the [package docs](https://pkg.go.dev/github.com/cogikyo/hgmx/auth) for migration setup, `Config`, modes and styling hooks.
+With the database, mail queue and config ready:
+
+```go
+a, err := auth.New(db, queue, cfg)
+if err != nil {
+	return err
+}
+a.Mount(mux)
+mux.Handle("GET /members", a.Require(auth.Anyone, members))
+```
+
 ## Packages
 
 - **`server`** composes the root handler, version reloads, recovery and graceful shutdown.
