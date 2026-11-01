@@ -21,6 +21,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/cogikyo/hgmx/clientip"
 	"github.com/cogikyo/hgmx/static"
 )
 
@@ -181,10 +182,7 @@ func (b *Beacon) accept(r *http.Request) int {
 }
 
 func (b *Beacon) visitor(r *http.Request, ua string) string {
-	ip := r.Header.Get("CF-Connecting-IP")
-	if ip == "" {
-		ip, _, _ = net.SplitHostPort(r.RemoteAddr)
-	}
+	ip := clientip.From(r)
 	day := time.Now().UTC().Unix() / 86400
 	b.mu.Lock()
 	if day != b.day {
