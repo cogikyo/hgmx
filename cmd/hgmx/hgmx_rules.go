@@ -8,9 +8,9 @@ import (
 	"os"
 	"slices"
 	"strings"
-	"time"
 
 	"golang.org/x/mod/modfile"
+	"golang.org/x/mod/module"
 	"golang.org/x/mod/semver"
 )
 
@@ -32,9 +32,7 @@ func (a *audit) hgmx() error {
 	if len(replaces) > 0 || a.site.version(hgmxPath) == "" {
 		return nil
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	latest, err := latestHgmx(ctx)
+	latest, err := latestHgmx(context.Background())
 	if err != nil {
 		// Keep offline site work possible when master cannot be resolved.
 		newLogger(logLevel, os.Stderr).Warn("Could not resolve hgmx master; skipping hgmx-latest", slog.String("error", err.Error()))
@@ -44,7 +42,8 @@ func (a *audit) hgmx() error {
 }
 
 func (a *audit) hgmxLatest(latest string) error {
-	if v := a.site.version(hgmxPath); v != latest {
+	v := a.site.version(hgmxPath)
+	if rev, err := module.PseudoVersionRev(v); err != nil || rev != latest {
 		a.report(finding{file: "go.mod", rule: ruleHgmxLatest,
 			msg: fmt.Sprintf("site requires hgmx %s; master resolves to %s", v, latest)})
 	}
@@ -60,7 +59,8 @@ func (a *audit) hgmxLatest(latest string) error {
 		if len(fields) < 3 || fields[0] != "#" || fields[1] != hgmxPath || !semver.IsValid(fields[2]) {
 			continue
 		}
-		if v := fields[2]; v != latest {
+		v := fields[2]
+		if rev, err := module.PseudoVersionRev(v); err != nil || rev != latest {
 			a.report(finding{file: "vendor/modules.txt", rule: ruleHgmxLatest,
 				msg: fmt.Sprintf("vendor contains hgmx %s; master resolves to %s", v, latest)})
 		}

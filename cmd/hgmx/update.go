@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -21,7 +22,6 @@ import (
 const (
 	hgmxPath       = "github.com/cogikyo/hgmx"
 	hgmxTool       = hgmxPath + "/cmd/hgmx"
-	hgmxRef        = "master"
 	vendorRecovery = "vendor/ may be incomplete or out of sync; recover with GOFLAGS=-mod=mod go mod vendor"
 )
 
@@ -29,14 +29,41 @@ func moduleEnv() []string {
 	return append(os.Environ(), "GOWORK=off", "GOFLAGS=-mod=mod", "GIT_TERMINAL_PROMPT=0")
 }
 
-// latestHgmx resolves master outside the site using Go's module proxy settings.
 func latestHgmx(ctx context.Context) (string, error) {
-	dir, err := os.MkdirTemp("", "hgmx-latest-*")
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", "ls-remote", "https://"+hgmxPath, "refs/heads/master")
+	cmd.Env = moduleEnv()
+	cmd.WaitDelay = 100 * time.Millisecond
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		if ctx.Err() != nil {
+			return "", fmt.Errorf("git ls-remote: %w", ctx.Err())
+		}
+		if msg := strings.TrimSpace(stderr.String()); msg != "" {
+			err = fmt.Errorf("%w: %s", err, msg)
+		}
+		return "", fmt.Errorf("git ls-remote: %w", err)
+	}
+	fields := strings.Fields(string(out))
+	if len(fields) != 2 || len(fields[0]) != 40 || fields[1] != "refs/heads/master" {
+		return "", fmt.Errorf("git ls-remote: invalid master response %q", strings.TrimSpace(string(out)))
+	}
+	if _, err := hex.DecodeString(fields[0]); err != nil {
+		return "", fmt.Errorf("git ls-remote: invalid master commit %q: %w", fields[0], err)
+	}
+	return fields[0][:12], nil
+}
+
+func hgmxVersion(ctx context.Context, commit string) (string, error) {
+	dir, err := os.MkdirTemp("", "hgmx-version-*")
 	if err != nil {
 		return "", err
 	}
 	defer os.RemoveAll(dir)
-	cmd := exec.CommandContext(ctx, "go", "list", "-m", "-f", "{{.Version}}", hgmxPath+"@"+hgmxRef)
+	cmd := exec.CommandContext(ctx, "go", "list", "-m", "-f", "{{.Version}}", hgmxPath+"@"+commit)
 	cmd.Dir, cmd.Env = dir, moduleEnv()
 	cmd.WaitDelay = 100 * time.Millisecond
 	var stderr bytes.Buffer
@@ -46,11 +73,14 @@ func latestHgmx(ctx context.Context) (string, error) {
 		if ctx.Err() != nil {
 			return "", ctx.Err()
 		}
-		return "", fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
+		if msg := strings.TrimSpace(stderr.String()); msg != "" {
+			err = fmt.Errorf("%w: %s", err, msg)
+		}
+		return "", fmt.Errorf("go list: %w", err)
 	}
 	v := strings.TrimSpace(string(out))
 	if !semver.IsValid(v) {
-		return "", fmt.Errorf("invalid hgmx version %q", v)
+		return "", fmt.Errorf("invalid hgmx version %q for commit %s", v, commit)
 	}
 	return v, nil
 }
@@ -134,8 +164,22 @@ func updateCmd() int {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	latest, err := latestHgmx(ctx)
+	if err != nil {
+		log.Error("Could not resolve hgmx master; update aborted", slog.String("error", err.Error()))
+		return 1
+	}
+	target, err := hgmxVersion(ctx, latest)
+	if err != nil {
+		log.Error("Could not resolve hgmx master commit's module version; update aborted", slog.String("commit", latest), slog.String("error", err.Error()))
+		return 1
+	}
+	if semver.Compare(target, s.version(hgmxPath)) < 0 {
+		log.Error("Refusing to downgrade hgmx", slog.String("current", old), slog.String("target", target), slog.String("master", latest))
+		return 1
+	}
 	for _, args := range [][]string{
-		{"get", "-tool", hgmxTool + "@" + hgmxRef},
+		{"get", "-tool", hgmxTool + "@" + latest},
 		{"mod", "tidy"},
 		{"mod", "vendor"},
 	} {

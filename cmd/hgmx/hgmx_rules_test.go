@@ -2,25 +2,30 @@ package main
 
 import (
 	"context"
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 )
 
 func TestHgmxLatest(t *testing.T) {
-	const latest = "v0.0.36-0.20261101193023-edcd391fa47d"
+	const latest = "294690d89e1a"
+	const current = "v0.0.36-0.20261101201201-" + latest
 	for _, tt := range []struct {
 		name    string
 		version string
 		vendor  string
 		want    string
 	}{
-		{"current", latest, "# " + hgmxPath + " " + latest + "\n## explicit; go 1.27.0\n" + hgmxTool + "\n", ""},
-		{"no-vendor", latest, "", ""},
+		{"current", current, "# " + hgmxPath + " " + current + "\n## explicit; go 1.27.0\n" + hgmxTool + "\n", ""},
+		{"same-commit", "v0.0.0-20261101201201-" + latest, "", ""},
+		{"no-vendor", current, "", ""},
 		{"old-module", "v0.0.33", "", "go.mod [hgmx-latest] site requires hgmx v0.0.33; master resolves to " + latest + "\n"},
-		{"old-vendor", latest, "# " + hgmxPath + " v0.0.33\n", "vendor/modules.txt [hgmx-latest] vendor contains hgmx v0.0.33; master resolves to " + latest + "\n"},
-		{"replacement-footer", latest, "# " + hgmxPath + " " + latest + "\n# " + hgmxPath + " => ../hgmx\n", ""},
+		{"old-commit", "v0.0.36-0.20261101193023-edcd391fa47d", "", "go.mod [hgmx-latest] site requires hgmx v0.0.36-0.20261101193023-edcd391fa47d; master resolves to " + latest + "\n"},
+		{"old-vendor", current, "# " + hgmxPath + " v0.0.33\n", "vendor/modules.txt [hgmx-latest] vendor contains hgmx v0.0.33; master resolves to " + latest + "\n"},
+		{"replacement-footer", current, "# " + hgmxPath + " " + current + "\n# " + hgmxPath + " => ../hgmx\n", ""},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -80,12 +85,9 @@ func TestHgmxTool(t *testing.T) {
 }
 
 func TestHgmxOffline(t *testing.T) {
-	t.Setenv("GOPROXY", "off")
-	t.Setenv("GONOPROXY", "none")
-	t.Setenv("GOMODCACHE", t.TempDir())
-	t.Setenv("GOTOOLCHAIN", "local")
-	if _, err := latestHgmx(context.Background()); err == nil {
-		t.Fatal("offline resolution succeeded")
+	t.Setenv("PATH", t.TempDir())
+	if _, err := latestHgmx(context.Background()); !errors.Is(err, exec.ErrNotFound) {
+		t.Fatalf("missing git: got %v; want executable not found", err)
 	}
 	dir := t.TempDir()
 	mod := "module example.com/site\n\ngo 1.27.0\n\nrequire " + hgmxPath + " v0.0.33\n\ntool " + hgmxTool + "\n"
@@ -106,8 +108,7 @@ func TestHgmxOffline(t *testing.T) {
 }
 
 func TestHgmxReplace(t *testing.T) {
-	t.Setenv("GOPROXY", "off")
-	t.Setenv("GONOPROXY", "none")
+	t.Setenv("PATH", t.TempDir())
 	for _, tt := range []struct {
 		name    string
 		replace string
