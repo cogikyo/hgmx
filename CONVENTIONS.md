@@ -439,8 +439,6 @@ It stops at the first failed stage and never writes formatted files.
 For package loading and Go commands, `check` sets `GOWORK=off` and, when `vendor/` exists, passes `-mod=vendor` even if `GOFLAGS` selects another mode.
 `dev` and `migrate` keep the caller's workspace settings.
 
-**Release hgmx by tagging and pushing the tag.** The CLI version comes from Go build info.
-
 ## Env
 
 - **`PGHOST`, `PGDATABASE`, `PGUSER`** configure Postgres through libpq-compatible `PG*` settings.

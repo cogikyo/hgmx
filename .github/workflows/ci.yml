@@ -1,0 +1,61 @@
+# .github/workflows/ci.yml
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Check Formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Check Generated Templates
+        run: go tool templ generate -path . -check
+
+      - name: Verify Vendored Scripts
+        run: go run ./scripts/fetch -check scripts
+
+      - name: Put Postgres on PATH
+        run: |
+          bin=$(ls -d /usr/lib/postgresql/*/bin | sort -V | tail -n 1)
+          test -x "$bin/initdb"
+          echo "$bin" >> "$GITHUB_PATH"
+
+      - name: Test
+        run: go test -count=1 ./...
+        env:
+          HGMX_PGTEST: require
+
+      - name: Cross-build CLI
+        run: |
+          for target in windows/amd64 darwin/arm64 linux/arm64; do
+            GOOS=${target%/*} GOARCH=${target#*/} go build -o /dev/null ./cmd/hgmx
+          done

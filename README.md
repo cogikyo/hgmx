@@ -10,10 +10,10 @@ Use Go 1.27 or later and put the standalone Tailwind CLI 4.3.3 on PATH.
 In a new project directory:
 
 ```bash
-go install github.com/cogikyo/hgmx/cmd/hgmx@v0.0.30
+go install github.com/cogikyo/hgmx/cmd/hgmx@master
 go mod init example.com/site
 hgmx init
-go get github.com/cogikyo/hgmx@v0.0.30
+go get github.com/cogikyo/hgmx@master
 go mod tidy
 go mod vendor
 hgmx check
@@ -76,8 +76,5 @@ Without `-o`, output goes to stdout.
 
 From this repository: `go build -o hgmx ./cmd/hgmx`.
 
-## Release
-
-Tag the release and push the tag; the release workflow builds and publishes the CLI.
 `hgmx.Version()` reports the main module's Go build-info version only when that module is hgmx itself, as in the CLI.
 It returns empty in a site; set the site's own version separately.
