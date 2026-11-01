@@ -3,16 +3,58 @@ package main
 import (
 	"context"
 	"errors"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
 
+const hgmxRefLines = "294690d89e1aea47982c8be93bfb4a011b69b363\trefs/heads/master\n" +
+	"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\trefs/tags/v0.1.0\n" +
+	"294690d89e1aea47982c8be93bfb4a011b69b363\trefs/tags/v0.1.0^{}\n" +
+	"294690d89e1aea47982c8be93bfb4a011b69b363\trefs/tags/v0.1.1\n" +
+	"edcd391fa47d0000000000000000000000000000\trefs/tags/v0.0.33\n" +
+	"294690d89e1aea47982c8be93bfb4a011b69b363\trefs/tags/v0.2.0\n" +
+	"edcd391fa47d0000000000000000000000000000\trefs/tags/v0.2.0^{}\n"
+
+func TestParseHgmxRefs(t *testing.T) {
+	lines := strings.Split(strings.TrimSpace(hgmxRefLines), "\n")
+	slices.Reverse(lines)
+	for _, input := range []string{hgmxRefLines, strings.Join(lines, "\n")} {
+		refs, err := parseHgmxRefs(input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if refs.master != "294690d89e1aea47982c8be93bfb4a011b69b363" {
+			t.Fatalf("master: %s", refs.master)
+		}
+		want := map[string]string{
+			"v0.1.0":  refs.master,
+			"v0.1.1":  refs.master,
+			"v0.0.33": "edcd391fa47d0000000000000000000000000000",
+			"v0.2.0":  "edcd391fa47d0000000000000000000000000000",
+		}
+		if !maps.Equal(refs.tags, want) {
+			t.Fatalf("tags: %v; want %v", refs.tags, want)
+		}
+	}
+	for _, input := range []string{"", "not-a-ref", strings.ReplaceAll(hgmxRefLines, "294690", "zzzzzz"), strings.ReplaceAll(hgmxRefLines, "refs/heads/master", "refs/heads/other")} {
+		if _, err := parseHgmxRefs(input); err == nil {
+			t.Fatalf("invalid refs accepted: %q", input)
+		}
+	}
+}
+
 func TestHgmxLatest(t *testing.T) {
 	const latest = "294690d89e1a"
 	const current = "v0.0.36-0.20261101201201-" + latest
+	refs, err := parseHgmxRefs(hgmxRefLines)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tt := range []struct {
 		name    string
 		version string
@@ -21,6 +63,10 @@ func TestHgmxLatest(t *testing.T) {
 	}{
 		{"current", current, "# " + hgmxPath + " " + current + "\n## explicit; go 1.27.0\n" + hgmxTool + "\n", ""},
 		{"same-commit", "v0.0.0-20261101201201-" + latest, "", ""},
+		{"annotated-tag", "v0.1.0", "# " + hgmxPath + " v0.1.0\n", ""},
+		{"lightweight-tag", "v0.1.1", "# " + hgmxPath + " v0.1.1\n", ""},
+		{"old-annotated-tag", "v0.2.0", "", "go.mod [hgmx-latest] site requires hgmx v0.2.0; master resolves to " + latest + "\n"},
+		{"unknown-tag", "v0.3.0", "", "go.mod [hgmx-latest] site requires hgmx v0.3.0; master resolves to " + latest + "\n"},
 		{"no-vendor", current, "", ""},
 		{"old-module", "v0.0.33", "", "go.mod [hgmx-latest] site requires hgmx v0.0.33; master resolves to " + latest + "\n"},
 		{"old-commit", "v0.0.36-0.20261101193023-edcd391fa47d", "", "go.mod [hgmx-latest] site requires hgmx v0.0.36-0.20261101193023-edcd391fa47d; master resolves to " + latest + "\n"},
@@ -46,7 +92,7 @@ func TestHgmxLatest(t *testing.T) {
 				t.Fatal(err)
 			}
 			a := &audit{site: s}
-			if err := a.hgmxLatest(latest); err != nil {
+			if err := a.hgmxLatest(refs); err != nil {
 				t.Fatal(err)
 			}
 			var got strings.Builder

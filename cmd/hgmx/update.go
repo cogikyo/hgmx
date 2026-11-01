@@ -29,10 +29,15 @@ func moduleEnv() []string {
 	return append(os.Environ(), "GOWORK=off", "GOFLAGS=-mod=mod", "GIT_TERMINAL_PROMPT=0")
 }
 
-func latestHgmx(ctx context.Context) (string, error) {
+type hgmxRefs struct {
+	master string
+	tags   map[string]string
+}
+
+func latestHgmx(ctx context.Context) (hgmxRefs, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", "ls-remote", "https://"+hgmxPath, "refs/heads/master")
+	cmd := exec.CommandContext(ctx, "git", "ls-remote", "https://"+hgmxPath, "refs/heads/master", "refs/tags/*")
 	cmd.Env = moduleEnv()
 	cmd.WaitDelay = 100 * time.Millisecond
 	var stderr bytes.Buffer
@@ -40,21 +45,43 @@ func latestHgmx(ctx context.Context) (string, error) {
 	out, err := cmd.Output()
 	if err != nil {
 		if ctx.Err() != nil {
-			return "", fmt.Errorf("git ls-remote: %w", ctx.Err())
+			return hgmxRefs{}, fmt.Errorf("git ls-remote: %w", ctx.Err())
 		}
 		if msg := strings.TrimSpace(stderr.String()); msg != "" {
 			err = fmt.Errorf("%w: %s", err, msg)
 		}
-		return "", fmt.Errorf("git ls-remote: %w", err)
+		return hgmxRefs{}, fmt.Errorf("git ls-remote: %w", err)
 	}
-	fields := strings.Fields(string(out))
-	if len(fields) != 2 || len(fields[0]) != 40 || fields[1] != "refs/heads/master" {
-		return "", fmt.Errorf("git ls-remote: invalid master response %q", strings.TrimSpace(string(out)))
+	return parseHgmxRefs(string(out))
+}
+
+func parseHgmxRefs(out string) (hgmxRefs, error) {
+	refs := hgmxRefs{tags: make(map[string]string)}
+	for line := range strings.Lines(out) {
+		fields := strings.Fields(line)
+		if len(fields) != 2 || len(fields[0]) != 40 {
+			return hgmxRefs{}, fmt.Errorf("git ls-remote: invalid ref response %q", line)
+		}
+		if _, err := hex.DecodeString(fields[0]); err != nil {
+			return hgmxRefs{}, fmt.Errorf("git ls-remote: invalid object %q: %w", fields[0], err)
+		}
+		commit, ref := fields[0], fields[1]
+		if ref == "refs/heads/master" {
+			refs.master = commit
+			continue
+		}
+		if tag, ok := strings.CutPrefix(ref, "refs/tags/"); ok {
+			if name, peeled := strings.CutSuffix(tag, "^{}"); peeled {
+				refs.tags[name] = commit
+			} else if refs.tags[tag] == "" {
+				refs.tags[tag] = commit
+			}
+		}
 	}
-	if _, err := hex.DecodeString(fields[0]); err != nil {
-		return "", fmt.Errorf("git ls-remote: invalid master commit %q: %w", fields[0], err)
+	if refs.master == "" {
+		return hgmxRefs{}, errors.New("git ls-remote: missing refs/heads/master")
 	}
-	return fields[0][:12], nil
+	return refs, nil
 }
 
 func hgmxVersion(ctx context.Context, commit string) (string, error) {
@@ -175,17 +202,18 @@ func updateCmd() int {
 		log.Error("Could not resolve hgmx master; update aborted", slog.String("error", err.Error()))
 		return 1
 	}
-	target, err := hgmxVersion(ctx, latest)
+	commit := latest.master[:12]
+	target, err := hgmxVersion(ctx, commit)
 	if err != nil {
-		log.Error("Could not resolve hgmx master commit's module version; update aborted", slog.String("commit", latest), slog.String("error", err.Error()))
+		log.Error("Could not resolve hgmx master commit's module version; update aborted", slog.String("commit", commit), slog.String("error", err.Error()))
 		return 1
 	}
 	if semver.Compare(target, s.version(hgmxPath)) < 0 {
-		log.Error("Refusing to downgrade hgmx", slog.String("current", old), slog.String("target", target), slog.String("master", latest))
+		log.Error("Refusing to downgrade hgmx", slog.String("current", old), slog.String("target", target), slog.String("master", commit))
 		return 1
 	}
 	commands := [][]string{
-		{"get", "-tool", hgmxTool + "@" + latest},
+		{"get", "-tool", hgmxTool + "@" + commit},
 		{"mod", "tidy"},
 	}
 	if vendored {

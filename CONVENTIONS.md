@@ -428,7 +428,7 @@ An applied migration can remain after a later step fails, so every intermediate 
 ### hgmx: Latest
 
 **Every site stays on the latest hgmx master while hgmx is being built out.**
-`go tool hgmx check` compares the pseudo-version commits in `go.mod` and existing `vendor/modules.txt` with master from `git ls-remote`; tagged versions count as behind.
+`go tool hgmx check` compares the commits in `go.mod` and existing `vendor/modules.txt` with master from one `git ls-remote` lookup of master and tags, using peeled commits for annotated tags.
 If resolution fails, including offline, missing git or after a 10-second timeout, it warns with the cause and skips this rule.
 
 Run `go tool hgmx update` to resolve master with git and run `go get -tool github.com/cogikyo/hgmx/cmd/hgmx@<12-char commit>`, then `go mod tidy`.

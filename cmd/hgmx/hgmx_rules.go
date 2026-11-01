@@ -41,11 +41,18 @@ func (a *audit) hgmx() error {
 	return a.hgmxLatest(latest)
 }
 
-func (a *audit) hgmxLatest(latest string) error {
+func (r hgmxRefs) current(version string) bool {
+	if rev, err := module.PseudoVersionRev(version); err == nil {
+		return rev == r.master[:12]
+	}
+	return r.tags[version] == r.master
+}
+
+func (a *audit) hgmxLatest(latest hgmxRefs) error {
 	v := a.site.version(hgmxPath)
-	if rev, err := module.PseudoVersionRev(v); err != nil || rev != latest {
+	if !latest.current(v) {
 		a.report(finding{file: "go.mod", rule: ruleHgmxLatest,
-			msg: fmt.Sprintf("site requires hgmx %s; master resolves to %s", v, latest)})
+			msg: fmt.Sprintf("site requires hgmx %s; master resolves to %s", v, latest.master[:12])})
 	}
 	data, err := os.ReadFile(a.site.path("vendor/modules.txt"))
 	if errors.Is(err, os.ErrNotExist) {
@@ -60,9 +67,9 @@ func (a *audit) hgmxLatest(latest string) error {
 			continue
 		}
 		v := fields[2]
-		if rev, err := module.PseudoVersionRev(v); err != nil || rev != latest {
+		if !latest.current(v) {
 			a.report(finding{file: "vendor/modules.txt", rule: ruleHgmxLatest,
-				msg: fmt.Sprintf("vendor contains hgmx %s; master resolves to %s", v, latest)})
+				msg: fmt.Sprintf("vendor contains hgmx %s; master resolves to %s", v, latest.master[:12])})
 		}
 		break
 	}
