@@ -474,7 +474,7 @@ For package loading and Go commands, `check` sets `GOWORK=off` and passes `-mod=
 - **`OTEL_*`** configures telemetry; export uses HTTP/protobuf.
   - Set `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` as needed.
   - An unset endpoint or `OTEL_SDK_DISABLED=true` disables export; local logging still works.
-- **`HGMX_TRUSTED_PROXY`** is the one proxy IP allowed to supply `CF-Connecting-IP`.
+- **`HGMX_TRUSTED_PROXY`** is the proxy allowed to supply `CF-Connecting-IP`: an IP or CIDR; invalid values stop startup.
   - `clientip.From` reads it once at startup; auth's per-IP limits use that address.
   - Unset or invalid settings use the connection's peer address instead.
 - **`HGMX_AUTH_KEY`** is the development fallback for `credential.Read("auth-key")`.

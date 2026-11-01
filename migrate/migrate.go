@@ -82,7 +82,7 @@ func Command(ctx context.Context, db *gorm.DB, tracks []Track, args []string, ou
 	if count == 0 {
 		if args[0] == "status" && len(tracks) > 0 {
 			for _, track := range tracks {
-				fmt.Fprintf(out, "track %q\nno migrations\n", track.Name)
+				fmt.Fprintf(out, "%s\nno migrations\n", trackLabel(track.Name))
 			}
 		} else if args[0] == "up" || args[0] == "status" {
 			fmt.Fprintln(out, "no migrations")
@@ -133,7 +133,7 @@ func Command(ctx context.Context, db *gorm.DB, tracks []Track, args []string, ou
 		if args[0] == "down" && track.Name != target {
 			continue
 		}
-		fmt.Fprintf(out, "track %q\n", track.Name)
+		fmt.Fprintln(out, trackLabel(track.Name))
 		if len(track.Steps) == 0 {
 			if args[0] == "down" {
 				fmt.Fprintln(out, "nothing to roll back")
@@ -194,6 +194,13 @@ func report(out io.Writer, steps []Step, rs []*goose.MigrationResult, err error)
 	for _, r := range rs {
 		fmt.Fprintf(out, "%s %d %s (%s)\n", r.Direction, r.Source.Version, steps[r.Source.Version-1].Name, r.Duration.Round(time.Millisecond))
 	}
+}
+
+func trackLabel(name string) string {
+	if name == "" {
+		return "track site"
+	}
+	return "track " + name
 }
 
 func provider(db *gorm.DB, conn *sql.DB, track Track) (*goose.Provider, error) {

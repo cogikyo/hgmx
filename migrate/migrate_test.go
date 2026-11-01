@@ -122,7 +122,7 @@ func TestEmpty(t *testing.T) {
 	}
 	for arg, want := range map[string]string{
 		"up":     "no migrations\n",
-		"status": "track \"\"\nno migrations\n",
+		"status": "track site\nno migrations\n",
 		"down":   "nothing to roll back\n",
 	} {
 		out, err := command(t, db, nil, arg)
@@ -198,7 +198,7 @@ func TestTracks(t *testing.T) {
 	if v := scalar[int](t, db, "SELECT max(version_id) FROM hgmx_auth_migrations"); v != 1 {
 		t.Errorf("auth version %d, want 1", v)
 	}
-	if out := run("status"); !strings.Contains(out, "track \"auth\"") || !strings.Contains(out, "track \"\"") || !strings.Contains(out, "owners") || !strings.Contains(out, "users") {
+	if out := run("status"); !strings.Contains(out, "track auth") || !strings.Contains(out, "track site") || !strings.Contains(out, "owners") || !strings.Contains(out, "users") {
 		t.Errorf("status omitted a track: %q", out)
 	}
 	run("up")
