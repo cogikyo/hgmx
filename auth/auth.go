@@ -8,10 +8,19 @@
 // Read the site's auth-key with credential.Read("auth-key").
 // Its development fallback is HGMX_AUTH_KEY; the key needs at least 32 bytes.
 // Start queue with mail.NewQueue and pass queue.Close to server.Run's after hooks.
-// In this example, db, queue and key are ready and layout is the site's document:
+// Keep gorm in store/ by adding Store methods:
+//
+//	func (s *Store) Auth(q *mail.Queue, c auth.Config) (*auth.Auth, error) {
+//		return auth.New(s.db, q, c)
+//	}
+//	func (s *Store) AuthCommand(ctx context.Context, c auth.Config, args []string, out io.Writer) error {
+//		return auth.Command(ctx, s.db, c, args, out)
+//	}
+//
+// In site wiring, st, queue and key are ready and layout is the site's document:
 //
 //	var a *auth.Auth
-//	a, err := auth.New(db, queue, auth.Config{
+//	a, err := st.Auth(queue, auth.Config{
 //		Name: "Example", Origin: "https://example.com", Mode: auth.Open,
 //		Key: []byte(key),
 //		Layout: func(r *http.Request, t string, b templ.Component) templ.Component {
@@ -23,7 +32,7 @@
 //	a.Mount(mux)
 //	mux.Handle("GET /members", a.Require(auth.Anyone, members))
 //
-// Declare a before New so Layout can read the user when a page is rendered.
+// Declare a before st.Auth so Layout can read the user when a page is rendered.
 // Layout must return the full document, including the body component.
 // Mount under server.Site's cross-origin protection, or provide equivalent CSRF checks.
 //
@@ -34,7 +43,8 @@
 // [Open] creates a user on their first verified code and allows account deletion.
 // Pass a non-nil mail queue in Invite and Open modes.
 //
-// Wire [Command] into the site's CLI, passing the arguments after "auth".
+// In the site's CLI, call st.AuthCommand(ctx, cfg, args, out).
+// Pass the arguments after "auth"; [Command] does not need Config.Layout.
 // "auth link <email>" creates a missing user and prints a 30-minute sign-in link.
 // "auth reset <email>" also removes passkeys and sessions and invalidates codes.
 // Treat the printed link as a secret; reset also invalidates outstanding links.
