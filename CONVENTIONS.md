@@ -212,15 +212,14 @@ Never branch on `HX-Request-Type`; preload requests lack it, so the full page wo
   - On a render error, return if the request was cancelled; otherwise panic into recovery.
   - Stream only for a measured need.
 - **Generated templ and CSS are committed**, and regenerated and checked before each commit.
-  - Run `hgmx gen`; `hgmx check` checks generation and formatting without writing.
+  - Run `go tool hgmx gen`; `go tool hgmx check` checks generation and formatting without writing.
 
 ### templ: Version
 
-- **The site's required templ version equals hgmx's compiled-in version.** `hgmx init` sets it in `go.mod`.
-  - `hgmx check` reports a mismatch and the `go get` command that fixes it.
-- **hgmx runs templ generation and formatting in-process.** Use `hgmx gen`, `dev` and `fmt`.
+- **The site's required templ version equals hgmx's compiled-in version.** `go tool hgmx init` sets it in `go.mod`.
+  - `go tool hgmx check` reports a mismatch and the command that fixes it.
+- **hgmx runs templ generation and formatting in-process.** Use `go tool hgmx gen`, `go tool hgmx dev` and `go tool hgmx fmt`.
   - Sites add no templ `tool` line and do not run `go run templ@version`.
-  - A `tool` line would vendor the generator's dependency tree into every site.
 
 ## Tailwind v4
 
@@ -423,18 +422,33 @@ An applied migration can remain after a later step fails, so every intermediate 
 
 ## Commands
 
+### hgmx: Latest
+
+**Every site stays on the latest hgmx master while hgmx is being built out.**
+`go tool hgmx check` compares `go.mod` and existing `vendor/modules.txt` with master as Go's module proxy resolves it.
+If resolution fails, including offline or after a timeout, it warns and skips this rule.
+
+Run `go tool hgmx update` to run `go get -tool github.com/cogikyo/hgmx/cmd/hgmx@master`, then `go mod tidy` and `go mod vendor`.
+It prints the old → new hgmx version and suggests `go tool hgmx gen` before `go tool hgmx check` if templ changed.
+
+### hgmx: Tool
+
+**Declare `tool github.com/cogikyo/hgmx/cmd/hgmx` in the site's `go.mod` and use `go tool hgmx`.**
+The library and CLI then use the same module version and cannot drift.
+For a first install, run `go get -tool github.com/cogikyo/hgmx/cmd/hgmx@master`.
+
 ### Layout: No Justfile
 
 **No justfile anywhere.** Run the shared hgmx commands from the site's module root.
 
-| Command                     | Task                                                                        |
-| --------------------------- | --------------------------------------------------------------------------- |
-| `hgmx init`                 | Write `main.go`, `routes/`, `store/` and `views/` in a module with `go.mod` |
-| `hgmx gen`                  | Generate templ and minified CSS                                             |
-| `hgmx dev [-- site flags…]` | Watch templ and CSS, restarting `go run . -static views/static`             |
-| `hgmx fmt`                  | Format Go and templ files                                                   |
-| `hgmx migrate …`            | Run `go run . migrate …` for development                                    |
-| `hgmx check`                | Check generation, rules and formatting; then vet, build and test            |
+| Command                             | Task                                                                        |
+| ----------------------------------- | --------------------------------------------------------------------------- |
+| `go tool hgmx init`                 | Write `main.go`, `routes/`, `store/` and `views/` in a module with `go.mod` |
+| `go tool hgmx gen`                  | Generate templ and minified CSS                                             |
+| `go tool hgmx dev [-- site flags…]` | Watch templ and CSS, restarting `go run . -static views/static`             |
+| `go tool hgmx fmt`                  | Format Go and templ files                                                   |
+| `go tool hgmx migrate …`            | Run `go run . migrate …` for development                                    |
+| `go tool hgmx check`                | Check generation, rules and formatting; then vet, build and test            |
 
 `init` refuses if any scaffold target already exists and pins the site's templ requirement to hgmx's.
 It rewrites site imports and regenerates templ Go files for the site's module path.
@@ -459,7 +473,7 @@ For package loading and Go commands, `check` sets `GOWORK=off` and, when `vendor
 ## Tests
 
 **The scaffold's `routes.TestNew` builds the mux.**
-A missing file passed to `static.Server.File` or a pattern conflict fails `hgmx check`.
+A missing file passed to `static.Server.File` or a pattern conflict fails `go tool hgmx check`.
 
 **Use `pgtest.Open(t)` for database tests.** It supplies a fresh database and non-superuser role per call, then cleans both up with the test.
 Production and test connections share hgmx's gorm configuration.

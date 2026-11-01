@@ -1,3 +1,4 @@
+go.mod [hgmx-tool] missing tool github.com/cogikyo/hgmx/cmd/hgmx
 views/page.templ:4:10 [templ/no-inline-js] onclick handler attribute
 views/page.templ:5:21 [templ/no-inline-js] hx-on:htmx:after-request attribute evaluates code
 views/page.templ:6:2 [templ/no-inline-js] inline <script> body

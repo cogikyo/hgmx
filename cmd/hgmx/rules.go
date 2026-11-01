@@ -26,10 +26,20 @@ type rule struct {
 }
 
 var (
+	ruleHgmxLatest = &rule{
+		"hgmx-latest",
+		"every site stays on the latest hgmx master while hgmx is being built out",
+		"run go tool hgmx update",
+	}
+	ruleHgmxTool = &rule{
+		"hgmx-tool",
+		"the site's go.mod pins the hgmx library and CLI together so they cannot drift",
+		"run go tool hgmx update; for a first install, run go get -tool github.com/cogikyo/hgmx/cmd/hgmx@master",
+	}
 	ruleJustfile = &rule{
 		"layout/no-justfile",
 		"hgmx commands replace per-site justfiles, so every site runs the same gen, dev, check and migrate",
-		"delete it; run hgmx gen, hgmx dev, hgmx check or hgmx migrate instead",
+		"delete it; run go tool hgmx gen, go tool hgmx dev, go tool hgmx check or go tool hgmx migrate instead",
 	}
 	ruleInternal = &rule{
 		"layout/no-internal",
@@ -94,6 +104,7 @@ var (
 )
 
 var rules = []*rule{
+	ruleHgmxLatest, ruleHgmxTool,
 	ruleJustfile, ruleInternal, ruleGoVersion, ruleTemplVersion,
 	ruleDirection, ruleStoreOnly, ruleLiveModels,
 	ruleAutoMigrate, ruleGlobal, ruleSlogContext, ruleExit,
@@ -152,6 +163,9 @@ func runRules(s site) ([]finding, error) {
 	if err := a.gomod(); err != nil {
 		return nil, err
 	}
+	if err := a.hgmx(); err != nil {
+		return nil, err
+	}
 	if err := a.templRules(); err != nil {
 		return nil, err
 	}
@@ -204,7 +218,7 @@ func (a *audit) gomod() error {
 	}
 	fix := fmt.Sprintf("run go get %s@%s", templPath, templ.Version())
 	if semver.Compare(r.Mod.Version, templ.Version()) > 0 {
-		fix = fmt.Sprintf("install an hgmx built with templ %s, or run go get %s@%s", r.Mod.Version, templPath, templ.Version())
+		fix = fmt.Sprintf("run go tool hgmx update, or run go get %s@%s", templPath, templ.Version())
 	}
 	a.report(finding{
 		file: "go.mod", line: r.Syntax.Start.Line, col: modCol(r.Syntax),

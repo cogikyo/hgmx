@@ -34,6 +34,7 @@ func init() {
 	rootCmd.AddCommand(fmtCobraCmd)
 	rootCmd.AddCommand(devCobraCmd)
 	rootCmd.AddCommand(checkCobraCmd)
+	rootCmd.AddCommand(updateCobraCmd)
 	rootCmd.AddCommand(migrateCobraCmd)
 	paletteCobraCmd.Flags().StringVarP(&paletteFormat, "format", "f", "tailwind", "Output format [tailwind, css, lua]")
 	paletteCobraCmd.Flags().StringVarP(&paletteOut, "out", "o", "", "Write to this file instead of stdout")
@@ -80,6 +81,15 @@ var migrateCobraCmd = &cobra.Command{
 	DisableFlagParsing: true,
 	Run: func(cmd *cobra.Command, args []string) {
 		os.Exit(migrateCmd(args))
+	},
+}
+
+var updateCobraCmd = &cobra.Command{
+	Use:   "update",
+	Short: "Updates the site's hgmx library and tool to master, tidies and vendors",
+	Args:  cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		os.Exit(updateCmd())
 	},
 }
 

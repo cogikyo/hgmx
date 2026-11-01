@@ -10,13 +10,12 @@ Use Go 1.27 or later and put the standalone Tailwind CLI 4.3.3 on PATH.
 In a new project directory:
 
 ```bash
-go install github.com/cogikyo/hgmx/cmd/hgmx@master
 go mod init example.com/site
-hgmx init
-go get github.com/cogikyo/hgmx@master
+go get -tool github.com/cogikyo/hgmx/cmd/hgmx@master
+go tool hgmx init
 go mod tidy
 go mod vendor
-hgmx check
+go tool hgmx check
 go build -o site .
 ./site
 ```
@@ -35,13 +34,14 @@ See [the deploy contract](CONVENTIONS.md#deploy-contract) before deploying schem
 
 Run these from the site's module root; there is no justfile.
 
-| Command                     | Task                                                                |
-| --------------------------- | ------------------------------------------------------------------- |
-| `hgmx gen`                  | Generate templ Go and minified CSS                                  |
-| `hgmx dev [-- site flags…]` | Watch templ and CSS; restart the site with disk-backed static files |
-| `hgmx fmt`                  | Format Go and templ                                                 |
-| `hgmx migrate …`            | Run the site's migration command through `go run .`                 |
-| `hgmx check`                | Check generation, rules and formatting; then vet, build and test    |
+| Command                             | Task                                                                |
+| ----------------------------------- | ------------------------------------------------------------------- |
+| `go tool hgmx gen`                  | Generate templ Go and minified CSS                                  |
+| `go tool hgmx dev [-- site flags…]` | Watch templ and CSS; restart the site with disk-backed static files |
+| `go tool hgmx fmt`                  | Format Go and templ                                                 |
+| `go tool hgmx migrate …`            | Run the site's migration command through `go run .`                 |
+| `go tool hgmx update`               | Update hgmx to master, tidy and vendor                              |
+| `go tool hgmx check`                | Check generation, rules and formatting; then vet, build and test    |
 
 Generation and formatting use templ in-process; the site's templ version must match hgmx's.
 `check` compares generated output to the tree without writing.
@@ -65,7 +65,7 @@ Missing executables or a socket bind failure skip the test unless `HGMX_PGTEST=r
 ## Generate a Palette
 
 ```bash
-hgmx palette 'night=#222536,#0184fe' -f tailwind -o views/static/css/colors.css
+go tool hgmx palette 'night=#222536,#0184fe' -f tailwind -o views/static/css/colors.css
 ```
 
 The input is `<name>=<base>,<primary>[,<accent>]`; repeat it for multiple themes.

@@ -32,7 +32,7 @@ func checkCmd() (code int) {
 				return err
 			}
 			for _, line := range stale {
-				fmt.Fprintf(os.Stdout, "%s; run hgmx gen\n", line)
+				fmt.Fprintf(os.Stdout, "%s; run go tool hgmx gen\n", line)
 			}
 			if len(stale) > 0 {
 				return fmt.Errorf("stale files: %d", len(stale))
@@ -58,7 +58,7 @@ func checkCmd() (code int) {
 				return err
 			}
 			for _, rel := range changed {
-				fmt.Fprintf(os.Stdout, "%s: not formatted; run hgmx fmt\n", rel)
+				fmt.Fprintf(os.Stdout, "%s: not formatted; run go tool hgmx fmt\n", rel)
 			}
 			if len(changed) > 0 {
 				return fmt.Errorf("unformatted files: %d", len(changed))
