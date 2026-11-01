@@ -103,7 +103,7 @@ func start() (*server, error) {
 		return nil, err
 	}
 	defer lock.Close()
-	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX); err != nil {
+	if err := lockFile(lock); err != nil {
 		return nil, err
 	}
 
@@ -134,7 +134,7 @@ func start() (*server, error) {
 			return nil, err
 		}
 		cmd := exec.Command("pg_ctl", "start", "-w", "-s", "-D", data, "-l", logfile)
-		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+		detach(cmd)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			startErr := fmt.Errorf("pg_ctl start: %v: %s (server log: %s)", err, out, logfile)
 			log, _ := os.ReadFile(logfile)
@@ -158,7 +158,7 @@ func start() (*server, error) {
 		admin.Close()
 		return nil, err
 	}
-	if err := syscall.Flock(int(lease.Fd()), syscall.LOCK_EX); err != nil {
+	if err := lockFile(lease); err != nil {
 		lease.Close()
 		admin.Close()
 		return nil, err
@@ -192,11 +192,10 @@ func reclaimOwner(admin *sql.DB, path, owner string) error {
 		return err
 	}
 	defer lease.Close()
-	if err := syscall.Flock(int(lease.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
-		if errors.Is(err, syscall.EWOULDBLOCK) {
-			return nil
-		}
+	if ok, err := tryLockFile(lease); err != nil {
 		return err
+	} else if !ok {
+		return nil
 	}
 	rows, err := admin.QueryContext(context.Background(), "SELECT rolname FROM pg_roles WHERE rolname ~ $1", "^hgmx_"+owner+"_[0-9a-f]{16}$")
 	if err != nil {
