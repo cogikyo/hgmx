@@ -476,9 +476,16 @@ For package loading and Go commands, `check` sets `GOWORK=off` and passes `-mod=
   - An unset endpoint or `OTEL_SDK_DISABLED=true` disables export; local logging still works.
 - **`HGMX_TRUSTED_PROXY`** is the proxy allowed to supply `CF-Connecting-IP`: an IP or CIDR; invalid values stop startup.
   - `clientip.From` reads it once at startup; auth's per-IP limits use that address.
-  - Unset or invalid settings use the connection's peer address instead.
+  - When unset, the connection's peer address is used instead.
 - **`HGMX_AUTH_KEY`** is the development fallback for `credential.Read("auth-key")`.
   - `$CREDENTIALS_DIRECTORY/auth-key` takes priority; use a per-site key of at least 32 bytes.
+- **`smtp-password`** is the mail credential, read with `credential.Read("smtp-password")`.
+  - `$CREDENTIALS_DIRECTORY/smtp-password` takes priority; `HGMX_SMTP_PASSWORD` is the development fallback.
+- **`HGMX_SMTP_HOST`, `HGMX_SMTP_USER`, `HGMX_SMTP_FROM`** configure the site's `mail.SMTP` sender.
+  - Use port 465, the default; `mail.SMTP` uses implicit TLS, not STARTTLS.
+  - Cloudflare Email Sending uses host `smtp.mx.cloudflare.net` and user `api_token`.
+  - One account-scoped token sends for every onboarded domain.
+  - Set `HGMX_SMTP_FROM` to an address on the site's `mail.<domain>`.
 
 ## Tests
 
