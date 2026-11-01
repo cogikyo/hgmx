@@ -55,7 +55,7 @@ async function scan() {
     const button = input.closest("[data-auth]")?.querySelector("[data-auth-passkey]");
     location.assign(button?.dataset.next || "/");
   } catch (err) {
-    if (!controller.signal.aborted) show(input, err);
+    if (!controller.signal.aborted && err.name !== "NotAllowedError") show(input, err);
   } finally {
     if (autofill === controller) autofill = undefined;
   }
