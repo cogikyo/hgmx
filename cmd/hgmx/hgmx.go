@@ -86,7 +86,7 @@ var migrateCobraCmd = &cobra.Command{
 
 var updateCobraCmd = &cobra.Command{
 	Use:   "update",
-	Short: "Updates the site's hgmx library and tool to master, tidies and vendors",
+	Short: "Updates the site's hgmx library and tool to master",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		os.Exit(updateCmd())

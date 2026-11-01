@@ -40,7 +40,7 @@ func loadSite(dir string) (site, error) {
 	if mod.Module == nil {
 		return site{}, errors.New("go.mod declares no module path")
 	}
-	s := site{dir: dir, mod: mod}
+	s := site{dir: dir, mod: mod, flags: []string{"-mod=readonly"}}
 	if _, err := os.Stat(filepath.Join(dir, "vendor")); err == nil {
 		s.flags = []string{"-mod=vendor"}
 	}

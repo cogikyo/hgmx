@@ -14,7 +14,6 @@ go mod init example.com/site
 go get -tool github.com/cogikyo/hgmx/cmd/hgmx@master
 go tool hgmx init
 go mod tidy
-go mod vendor
 go tool hgmx check
 go build -o site .
 ./site
@@ -40,7 +39,7 @@ Run these from the site's module root; there is no justfile.
 | `go tool hgmx dev [-- site flags…]` | Watch templ and CSS; restart the site with disk-backed static files |
 | `go tool hgmx fmt`                  | Format Go and templ                                                 |
 | `go tool hgmx migrate …`            | Run the site's migration command through `go run .`                 |
-| `go tool hgmx update`               | Update hgmx to master, tidy and vendor                              |
+| `go tool hgmx update`               | Update hgmx to master and tidy; re-vendor if present                |
 | `go tool hgmx check`                | Check generation, rules and formatting; then vet, build and test    |
 
 Generation and formatting use templ in-process; the site's templ version must match hgmx's.

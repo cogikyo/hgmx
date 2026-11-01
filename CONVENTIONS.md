@@ -317,7 +317,8 @@ mux.Handle(webapp.Path, app)
 - **Add `middleware/`** when application routes need shared request handling.
   - Add a root domain package when business rules need a home outside handlers and queries.
   - Don't scaffold empty packages or add a DI framework.
-- **Commit `vendor/`:** deployed sites build offline from it.
+- **Don't commit `vendor/`**, except on existing sites until the deploy system confirms removal is safe.
+  - Nix deploys will fetch modules using a pinned per-site `vendorHash` maintained by kiln.
 
 ### Imports: Direction
 
@@ -430,7 +431,8 @@ An applied migration can remain after a later step fails, so every intermediate 
 `go tool hgmx check` compares the pseudo-version commits in `go.mod` and existing `vendor/modules.txt` with master from `git ls-remote`; tagged versions count as behind.
 If resolution fails, including offline, missing git or after a 10-second timeout, it warns with the cause and skips this rule.
 
-Run `go tool hgmx update` to resolve master with git and run `go get -tool github.com/cogikyo/hgmx/cmd/hgmx@<12-char commit>`, then `go mod tidy` and `go mod vendor`.
+Run `go tool hgmx update` to resolve master with git and run `go get -tool github.com/cogikyo/hgmx/cmd/hgmx@<12-char commit>`, then `go mod tidy`.
+It runs `go mod vendor` only when `vendor/` already exists.
 Update fails if master cannot be resolved or its module version is older than the site's current requirement.
 It prints the old → new hgmx version and suggests `go tool hgmx gen` before `go tool hgmx check` if templ changed.
 
@@ -458,7 +460,7 @@ It rewrites site imports and regenerates templ Go files for the site's module pa
 Tailwind generation uses `tailwindcss` from PATH when `views/static/css/main.css` exists.
 `check` compares generated output to the tree in its gen stage without writing.
 It stops at the first failed stage and never writes formatted files.
-For package loading and Go commands, `check` sets `GOWORK=off` and, when `vendor/` exists, passes `-mod=vendor` even if `GOFLAGS` selects another mode.
+For package loading and Go commands, `check` sets `GOWORK=off` and passes `-mod=vendor` when `vendor/` exists or `-mod=readonly` otherwise, overriding `GOFLAGS`.
 `dev` and `migrate` keep the caller's workspace settings.
 
 ## Env

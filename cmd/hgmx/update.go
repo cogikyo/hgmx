@@ -123,6 +123,12 @@ func updateCmd() int {
 	if len(replaces) > 0 {
 		return 1
 	}
+	_, err = os.Stat(s.path("vendor"))
+	vendored := err == nil
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		log.Error("Failed to check vendor directory", slog.String("error", err.Error()))
+		return 1
+	}
 	old, oldTempl := s.version(hgmxPath), s.version(templPath)
 	if old == "" {
 		old = "(none)"
@@ -178,11 +184,14 @@ func updateCmd() int {
 		log.Error("Refusing to downgrade hgmx", slog.String("current", old), slog.String("target", target), slog.String("master", latest))
 		return 1
 	}
-	for _, args := range [][]string{
+	commands := [][]string{
 		{"get", "-tool", hgmxTool + "@" + latest},
 		{"mod", "tidy"},
-		{"mod", "vendor"},
-	} {
+	}
+	if vendored {
+		commands = append(commands, []string{"mod", "vendor"})
+	}
+	for _, args := range commands {
 		log.Info("Running go " + strings.Join(args, " "))
 		cmd := exec.CommandContext(ctx, "go", args...)
 		cmd.Dir, cmd.Env = s.dir, moduleEnv()
@@ -203,7 +212,9 @@ func updateCmd() int {
 	if err != nil {
 		restore()
 		log.Error("Failed to read updated go.mod", slog.String("error", err.Error()))
-		log.Warn(vendorRecovery)
+		if vendored {
+			log.Warn(vendorRecovery)
+		}
 		return 1
 	}
 	s = updated
