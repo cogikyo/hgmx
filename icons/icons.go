@@ -182,7 +182,8 @@ func New() *Handler {
 }
 
 // Head returns layout tags; place them after the script defining global Motion.
-// Animations load per icon on first hover; reduced motion disables all playback.
+// Page icons fetch animations after load.
+// Reduced motion disables downloads and playback.
 func (h *Handler) Head() template.HTML {
 	return h.head
 }

@@ -4,6 +4,9 @@ const reduce = matchMedia("(prefers-reduced-motion: reduce)");
 const drawn = ["pathLength", "stroke-dasharray", "stroke-dashoffset"];
 const authored = new WeakMap();
 const latest = new WeakMap();
+const plays = new Map();
+
+const load = (name) => import(`./anim/${name}.js`).then(({ default: play }) => plays.set(name, play));
 
 const near = (a, b) => Math.abs(a - b) < 1e-6;
 
@@ -25,14 +28,29 @@ function restore(svg) {
   }
 }
 
+function preload(root) {
+  if (reduce.matches || document.readyState !== "complete") return;
+  const svgs = [...root.querySelectorAll("svg[data-icon]")];
+  if (root.matches?.("svg[data-icon]")) svgs.push(root);
+  for (const svg of svgs) {
+    const { icon } = svg.dataset;
+    if (!plays.has(icon)) load(icon).catch(() => {});
+  }
+}
+
+addEventListener("load", () => preload(document));
+preload(document);
+document.addEventListener("htmx:after:process", (e) => preload(e.target));
+
 document.addEventListener("hovered", async (e) => {
   const svg = e.target.closest?.("svg[data-icon]");
   if (!svg || reduce.matches) return;
-  const { default: play } = await import(`./anim/${svg.dataset.icon}.js`);
+  const { icon } = svg.dataset;
+  if (!plays.has(icon)) await load(icon);
   for (const el of svg.querySelectorAll("*")) {
     if (!authored.has(el)) authored.set(el, drawn.map((name) => el.getAttribute(name)));
   }
-  const run = record(play, svg);
+  const run = record(plays.get(icon), svg);
   latest.set(svg, run);
   await Promise.all(run.map((controls) => controls.finished));
   if (latest.get(svg) === run) restore(svg);
