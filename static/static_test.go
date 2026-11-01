@@ -70,3 +70,19 @@ func TestDevServesEdits(t *testing.T) {
 		t.Fatalf("after edit: %d %q %q, want 200 \"two\" no-cache", second.Code, second.Body.String(), second.Header().Get("Cache-Control"))
 	}
 }
+
+func TestFileExpires(t *testing.T) {
+	s := Map("/static/", map[string][]byte{"robots.txt": []byte("User-agent: *")})
+	func() {
+		defer func() {
+			if recover() == nil {
+				t.Error("File(missing) did not panic, so the route fails only when requested")
+			}
+		}()
+		s.File("favicon.ico")
+	}()
+	w := get(t, s.File("robots.txt"), "/robots.txt")
+	if w.Code != http.StatusOK || w.Header().Get("Cache-Control") != "public, max-age=86400" {
+		t.Fatalf("/robots.txt: %d %q, want 200 max-age=86400; a fixed URL can't move when the file changes, so it can't be immutable", w.Code, w.Header().Get("Cache-Control"))
+	}
+}

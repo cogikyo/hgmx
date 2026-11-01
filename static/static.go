@@ -1,4 +1,4 @@
-// Package static serves files at URLs with one hash for the whole set.
+// Package static serves files at set-hash URLs or individual fixed URLs.
 package static
 
 import (
@@ -18,6 +18,7 @@ import (
 
 const (
 	immutable = "public, max-age=31536000, immutable"
+	daily     = "public, max-age=86400"
 	dev       = "dev"
 )
 
@@ -42,6 +43,7 @@ var types = map[string]string{
 }
 
 // Server serves files below a root-relative URL prefix ending in a slash.
+// File provides handlers for fixed URLs outside that prefix.
 type Server struct {
 	prefix string
 	hash   string
@@ -102,6 +104,22 @@ func (s *Server) URL(name string) (string, error) {
 	return s.prefix + s.hash + "/" + strings.Join(segments, "/"), nil
 }
 
+// File returns a handler for name at a fixed URL chosen by the caller.
+// It panics immediately if name is missing from the file set.
+// Responses cache publicly for one day, or use no-cache in dev mode.
+func (s *Server) File(name string) http.Handler {
+	if _, ok := s.open(name); !ok {
+		panic(fmt.Sprintf("static: no file %q", name))
+	}
+	cache := daily
+	if s.live != nil {
+		cache = "no-cache"
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s.serve(w, r, name, cache)
+	})
+}
+
 // ServeHTTP expects the full URL path, without http.StripPrefix.
 // A stale hash serves the current file with no-cache, not a 404.
 // Current snapshot hashes get immutable caching; all others get no-cache.
@@ -112,14 +130,18 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	cache := "no-cache"
+	if hash == s.hash && s.live == nil {
+		cache = immutable
+	}
+	s.serve(w, r, name, cache)
+}
+
+func (s *Server) serve(w http.ResponseWriter, r *http.Request, name, cache string) {
 	f, ok := s.open(name)
 	if !ok {
 		http.NotFound(w, r)
 		return
-	}
-	cache := "no-cache"
-	if hash == s.hash && s.live == nil {
-		cache = immutable
 	}
 	if typ, ok := types[path.Ext(name)]; ok {
 		w.Header().Set("Content-Type", typ)

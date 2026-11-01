@@ -65,3 +65,11 @@ func TestRenderFailure(t *testing.T) {
 		t.Fatalf("client gone: logged %q, body %q", logged.String(), rec.Body.String())
 	}
 }
+
+func TestNew(t *testing.T) {
+	v, err := views.New(views.Config{Version: "v1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	New(nil, v)
+}

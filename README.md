@@ -55,7 +55,7 @@ Missing executables or a socket bind failure skip the test unless `HGMX_PGTEST=r
 - **`telemetry`** exports OTLP/HTTP traces, logs and metrics from `OTEL_*` settings, with local logging and a browser beacon.
 - **`pg`** opens Postgres from `PG*` settings and supplies IDs, JSON, enums and query scopes; `pg/pgtest` supplies test databases.
 - **`migrate`** runs Go-defined schema steps with transactions and a session lock.
-- **`static`** serves file sets under hashed URLs, with a disk-backed dev mode.
+- **`static`** serves file sets at hashed URLs or fixed root URLs, with a disk-backed dev mode.
 - **`scripts`** serves selected htmx, hx-preload, navigation support, hyperscript and Motion scripts in dependency order.
 - **`palette`** generates contrast-tier scales and semantic tokens from base, primary and optional accent colours.
 - **`theme`** serves palette stylesheets, the theme switcher and explorer.

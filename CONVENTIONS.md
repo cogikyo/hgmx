@@ -271,6 +271,7 @@ mux.HandleFunc("GET /docs/{path...}", doc)
 mux.HandleFunc("GET /items", items) // ?q= search uses the page route
 mux.HandleFunc("GET /items/{name}", item)
 mux.Handle("/static/", assets)
+mux.Handle("GET /favicon.ico", assets.File("favicon/favicon.ico"))
 mux.Handle(scripts.Path, js)
 mux.Handle(webapp.Path, app)
 ```
@@ -453,6 +454,9 @@ For package loading and Go commands, `check` sets `GOWORK=off` and, when `vendor
 
 ## Tests
 
+**The scaffold's `routes.TestNew` builds the mux.**
+A missing file passed to `static.Server.File` or a pattern conflict fails `hgmx check`.
+
 **Use `pgtest.Open(t)` for database tests.** It supplies a fresh database and non-superuser role per call, then cleans both up with the test.
 Production and test connections share hgmx's gorm configuration.
 
@@ -501,7 +505,7 @@ The infrastructure packages are:
 - **`telemetry`** owns local logging, OTLP export and browser beacons.
 - **`pg`** owns Postgres connections, column types and query scopes; `pg/pgtest` supplies test databases.
 - **`migrate`** runs Go-defined schema steps under a session lock.
-- **`static`** serves the site's files under a set-hash URL.
+- **`static`** serves the site's files at set-hash URLs or fixed root URLs.
 - **`scripts`** serves selected scripts and navigation support with ordered head tags.
 - **`webapp`** serves the install manifest and icons.
 - **`palette`** generates contrast-tier scales and semantic colour tokens.
