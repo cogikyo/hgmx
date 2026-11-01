@@ -144,7 +144,7 @@ func updateCmd() int {
 	}
 	replaces := s.hgmxReplaces()
 	for _, r := range replaces {
-		log.Error("Refusing to update with an hgmx replace; remove this line and use go.work to develop against ../hgmx",
+		log.Error("Refusing to update with an hgmx replace; remove this line and use go.work to develop against a local hgmx checkout",
 			slog.String("file", "go.mod"), slog.Int("line", r.Syntax.Start.Line), slog.String("replace", strings.Join(r.Syntax.Token, " ")))
 	}
 	if len(replaces) > 0 {

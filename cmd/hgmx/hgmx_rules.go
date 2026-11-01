@@ -26,7 +26,7 @@ func (a *audit) hgmx() error {
 		a.report(finding{
 			file: "go.mod", line: r.Syntax.Start.Line, col: r.Syntax.Start.LineRune, rule: ruleHgmxLatest,
 			msg: "replace " + r.Old.Path + " overrides the pinned hgmx version",
-			fix: "remove this replace; use go.work to develop against ../hgmx",
+			fix: "remove this replace; use go.work to develop against a local hgmx checkout",
 		})
 	}
 	if len(replaces) > 0 || a.site.version(hgmxPath) == "" {

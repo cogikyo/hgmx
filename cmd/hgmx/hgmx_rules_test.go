@@ -191,7 +191,7 @@ func TestHgmxReplace(t *testing.T) {
 				if !strings.Contains(strings.Split(mod, "\n")[f.line-1], path) {
 					t.Fatalf("finding points to the wrong line: %+v", f)
 				}
-				if f.msg != "replace "+path+" overrides the pinned hgmx version" || f.fix != "remove this replace; use go.work to develop against ../hgmx" {
+				if f.msg != "replace "+path+" overrides the pinned hgmx version" || f.fix != "remove this replace; use go.work to develop against a local hgmx checkout" {
 					t.Fatalf("unexpected finding: %+v", f)
 				}
 			}
