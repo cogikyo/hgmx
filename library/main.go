@@ -69,7 +69,9 @@ func run(p *telemetry.Pipeline, addr, dir string) error {
 	defer stop()
 	context.AfterFunc(ctx, stop)
 	log.InfoContext(ctx, "listening", "addr", addr, "version", version)
-	return server.Run(ctx, server.New(addr, h, log), p.Shutdown)
+	return server.Run(ctx, server.New(addr, h, log), p.Shutdown, func(ctx context.Context) error {
+		return pg.Close(ctx, db)
+	})
 }
 
 func migrateMain(args []string) int {

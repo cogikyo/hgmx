@@ -2,6 +2,7 @@
 package pg
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/cogikyo/hgmx/pg/internal/config"
@@ -19,7 +20,24 @@ var (
 )
 
 // Open reads libpq-compatible PG* settings and opens a pool without pinging.
-// The caller owns the pool; SQL logs use placeholders, not bound values.
+// The caller must [Close] the pool; SQL logs use placeholders, not bound values.
 func Open(log *slog.Logger) (*gorm.DB, error) {
 	return gorm.Open(postgres.New(postgres.Config{}), config.Gorm(log))
+}
+
+// Close closes db's pool and returns ctx.Err() if ctx ends first.
+// Pool closure continues after cancellation; drain requests before calling.
+func Close(ctx context.Context, db *gorm.DB) error {
+	pool, err := db.DB()
+	if err != nil {
+		return err
+	}
+	done := make(chan error, 1)
+	go func() { done <- pool.Close() }()
+	select {
+	case err := <-done:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }

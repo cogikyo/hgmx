@@ -299,7 +299,7 @@ mux.Handle(webapp.Path, app)
 - **`telemetry.FromEnv(local)` never returns nil**, even with export disabled or invalid configuration.
   - Log its configuration error through `Logger()`; local logs and access lines still work.
   - Export is OTLP HTTP/protobuf, configured by supported `OTEL_*` environment variables.
-  - Pass `p.Shutdown` to `server.Run` so export flushes after the HTTP drain.
+  - Pass `p.Shutdown`, then `func(ctx context.Context) error { return pg.Close(ctx, db) }` to `server.Run`.
   - `Shutdown` logs dropped telemetry and returns nil if the final export fails or times out.
 - **`server.Site` serves `/healthz` as `ok <version>`** with `no-store`; set the build version via `-X main.version`.
 
@@ -351,7 +351,7 @@ Raise the site's `go` directive when upgrading hgmx requires it.
 ### Gorm: Store Only
 
 - **Models and gorm imports stay in `store/`**, including its migrations.
-  - `main` passes `pg.Open`'s result to `store.New` without naming a gorm type.
+  - `main` passes `pg.Open`'s result to `store.New` and `pg.Close` without naming a gorm type.
 - **`store.Store` methods take `ctx` first** and query through `s.db.WithContext(ctx)`.
   - Routes hold `*store.Store` and call its methods.
 - **Test outcomes with `errors.Is`**, using `pg.ErrNotFound`, `pg.ErrDuplicate` or `pg.ErrForeignKey`.
@@ -447,6 +447,7 @@ For package loading and Go commands, `check` sets `GOWORK=off` and, when `vendor
   - hgmx defines no database URL variable.
 - **`pg.Open` opens a lazy pool**, so serving can start without a reachable database.
   - The first query establishes connectivity.
+  - Close it on shutdown with `pg.Close`.
   - SQL logs retain placeholders and never include bound parameter values.
 - **`OTEL_*`** configures telemetry; export uses HTTP/protobuf.
   - Set `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_SERVICE_NAME` and `OTEL_RESOURCE_ATTRIBUTES` as needed.
