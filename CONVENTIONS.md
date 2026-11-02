@@ -88,13 +88,6 @@ This spelling was verified with htmx 4.0.0 in Chromium and Firefox; WebKit is un
 ::view-transition-new(main) {
   animation-duration: 120ms;
 }
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
-    animation: none;
-  }
-}
 ```
 
 **Use it this way:**
@@ -104,6 +97,9 @@ This spelling was verified with htmx 4.0.0 in Chromium and Firefox; WebKit is un
   - Don't put `hx-get` with `hx-push-url` on nav links.
 - **Handlers always return the full page:** no `HX-Request` branch, no `Vary`, no partial template.
 - **The body takes no `hx-sync`** when loading `scripts.Navigation`.
+- **Leave `view-transition-name` off `#main`** if fixed or positioned layers must interleave with its content.
+  The name creates a stacking context even outside transitions, so overlays can block links.
+  With the root name also off, boost crossfades nothing visible.
 - **Version reloads pair `server.VersionConfig` with `server.PageVersion`.**
   - Emit `server.VersionConfig(version)` on `<body>` and wrap page handlers with `PageVersion`.
   - A GET or HEAD carrying a different build version gets a full reload; requests without the header pass through.
@@ -177,8 +173,8 @@ The `htmx/boost` check rejects literal boost values, including string expression
   - Inline rules would need `'inline-speculation-rules'` in the CSP.
   - It also adds `@view-transition { navigation: auto; }`.
 - **Only `#main` animates**, and the root animation is off.
-  - `#main` carries `view-transition-name`, so persistent chrome doesn't flash.
-- **Page transitions take 120 ms**, and reduced motion turns them off.
+  - `#main` carries `view-transition-name` unless the stacking exception in [Navigation](#navigation) applies.
+- **Page transitions take 120 ms**, and reduced motion turns them off through `scripts.Navigation`, which checks each swap.
 - **Function never depends on animation.**
 - **Motion handles choreographed component animation**, such as a logo, menu or icons.
   - View transitions handle page-to-page changes; the two don't overlap.
@@ -314,6 +310,7 @@ mux.Handle(webapp.Path, app)
 
 **Set site overrides in `server.Site.CSP`, a `map[string][]string`.**
 Each entry replaces one base directive's sources or adds a directive outside the base.
+For a form POST that redirects off-origin, include the destination in the `form-action` override; Chromium checks redirects too.
 A nil map keeps the base; CSP cannot be disabled.
 Unknown directives and unsafe source tokens panic when `Handler` is built.
 Each source token must be non-empty visible ASCII without spaces, semicolons or commas.
