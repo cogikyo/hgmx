@@ -3,7 +3,10 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"go/constant"
 	"go/format"
+	"go/token"
+	"go/types"
 	"os"
 	"regexp"
 	"strings"
@@ -31,8 +34,8 @@ func (a *audit) templRules() error {
 		if err := a.overlayTempl(t, rel); err != nil {
 			return err
 		}
-		report := func(r parser.Range, msg string) {
-			a.report(finding{file: rel, line: int(r.From.Line) + 1, col: int(r.From.Col) + 1, rule: ruleInlineJS, msg: msg})
+		report := func(at parser.Range, r *rule, msg string) {
+			a.report(finding{file: rel, line: int(at.From.Line) + 1, col: int(at.From.Col) + 1, rule: r, msg: msg})
 		}
 		attr := func(key parser.AttributeKey) error {
 			k, ok := key.(parser.ConstantAttributeKey)
@@ -40,24 +43,38 @@ func (a *audit) templRules() error {
 				return nil
 			}
 			if msg := handlerAttr(k.Name); msg != "" {
-				report(k.NameRange, msg)
+				report(k.NameRange, ruleInlineJS, msg)
 			}
 			return nil
 		}
 		expr := func(e parser.Expression) error {
 			if rawScript.MatchString(e.Value) {
-				report(e.Range, "templ.Raw renders a <script> element")
+				report(e.Range, ruleInlineJS, "templ.Raw renders a <script> element")
 			}
 			return nil
 		}
 
+		boost := func(key parser.AttributeKey, value string) {
+			if k, ok := key.(parser.ConstantAttributeKey); ok && isBoost(k.Name) && value != "false" {
+				report(k.NameRange, ruleBoost, fmt.Sprintf("literal %s value", k.Name))
+			}
+		}
+
 		v := visitor.New()
-		v.ConstantAttribute = func(n *parser.ConstantAttribute) error { return attr(n.Key) }
+		v.ConstantAttribute = func(n *parser.ConstantAttribute) error {
+			boost(n.Key, n.Value)
+			return attr(n.Key)
+		}
 		v.BoolConstantAttribute = func(n *parser.BoolConstantAttribute) error { return attr(n.Key) }
-		v.ExpressionAttribute = func(n *parser.ExpressionAttribute) error { return attr(n.Key) }
+		v.ExpressionAttribute = func(n *parser.ExpressionAttribute) error {
+			if tv, err := types.Eval(token.NewFileSet(), nil, token.NoPos, n.Expression.Value); err == nil && tv.Value != nil && tv.Value.Kind() == constant.String {
+				boost(n.Key, constant.StringVal(tv.Value))
+			}
+			return attr(n.Key)
+		}
 		v.BoolExpressionAttribute = func(n *parser.BoolExpressionAttribute) error { return attr(n.Key) }
 		v.ScriptTemplate = func(n *parser.ScriptTemplate) error {
-			report(n.Range, fmt.Sprintf("script template %s", n.Name.Value))
+			report(n.Range, ruleInlineJS, fmt.Sprintf("script template %s", n.Name.Value))
 			return nil
 		}
 		v.GoCode = func(n *parser.GoCode) error { return expr(n.Expression) }
@@ -73,7 +90,7 @@ func (a *audit) templRules() error {
 		script := v.ScriptElement
 		v.ScriptElement = func(n *parser.ScriptElement) error {
 			if inlineScript(n) {
-				report(n.Range, "inline <script> body")
+				report(n.Range, ruleInlineJS, "inline <script> body")
 			}
 			return script(n)
 		}
@@ -95,6 +112,11 @@ func handlerAttr(name string) string {
 		return fmt.Sprintf("%s handler attribute", name)
 	}
 	return ""
+}
+
+func isBoost(name string) bool {
+	lower := strings.TrimPrefix(strings.ToLower(name), "data-")
+	return lower == "hx-boost" || strings.HasPrefix(lower, "hx-boost:")
 }
 
 func isLetters(s string) bool {

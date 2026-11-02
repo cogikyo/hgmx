@@ -1,0 +1,15 @@
+package views
+
+import "github.com/cogikyo/hgmx/scripts"
+
+templ Page(boost string) {
+	<body hx-boost:inherited="target:#main select:#main swap:'innerHTML strip show:top showTarget:body'">
+		<main hx-boost:inherited={ scripts.Boost }>
+			<a href="/report.pdf" hx-boost="false">report</a>
+			<a href="/export.csv" hx-boost={ "false" }>export</a>
+			<div data-hx-boost="true"></div>
+			<div hx-boost:inherited={ "target:#other" }></div>
+			<div hx-boost:inherited={ boost }></div>
+		</main>
+	</body>
+}

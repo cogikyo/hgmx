@@ -51,6 +51,9 @@ const (
 	Motion
 )
 
+// Boost is the hx-boost:inherited value for [Navigation].
+const Boost = "target:#main select:#main swap:'innerHTML strip show:top showTarget:body' transition:true"
+
 var files = [...]struct {
 	name string
 	data []byte

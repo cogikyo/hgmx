@@ -57,11 +57,11 @@ It relies on `scripts.Navigation`, described there.
 Every page route returns the full page, and htmx picks what to swap.
 This spelling was verified with htmx 4.0.0 in Chromium and Firefox; WebKit is untested.
 
-```html
+```templ
 <body
-  hx-boost:inherited="target:#main select:#main swap:'innerHTML strip show:top showTarget:body' transition:true"
+  hx-boost:inherited={ scripts.Boost }
   hx-select-oob:inherited="#nav-links:outerMorph"
-  hx-config:inherited='{"headers":{"HGMX-Version":"<rev>"}}'
+  hx-config:inherited={ server.VersionConfig(version) }
 >
   <nav id="nav">
     …
@@ -116,7 +116,7 @@ This spelling was verified with htmx 4.0.0 in Chromium and Firefox; WebKit is un
 - **Persistent elements outside `#main`** keep their DOM node and JS state across clicks, Back and Forward.
   - Examples are a nav controller, Motion state, or a background canvas.
 - **Validation and 404 pages use the full layout.** htmx 4 selects their `#main` as on success.
-  - Recovery serves the fixed `InternalError` page for a 500; it has no nav.
+  - Recovery serves fixed `InternalError` HTML for a 500; hgmx's default has no nav.
   - A boosted 500 leaves the previous page marked in the nav; this is accepted.
 - **Links to non-page responses** get `hx-boost="false"` or `download`; otherwise `#main` ends up empty.
   - These include feeds, PDFs, `/healthz`, downloads and pages without `#main`.
@@ -160,6 +160,12 @@ Preload requests never carry `HX-Request-Type`.
 **Fragments are a fallback** for a site that truly needs them: use explicit `hx-get` with `hx-preload`, branch on `HX-Target: main#main` with `Vary: HX-Target`.
 Never branch on `HX-Request-Type`; preload requests lack it, so the full page would land inside `#main`.
 
+### htmx: Boost
+
+**Use `hx-boost:inherited={ scripts.Boost }` with `scripts.Navigation`.**
+The shared value keeps navigation settings in step with hgmx.
+The `htmx/boost` check rejects literal boost values, including string expressions, except `"false"` to opt out.
+
 ## Prefetch and Transitions
 
 - **htmx sites load `scripts.Navigation`**, which includes htmx and hx-preload.
@@ -189,7 +195,7 @@ Never branch on `HX-Request-Type`; preload requests lack it, so the full page wo
 
 - **No inline scripts:** no inline modules, classic scripts, importmaps or `templ.Raw("<script>…")`.
   - Inline scripts rerun on every swap; external modules evaluate once and cache.
-  - CSP then needs only `script-src 'self'`, without nonces.
+  - hgmx's base CSP blocks inline JS.
   - Data scripts (`application/json`, `application/ld+json`) and `text/hyperscript` are allowed.
 - **Module JS is idempotent across swaps.**
   - Delegate events on `document`, or initialise from `htmx:after:process`.
@@ -251,7 +257,8 @@ templ Button(size Size, active bool, attrs templ.Attributes) {
 ```
 
 - **No safelist:** data-driven colours render from the value itself, as an SVG `fill` or a `style`.
-  - A `style` attribute also needs a CSP that allows inline styles.
+  - A `style` attribute needs a `Site.CSP` override: `"style-src-attr": {"'unsafe-inline'"}`.
+  - `theme.Explorer` emits no `style` attributes; its bundled JS sets the chrome colours, so it needs no override.
 - **No tailwind-merge.** Components expose typed variants instead of accepting override classes.
   - A caller's extra classes must not conflict with the component's own.
 - **`@layer components`** is only for single-element patterns or HTML you don't author.
@@ -280,18 +287,17 @@ mux.Handle(webapp.Path, app)
 - **`server.Site{Version, CSP, Allow, InternalError, Telemetry}.Handler(mux)` owns composition.**
   - Application routes run telemetry, recovery, `http.CrossOriginProtection`, then an unwrapped `*http.ServeMux`.
   - `/healthz` and the `/_v/` beacon bypass that application chain; the beacon mounts only when telemetry is enabled.
-  - Supply non-nil `Telemetry` and `InternalError`; use `telemetry.Disabled` to opt out of telemetry.
-- **`InternalError` is the panic (500) page, not the 404 page.** It renders fixed markup without calling failing templates.
+  - Supply non-nil `Telemetry`; use `telemetry.Disabled` to opt out of telemetry.
+- **`InternalError` is fixed panic-page HTML, not the 404 page.**
+  Empty uses hgmx's default; recovery never renders a template.
+  - It sends 500 with `no-store` and an accurate `Content-Length`, with no body for HEAD.
   - The application's mux owns its 404 page.
 - **Safe methods never mutate.** Cross-origin protection guards the application routes.
 - **Security headers cover every route**, including `/healthz` and the mounted `/_v/` beacon.
-  - `server.Site` sets the site's CSP, `nosniff`, referrer and permissions policies, and opener isolation.
+  - `server.Site` sets hgmx's base CSP with site overrides, `nosniff`, referrer and permissions policies, and opener isolation.
 - **`Site.Allow []string`** changes named default Permissions-Policy entries from `()` to `(self)`.
   - Unknown names panic when `Handler` is built.
   - Supported names are `accelerometer`, `browsing-topics`, `camera`, `geolocation`, `gyroscope`, `magnetometer`, `microphone`, `payment` and `usb`.
-- **CSP starts from `default-src 'none'`** and allows `script-src 'self'` for scripts.
-  - Sites using `webapp` add `manifest-src 'self'` and `img-src 'self'`; these were checked in Chromium.
-  - The telemetry beacon needs `script-src 'self'` and `connect-src 'self'`.
 - **Use `server.New` and `server.Run(ctx, srv, hooks...)`** for the server lifecycle.
   - `New` sets header and idle timeouts; read and write timeouts stay unset for uploads and streams.
   - `Run` drains for up to 5 seconds, then closes on drain failure and runs shutdown hooks.
@@ -304,6 +310,28 @@ mux.Handle(webapp.Path, app)
   - `Shutdown` logs dropped telemetry and returns nil if the final export fails or times out.
 - **`server.Site` serves `/healthz` as `ok <version>`** with `no-store`; set the build version via `-X main.version`.
 
+### CSP Literal
+
+**Set site overrides in `server.Site.CSP`, a `map[string][]string`.**
+Each entry replaces one base directive's sources or adds a directive outside the base.
+A nil map keeps the base; CSP cannot be disabled.
+Unknown directives and unsafe source tokens panic when `Handler` is built.
+Each source token must be non-empty visible ASCII without spaces, semicolons or commas.
+
+The base policy is:
+
+```http
+Content-Security-Policy: default-src 'none'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; manifest-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'
+```
+
+This includes the sources needed by `webapp` and hgmx's telemetry beacon.
+Cloudflare's automatically injected beacon reports to the site's own `/cdn-cgi/rum`, so `connect-src 'self'` covers it.
+This follows [Cloudflare's FAQ](https://developers.cloudflare.com/web-analytics/faq/#what-do-i-need-to-add-to-my-content-security-policy-csp); it has not been browser-verified here.
+
+**For one response, set `Content-Security-Policy` only with `server.CSP{…}.Header()`.**
+`Header()` serializes the base with those overrides and performs the same validation.
+The `csp-literal` check rejects direct header values that are not calls to `server.CSP.Header()`.
+
 ## Layout
 
 - **`main.go`** holds flags, wiring and the `migrate` dispatch; serving never migrates.
@@ -311,7 +339,7 @@ mux.Handle(webapp.Path, app)
 - **`routes/routes.go`** holds the URL table in `New(*store.Store, *views.Site) *http.ServeMux`.
   - Handlers in `routes/` parse input, call the store and render a full page.
 - **`store/`** holds `Store`, models and queries; `store/migrations/` holds `All []migrate.Step`.
-- **`views/`** owns embedded static files, the page shell and fixed error markup.
+- **`views/`** owns embedded static files and the page shell.
   - `views/pages/<name>/` holds templ and its view-model types, without HTTP handlers.
 - **`views/components/<name>/`** holds components copied from hgmx and the site's own.
 - **Add `middleware/`** when application routes need shared request handling.

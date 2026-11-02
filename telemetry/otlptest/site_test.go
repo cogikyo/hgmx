@@ -36,11 +36,7 @@ func TestSite(t *testing.T) {
 		io.WriteString(w, "partial")
 		panic("late")
 	})
-	fallback := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "fallback")
-	})
-	h := server.Site{Version: "v1", CSP: "default-src 'self'", InternalError: fallback, Telemetry: p}.Handler(mux)
+	h := server.Site{Version: "v1", InternalError: "fallback", Telemetry: p}.Handler(mux)
 
 	serve := func(r *http.Request) *httptest.ResponseRecorder {
 		w := httptest.NewRecorder()
@@ -56,7 +52,7 @@ func TestSite(t *testing.T) {
 	serve(httptest.NewRequest("GET", "/items/7", nil))
 	boom := serve(httptest.NewRequest("GET", "/boom", nil))
 	if boom.Code != 500 || boom.Body.String() != "fallback" || boom.Header().Get("Content-Security-Policy") == "" ||
-		boom.Header().Get("X-Content-Type-Options") != "nosniff" || boom.Header().Get("Cache-Control") != "" {
+		boom.Header().Get("X-Content-Type-Options") != "nosniff" || boom.Header().Get("Cache-Control") != "no-store" {
 		t.Errorf("panic: %d %q %v; want the fallback with security headers only", boom.Code, boom.Body, boom.Header())
 	}
 	serve(httptest.NewRequest("GET", "/late", nil))

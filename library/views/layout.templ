@@ -1,6 +1,7 @@
 package views
 
 import (
+	"github.com/cogikyo/hgmx/scripts"
 	"github.com/cogikyo/hgmx/server"
 
 	"github.com/cogikyo/hgmx/library/views/components/nav"
@@ -20,7 +21,7 @@ templ layout(s *Site, path, title string, content templ.Component) {
 			@templ.Raw(s.head)
 		</head>
 		<body
-			hx-boost:inherited="target:#main select:#main swap:'innerHTML strip show:top showTarget:body' transition:true"
+			hx-boost:inherited={ scripts.Boost }
 			hx-select-oob:inherited="#nav-links:outerMorph"
 			hx-config:inherited={ server.VersionConfig(s.Version) }
 		>

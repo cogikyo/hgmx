@@ -93,8 +93,18 @@ var (
 	}
 	ruleInlineJS = &rule{
 		"templ/no-inline-js",
-		"the CSP allows script-src 'self' only, so inline handlers and script bodies are blocked, and hx-on evaluates code",
+		"hgmx's base CSP blocks inline handlers and script bodies, and hx-on evaluates code",
 		"move the behaviour to hyperscript (_=) or a .js module served from static",
+	}
+	ruleCSP = &rule{
+		"csp-literal",
+		"hgmx sends a strict base Content-Security-Policy on every response, and a hand-written header drifts from it",
+		"set overrides in server.Site.CSP, or for one response use server.CSP{…}.Header()",
+	}
+	ruleBoost = &rule{
+		"htmx/boost",
+		"hgmx's navigation script expects one hx-boost value, and copied literals drift from it",
+		"write hx-boost:inherited={ scripts.Boost }",
 	}
 	ruleIgnore = &rule{
 		"hgmx/ignore",
@@ -108,7 +118,7 @@ var rules = []*rule{
 	ruleJustfile, ruleInternal, ruleGoVersion, ruleTemplVersion,
 	ruleDirection, ruleStoreOnly, ruleLiveModels,
 	ruleAutoMigrate, ruleGlobal, ruleSlogContext, ruleExit,
-	ruleInlineJS, ruleIgnore,
+	ruleCSP, ruleInlineJS, ruleBoost, ruleIgnore,
 }
 
 type finding struct {

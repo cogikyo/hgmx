@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"errors"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -180,7 +182,7 @@ func TestHandlerAccess(t *testing.T) {
 	var log bytes.Buffer
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /a/{id}", func(w http.ResponseWriter, r *http.Request) {})
-	h := Site{InternalError: http.NotFoundHandler(), Telemetry: telemetry.Disabled(slog.NewTextHandler(&log, nil))}.Handler(mux)
+	h := Site{Telemetry: telemetry.Disabled(slog.NewTextHandler(&log, nil))}.Handler(mux)
 	for _, tc := range []struct{ target, want string }{
 		{"//a/7", `pattern="GET /a/{id}" path=//a/7 status=307`},
 		{"/a/7", `pattern="GET /a/{id}" path=/a/7 status=200`},
@@ -189,6 +191,62 @@ func TestHandlerAccess(t *testing.T) {
 		h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", tc.target, nil))
 		if !strings.Contains(log.String(), tc.want) {
 			t.Errorf("GET %s access line %q, want %s", tc.target, log.String(), tc.want)
+		}
+	}
+}
+
+func TestCSP(t *testing.T) {
+	const base = "default-src 'none'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; manifest-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
+	for _, tc := range []struct {
+		name string
+		csp  CSP
+		want string
+	}{
+		{"base", nil, base},
+		{"replace", CSP{"form-action": {"'none'"}, "img-src": {"'self'", "https://media.example"}},
+			"default-src 'none'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; img-src 'self' https://media.example; font-src 'self'; connect-src 'self'; manifest-src 'self'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'"},
+		{"add", CSP{"style-src-attr": {"'unsafe-inline'"}, "frame-src": {"https://pay.example"}, "upgrade-insecure-requests": nil},
+			base + "; style-src-attr 'unsafe-inline'; frame-src https://pay.example; upgrade-insecure-requests"},
+		{"unknown", CSP{"script-scr": {"'self'"}}, "panic"},
+		{"injection", CSP{"img-src": {"'self'; script-src *"}}, "panic"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := func() (s string) {
+				defer func() {
+					if recover() != nil {
+						s = "panic"
+					}
+				}()
+				return tc.csp.Header()
+			}()
+			if got != tc.want {
+				t.Errorf("Header() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestInternalError(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "public, max-age=600")
+		w.Header().Set("ETag", `"v1"`)
+		panic("broken")
+	})
+	for _, page := range []string{"", "<p>custom</p>"} {
+		h := Site{InternalError: page, Telemetry: telemetry.Disabled(slog.DiscardHandler)}.Handler(mux)
+		want := cmp.Or(page, internalErrorPage)
+		for _, method := range []string{"GET", "HEAD"} {
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, httptest.NewRequest(method, "/", nil))
+			header := rec.Header()
+			if rec.Code != http.StatusInternalServerError || header.Get("Content-Type") != "text/html; charset=utf-8" ||
+				header.Get("Cache-Control") != "no-store" || header.Get("ETag") != "" || header.Get("Content-Length") != strconv.Itoa(len(want)) {
+				t.Errorf("%s %q: status %d, headers %v", method, page, rec.Code, header)
+			}
+			if body := rec.Body.String(); method == "GET" && body != want || method == "HEAD" && body != "" {
+				t.Errorf("%s %q: body %q", method, page, body)
+			}
 		}
 	}
 }

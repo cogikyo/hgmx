@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"go/ast"
+	"go/constant"
 	"go/token"
 	"go/types"
 	"path/filepath"
@@ -212,9 +213,33 @@ func (a *audit) typeRules(p *packages.Package) {
 				}
 				exitOK := d.Recv == nil && (d.Name.Name == "main" && p.Name == "main" || d.Name.Name == "TestMain" && test)
 				ast.Inspect(d.Body, func(n ast.Node) bool {
-					if call, ok := n.(*ast.CallExpr); ok {
-						if r, msg, fix := callRule(p, call, exitOK); r != nil {
-							report(call.Pos(), r, msg, fix)
+					switch n := n.(type) {
+					case *ast.CallExpr:
+						if r, msg, fix := callRule(p, n, exitOK); r != nil {
+							report(n.Pos(), r, msg, fix)
+						}
+					case *ast.AssignStmt:
+						for i, lhs := range n.Lhs {
+							ix, ok := lhs.(*ast.IndexExpr)
+							if !ok || !isNamed(p.TypesInfo.TypeOf(ix.X), "net/http", "Header") {
+								continue
+							}
+							var values []ast.Expr
+							if len(n.Rhs) == len(n.Lhs) {
+								values = elems(n.Rhs[i])
+							}
+							if cspLiteral(p, ix.Index, values...) {
+								report(lhs.Pos(), ruleCSP, types.ExprString(lhs)+" sets Content-Security-Policy", "")
+							}
+						}
+					case *ast.CompositeLit:
+						if !isNamed(p.TypesInfo.TypeOf(n), "net/http", "Header") {
+							break
+						}
+						for _, e := range n.Elts {
+							if kv, ok := e.(*ast.KeyValueExpr); ok && cspLiteral(p, kv.Key, elems(kv.Value)...) {
+								report(kv.Pos(), ruleCSP, "http.Header literal sets Content-Security-Policy", "")
+							}
 						}
 					}
 					return true
@@ -235,6 +260,10 @@ func callRule(p *packages.Package, call *ast.CallExpr, exitOK bool) (r *rule, ms
 		if name == "AutoMigrate" {
 			return ruleAutoMigrate, "AutoMigrate changes the schema outside a migration", ""
 		}
+	case "net/http":
+		if recv := fn.Signature().Recv(); (name == "Set" || name == "Add") && recv != nil && isNamed(recv.Type(), "net/http", "Header") && cspLiteral(p, call.Args[0], call.Args[1]) {
+			return ruleCSP, callee + " sets Content-Security-Policy", ""
+		}
 	case "os":
 		if name == "Exit" && !exitOK {
 			return ruleExit, "os.Exit outside main", ""
@@ -254,6 +283,34 @@ func callRule(p *packages.Package, call *ast.CallExpr, exitOK bool) (r *rule, ms
 		}
 	}
 	return nil, "", ""
+}
+
+func cspLiteral(p *packages.Package, key ast.Expr, values ...ast.Expr) bool {
+	v := p.TypesInfo.Types[key].Value
+	if v == nil || v.Kind() != constant.String || !strings.EqualFold(constant.StringVal(v), "Content-Security-Policy") {
+		return false
+	}
+	return len(values) == 0 || slices.ContainsFunc(values, func(e ast.Expr) bool { return !cspHeader(p, e) })
+}
+
+func elems(e ast.Expr) []ast.Expr {
+	if c, ok := ast.Unparen(e).(*ast.CompositeLit); ok {
+		return c.Elts
+	}
+	return nil
+}
+
+func cspHeader(p *packages.Package, e ast.Expr) bool {
+	call, ok := ast.Unparen(e).(*ast.CallExpr)
+	if !ok {
+		return false
+	}
+	fn, ok := typeutil.Callee(p.TypesInfo, call).(*types.Func)
+	if !ok || fn.Name() != "Header" {
+		return false
+	}
+	recv := fn.Signature().Recv()
+	return recv != nil && isNamed(recv.Type(), hgmxPath+"/server", "CSP")
 }
 
 func contextInScope(pkg *types.Package, pos token.Pos) string {

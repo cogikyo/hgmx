@@ -48,19 +48,3 @@ func New(c Config) (*Site, error) {
 func (s *Site) Page(path, title string, content templ.Component) templ.Component {
 	return layout(s, path, title, content)
 }
-
-const InternalError = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Internal Server Error</title>
-</head>
-<body>
-<main id="main">
-<h1>Internal Server Error</h1>
-<p>Something went wrong on our side. <a href="/">Go home</a>.</p>
-</main>
-</body>
-</html>
-`

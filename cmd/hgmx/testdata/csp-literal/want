@@ -1,0 +1,7 @@
+go.mod [hgmx-tool] missing tool github.com/cogikyo/hgmx/cmd/hgmx
+go.mod:7:1 [hgmx-latest] replace github.com/cogikyo/hgmx overrides the pinned hgmx version
+routes/routes.go:16:2 [csp-literal] w.Header().Set sets Content-Security-Policy
+routes/routes.go:18:2 [csp-literal] h.Add sets Content-Security-Policy
+routes/routes.go:19:2 [csp-literal] h[csp] sets Content-Security-Policy
+routes/routes.go:20:2 [csp-literal] h.Set sets Content-Security-Policy
+routes/routes.go:23:18 [csp-literal] http.Header literal sets Content-Security-Policy

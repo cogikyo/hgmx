@@ -1,13 +1,16 @@
 package server
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"maps"
 	"net/http"
 	"runtime/debug"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -72,6 +75,37 @@ func recovery(log *slog.Logger, fallback, h http.Handler) http.Handler {
 	})
 }
 
+const internalErrorPage = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Internal Server Error</title>
+</head>
+<body>
+<main id="main">
+<h1>Internal Server Error</h1>
+<p>Something went wrong on our side. <a href="/">Go home</a>.</p>
+</main>
+</body>
+</html>
+`
+
+func internalError(page string) http.Handler {
+	page = cmp.Or(page, internalErrorPage)
+	length := strconv.Itoa(len(page))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("Content-Type", "text/html; charset=utf-8")
+		h.Set("Cache-Control", "no-store")
+		h.Set("Content-Length", length)
+		w.WriteHeader(http.StatusInternalServerError)
+		if r.Method != http.MethodHead {
+			io.WriteString(w, page)
+		}
+	})
+}
+
 var headers = map[string]string{
 	"X-Content-Type-Options":     "nosniff",
 	"Referrer-Policy":            "same-origin",
@@ -80,8 +114,7 @@ var headers = map[string]string{
 
 var features = []string{"accelerometer", "browsing-topics", "camera", "geolocation", "gyroscope", "magnetometer", "microphone", "payment", "usb"}
 
-// security sets default headers that h may override; the caller owns the CSP.
-// An empty csp leaves Content-Security-Policy unset by this middleware.
+// security sets default headers that h may override.
 func security(csp string, allow []string, h http.Handler) http.Handler {
 	for _, name := range allow {
 		if !slices.Contains(features, name) {
@@ -99,9 +132,7 @@ func security(csp string, allow []string, h http.Handler) http.Handler {
 	permissions := strings.Join(policy, ", ")
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		header := w.Header()
-		if csp != "" {
-			header.Set("Content-Security-Policy", csp)
-		}
+		header.Set("Content-Security-Policy", csp)
 		for k, v := range headers {
 			header.Set(k, v)
 		}

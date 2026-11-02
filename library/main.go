@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -21,8 +20,6 @@ import (
 )
 
 var version = "dev"
-
-const csp = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "migrate" {
@@ -59,10 +56,8 @@ func run(p *telemetry.Pipeline, addr, dir string) error {
 	mux := routes.New(store.New(db), v)
 	// Site owns health, the beacon, and the application middleware chain.
 	h := server.Site{
-		Version:       version,
-		CSP:           csp,
-		InternalError: http.HandlerFunc(routes.InternalError),
-		Telemetry:     p,
+		Version:   version,
+		Telemetry: p,
 	}.Handler(mux)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

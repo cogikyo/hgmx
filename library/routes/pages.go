@@ -1,9 +1,7 @@
 package routes
 
 import (
-	"io"
 	"net/http"
-	"strconv"
 
 	"github.com/a-h/templ"
 	"github.com/cogikyo/hgmx/render"
@@ -26,15 +24,4 @@ func (p *pages) page(status int, title string, content templ.Component) http.Han
 		}
 		panic(err)
 	}))
-}
-
-func InternalError(w http.ResponseWriter, r *http.Request) {
-	h := w.Header()
-	h.Set("Content-Type", "text/html; charset=utf-8")
-	h.Set("Cache-Control", "no-store")
-	h.Set("Content-Length", strconv.Itoa(len(views.InternalError)))
-	w.WriteHeader(http.StatusInternalServerError)
-	if r.Method != http.MethodHead {
-		io.WriteString(w, views.InternalError)
-	}
 }

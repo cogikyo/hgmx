@@ -23,7 +23,7 @@ go build -o site .
 It requires `go.mod`, refuses to overwrite any scaffold target and pins templ to hgmx's compiled-in version.
 The scaffold serves Home, About and a full-page 404, with system-ui and OFL-licensed Iosevka fonts.
 `main` builds views with `views.New`, then passes the mux from `routes.New(store, views)` to `server.Site` and `server.Run`.
-`server.Site.InternalError` is the panic (500) page, not the application's 404 page.
+`server.Site` supplies the base CSP and a fixed panic (500) page; set `InternalError` to custom HTML or leave it empty for hgmx's default.
 The database pool is lazy: the scaffold serves without Postgres.
 Set `PGHOST`, `PGDATABASE` and `PGUSER` for the site's database and `OTEL_*` for telemetry export.
 Serving never migrates; use `migrate up`, `down [track]` or `status`.

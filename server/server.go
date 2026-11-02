@@ -21,11 +21,12 @@ const stopTimeout = 8 * time.Second
 // Site configures the root handler around an application mux.
 type Site struct {
 	Version string
-	CSP     string
+	CSP     CSP
 	// Allow grants (self) for named default Permissions-Policy features.
 	Allow []string
-	// InternalError serves the panic (500) page, not the 404 page.
-	InternalError http.Handler
+	// InternalError is fixed panic-page HTML; empty uses hgmx's default.
+	// Recovery serves it as 500 without rendering templates.
+	InternalError string
 	Telemetry     *telemetry.Pipeline
 }
 
@@ -33,12 +34,9 @@ type Site struct {
 // The mux type rejects outer wrappers that can hide r.Pattern from telemetry.
 // StripPrefix, nested muxes, and route wrappers can still coarsen http.route.
 // Security headers cover all routes; health and enabled beacons bypass mux.
-// It panics on nil InternalError or Telemetry, or unknown Allow names.
+// It panics on nil Telemetry, an invalid CSP, or unknown Allow names.
 // Use [telemetry.Disabled] to opt out of telemetry.
 func (s Site) Handler(mux *http.ServeMux) http.Handler {
-	if s.InternalError == nil {
-		panic("server: Site.InternalError is nil")
-	}
 	if s.Telemetry == nil {
 		panic("server: Site.Telemetry is nil; use telemetry.Disabled for a site without telemetry")
 	}
@@ -48,8 +46,8 @@ func (s Site) Handler(mux *http.ServeMux) http.Handler {
 	if b := p.Beacon(); b.Head() != "" {
 		root.Handle(telemetry.Path, b)
 	}
-	app := p.Handler(recovery(p.Logger(), s.InternalError, http.NewCrossOriginProtection().Handler(mux)))
-	return security(s.CSP, s.Allow, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	app := p.Handler(recovery(p.Logger(), internalError(s.InternalError), http.NewCrossOriginProtection().Handler(mux)))
+	return security(s.CSP.Header(), s.Allow, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if h, pattern := root.Handler(r); pattern != "" {
 			h.ServeHTTP(w, r)
 			return
