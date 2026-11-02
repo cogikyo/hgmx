@@ -34,6 +34,7 @@ type View struct {
 // View prepares [Explorer] using Default unless base or primary is present.
 // Invalid seed input sets Err; use v.Status() for the HTTP response status.
 // Action is the explorer page's URL, used for forms and preset links.
+// Explorer needs its bundled JS for chrome colours, not style-src-attr.
 func (h *Handler) View(action string, q url.Values, presets ...Preset) View {
 	v := View{Seed: Default, Action: action, Presets: presets, assets: h.explorer}
 	if q.Has("base") || q.Has("primary") {
@@ -79,14 +80,20 @@ func (v View) download(format string) string {
 	return Sheet(exportName, v.Seed) + "&download=" + format
 }
 
-func (v View) style() string {
+func (v View) colors() string {
 	primary := v.scale("primary")
-	return fmt.Sprintf(
-		"--tx-base:%s;--tx-fg:%s;--tx-muted:%s;--tx-line:%s;--tx-surface:%s;--tx-accent:%s;--tx-on-accent:%s;--tx-focus:%s;--tx-error:%s",
-		v.Seed.Base.Hex(), v.role("fg").Hex(), v.role("muted").Hex(),
-		v.role("line").Hex(), v.role("surface").Hex(), primary.Fill.Hex(),
-		primary.On.Hex(), v.scale("accent").Steps[palette.FillStep].Hex(), v.scale("error").Steps[7].Hex(),
-	)
+	b, _ := json.Marshal(map[string]string{
+		"--tx-base":      v.Seed.Base.Hex(),
+		"--tx-fg":        v.role("fg").Hex(),
+		"--tx-muted":     v.role("muted").Hex(),
+		"--tx-line":      v.role("line").Hex(),
+		"--tx-surface":   v.role("surface").Hex(),
+		"--tx-accent":    primary.Fill.Hex(),
+		"--tx-on-accent": primary.On.Hex(),
+		"--tx-focus":     v.scale("accent").Steps[palette.FillStep].Hex(),
+		"--tx-error":     v.scale("error").Steps[7].Hex(),
+	})
+	return string(b)
 }
 
 func (v View) scale(name string) palette.Scale {

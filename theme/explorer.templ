@@ -10,7 +10,7 @@ import (
 templ Explorer(v View) {
 	<link rel="stylesheet" href={ v.assets.css }/>
 	<script type="module" src={ v.assets.js }></script>
-	<section class="theme-explorer" style={ v.style() } aria-label="Palette explorer">
+	<section class="theme-explorer" aria-label="Palette explorer">
 		<form
 			class="tx-controls"
 			action={ templ.URL(v.Action) }
@@ -52,7 +52,7 @@ templ Explorer(v View) {
 			}
 		</form>
 		<div id="tx-results">
-			<div id="tx-view" class="tx-view">
+			<div id="tx-view" class="tx-view" data-tx-colors={ v.colors() }>
 				if v.Err != nil {
 					<p class="tx-error" role="alert">{ v.Err.Error() }</p>
 				}

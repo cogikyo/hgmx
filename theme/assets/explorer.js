@@ -228,6 +228,14 @@ function shade(scroller) {
 
 function init(root) {
   if (!(root instanceof Element || root instanceof Document)) return;
+  const palettes = [...root.querySelectorAll("[data-tx-colors]")];
+  if (root instanceof Element && root.matches("[data-tx-colors]")) palettes.push(root);
+  for (const palette of palettes) {
+    const explorer = palette.closest(".theme-explorer");
+    for (const [name, value] of Object.entries(JSON.parse(palette.dataset.txColors))) {
+      explorer.style.setProperty(name, value);
+    }
+  }
   for (const s of root.querySelectorAll(".tx-scroll")) {
     if (scrollers.has(s)) continue;
     scrollers.add(s);
