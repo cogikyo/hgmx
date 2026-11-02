@@ -86,7 +86,7 @@ func (p Palette) CSS(w io.Writer, selector string) error {
 // Load the output of [Palette.CSS] too; Theme does not define their values.
 func (p Palette) Theme(w io.Writer) error {
 	b := bufio.NewWriter(w)
-	b.WriteString("@theme inline {\n\t--color-*: initial;\n")
+	b.WriteString("@theme inline {\n\t--color-*: initial;\n\t--color-black: #000;\n\t--color-white: #fff;\n")
 	for _, t := range p.Tokens() {
 		fmt.Fprintf(b, "\t--color-%s: var(--%s);\n", t.Name, t.Name)
 	}

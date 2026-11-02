@@ -260,6 +260,8 @@
 
 @theme inline {
 	--color-*: initial;
+	--color-black: #000;
+	--color-white: #fff;
 	--color-base: var(--base);
 	--color-inset: var(--inset);
 	--color-surface: var(--surface);
