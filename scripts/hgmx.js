@@ -25,6 +25,10 @@
         Object.assign(headers, api.HCON.parse(api.attributeValue(elt, "hx-config")).headers);
       }
     },
+    htmx_before_swap: (elt, { ctx, tasks }) => {
+      if (!navigation(ctx.request) || !matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      for (const task of tasks) task.swapSpec.transition = false;
+    },
     htmx_after_swap: (elt, { ctx }) => {
       if (!navigation(ctx.request)) return;
       let main = document.querySelector("main");
