@@ -40,10 +40,20 @@ Run these from the site's module root; there is no justfile.
 | `go tool hgmx fmt`                  | Format Go and templ                                                 |
 | `go tool hgmx migrate …`            | Run the site's migration command through `go run .`                 |
 | `go tool hgmx update`               | Update hgmx to master and tidy; re-vendor if present                |
-| `go tool hgmx check`                | Check generation, rules and formatting; then vet, build and test    |
+| `go tool hgmx credentials`          | Build the site and write `credentials.json`                         |
+| `go tool hgmx credentials check …`  | Test SMTP and Google client authentication                          |
+| `go tool hgmx check`                | Check generated files, credentials, rules, format, vet, build, test |
 
 Generation and formatting use templ in-process; the site's templ version must match hgmx's.
 `check` compares generated output to the tree without writing.
+Its `credentials` stage fails if the site-root `credentials.json` is missing or differs from the site's declarations and registered flags, including formatting differences.
+Declare secrets in a site-owned `credential.Registry`, read through its handles, then run `go tool hgmx credentials` and commit the file with the code, even for sites with no secrets.
+See [credential wiring](CONVENTIONS.md#hgmx-credentials) for the early command dispatch.
+
+`go tool hgmx credentials check [name...] [-- site flags...]` requires a current manifest and checks the named SMTP/Google credentials, or all declared SMTP/Google targets when no names are given.
+It never prints secrets; SMTP sends no mail, and the Google probe does not test browser sign-in.
+Ordinary `check` does not run these live provider checks.
+
 Database tests use `pgtest.Open(t)`; put `initdb` and `pg_ctl` on PATH.
 Missing executables or a socket bind failure skip the test unless `HGMX_PGTEST=require`; other startup failures fail.
 

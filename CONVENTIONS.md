@@ -508,7 +508,9 @@ The `hgmx-skills` rule in `go tool hgmx check` fails on missing, stale, edited o
 | `go tool hgmx dev [-- site flags…]` | Watch templ and CSS, restarting `go run . -static views/static`             |
 | `go tool hgmx fmt`                  | Format Go and templ files                                                   |
 | `go tool hgmx migrate …`            | Run `go run . migrate …` for development                                    |
-| `go tool hgmx check`                | Check generation, rules and formatting; then vet, build and test            |
+| `go tool hgmx credentials`          | Build the site and write `credentials.json`                                 |
+| `go tool hgmx credentials check …`  | Test SMTP and Google client authentication                                  |
+| `go tool hgmx check`                | Check generated files, credentials, rules, format, vet, build, test         |
 
 `init` refuses if any scaffold target already exists and pins the site's templ requirement to hgmx's.
 It rewrites site imports and regenerates templ Go files for the site's module path.
@@ -517,6 +519,28 @@ Tailwind generation uses `tailwindcss` from PATH when `views/static/css/main.css
 It stops at the first failed stage and never writes formatted files.
 For package loading and Go commands, `check` sets `GOWORK=off` and passes `-mod=vendor` when `vendor/` exists or `-mod=readonly` otherwise, overriding `GOFLAGS`.
 `dev` and `migrate` keep the caller's workspace settings.
+
+### hgmx: Credentials
+
+**Declare credentials unconditionally in a site-owned `credential.Registry`.**
+Use `Feature(name, condition)` for requirements that follow runtime flags or env, or `credential.Always` for unconditional requirements.
+Keep those conditions consistent with the site's runtime branches; Go serializes them for Nix without evaluating them.
+`Declare(definition, requirement, shared)` copies the metadata and returns a handle; read values through `handle.Read()`.
+Use `"site"` for site-local secrets or a shared label such as `"smtp"`.
+
+Register server flags before dispatching the site's `credentials` subcommand to `credential.Command`, before opening databases, queues or telemetry.
+Pass that same FlagSet and a `credential.Checks` map keyed by each SMTP/Google handle's `Name()`, with callbacks using the site's provider settings.
+The scaffold includes the dispatch and an empty registry for sites with no secrets.
+
+Run **`go tool hgmx credentials`** after changing declarations or registered flags, then commit the site-root `credentials.json` with the code, even for zero-secret sites.
+It builds the site and exports metadata without secret values; cogictl uses the file to select deployment secrets.
+The `credentials` stage of `go tool hgmx check` compares that output byte-for-byte without writing; a missing file or any difference, including formatting, fails.
+Invalid declarations, unknown referenced flags and site build failures also fail the stage.
+
+Use `go tool hgmx credentials check [name...] [-- site flags...]` for live SMTP/Google client checks with a current manifest.
+With no names, it checks all declared SMTP/Google targets; missing values or settings fail instead of skipping them.
+It never prints secrets; SMTP sends no mail, and Google success verifies token-endpoint client authentication, not browser sign-in.
+Ordinary `go tool hgmx check` does not run live provider checks.
 
 ## Env
 
@@ -532,11 +556,12 @@ For package loading and Go commands, `check` sets `GOWORK=off` and passes `-mod=
 - **`HGMX_TRUSTED_PROXY`** is the proxy allowed to supply `CF-Connecting-IP`: an IP or CIDR; invalid values stop startup.
   - `clientip.From` reads it once at startup; auth's per-IP limits use that address.
   - When unset, the connection's peer address is used instead.
-- **`HGMX_AUTH_KEY`** is read by `credential.Read("auth-key")` when the credential file is missing.
+- **`HGMX_AUTH_KEY`** is the fallback for a handle declared from `auth.KeyCredential`.
   - `$CREDENTIALS_DIRECTORY/auth-key` takes priority; use a per-site key of at least 32 bytes.
-- **`smtp-password`** is the mail credential, read with `credential.Read("smtp-password")`.
+- **`smtp-password`** is read through a handle declared from `mail.PasswordCredential`.
   - `$CREDENTIALS_DIRECTORY/smtp-password` takes priority; if missing, `HGMX_SMTP_PASSWORD` is read instead.
-- **`google-client-secret`** is read by `auth.New` with `credential.Read("google-client-secret")` when `Config.Google` is set.
+- **`google-client-secret`** is read through a handle declared from `auth.GoogleCredential` and passed to `auth.Google.ClientSecret`.
+  - `auth.New` requires both `ClientID` and `ClientSecret` when `Config.Google` is set; it does not read credentials.
   - `$CREDENTIALS_DIRECTORY/google-client-secret` takes priority; if missing, `HGMX_GOOGLE_CLIENT_SECRET` is read instead.
 - **`HGMX_SMTP_HOST`, `HGMX_SMTP_USER`, `HGMX_SMTP_FROM`** configure the site's `mail.SMTP` sender.
   - Use port 465, the default; `mail.SMTP` uses implicit TLS, not STARTTLS.

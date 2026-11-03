@@ -5,7 +5,7 @@
 // # Site wiring
 //
 // Run [Track] before the site's migration track, never at server startup.
-// Read the site's auth-key with credential.Read("auth-key").
+// Read the site's auth-key through a handle declared from [KeyCredential].
 // Its fallback is HGMX_AUTH_KEY; the key needs at least 32 bytes.
 // Start queue with mail.NewQueue and pass queue.Close to server.Run's after hooks.
 // Keep gorm in store/ by adding Store methods:
@@ -111,7 +111,6 @@ import (
 	"github.com/go-webauthn/webauthn/webauthn"
 	"gorm.io/gorm"
 
-	"github.com/cogikyo/hgmx/credential"
 	"github.com/cogikyo/hgmx/mail"
 	"github.com/cogikyo/hgmx/pg"
 	"github.com/cogikyo/hgmx/static"
@@ -138,7 +137,6 @@ type Config struct {
 	// Key is the HMAC key for codes and links, at least 32 bytes.
 	Key []byte
 	// Google enables Google sign-in when non-nil.
-	// New then requires the google-client-secret credential.
 	Google *Google
 	// Hosts must share a registrable domain or use localhost names.
 	// A single loopback IP is also allowed; at least one host is required.
@@ -191,6 +189,7 @@ var passkeyJS []byte
 func Anyone(*http.Request, User) bool { return true }
 
 // New checks c and prepares handlers; it does not migrate the database.
+// A non-nil c.Google needs both ClientID and ClientSecret supplied by the site.
 // A nil q is allowed only when every host is Operator and disables mail notices.
 // The caller owns q and must close it on shutdown.
 func New(db *gorm.DB, q *mail.Queue, c Config) (*Auth, error) {
@@ -227,11 +226,7 @@ func New(db *gorm.DB, q *mail.Queue, c Config) (*Auth, error) {
 	script, _ := assets.URL("passkey.js")
 	var google *provider
 	if c.Google != nil {
-		secret, err := credential.Read("google-client-secret")
-		if err != nil {
-			return nil, fmt.Errorf("auth: Config.Google: %w", err)
-		}
-		google = newProvider(googleKind, googleIssuer, c.Google.ClientID, secret)
+		google = newProvider(googleKind, googleIssuer, c.Google.ClientID, c.Google.ClientSecret)
 	}
 	return &Auth{
 		db:      db,
@@ -255,8 +250,8 @@ func (c Config) check() (map[string]*host, string, error) {
 	if len(c.Key) < 32 {
 		return nil, "", errors.New("auth: Config.Key must be at least 32 bytes")
 	}
-	if c.Google != nil && c.Google.ClientID == "" {
-		return nil, "", errors.New("auth: Config.Google needs a ClientID")
+	if c.Google != nil && (c.Google.ClientID == "" || c.Google.ClientSecret == "") {
+		return nil, "", errors.New("auth: Config.Google needs a ClientID and ClientSecret")
 	}
 	return parseHosts(c.Hosts)
 }

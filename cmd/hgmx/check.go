@@ -39,6 +39,7 @@ func checkCmd() (code int) {
 			}
 			return nil
 		}},
+		{"credentials", func() error { return s.checkCredentials(ctx) }},
 		{"rules", func() error {
 			findings, err := runRules(s)
 			if err != nil {

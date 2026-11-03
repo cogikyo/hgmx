@@ -19,7 +19,8 @@ import (
 
 // Google configures sign-in with Google.
 type Google struct {
-	ClientID string // OAuth 2.0 client ID for a Google web application.
+	ClientID     string // OAuth 2.0 client ID for a Google web application.
+	ClientSecret string // Required; supplied by the site.
 }
 
 const (

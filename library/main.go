@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/cogikyo/hgmx/credential"
 	"github.com/cogikyo/hgmx/migrate"
 	"github.com/cogikyo/hgmx/pg"
 	"github.com/cogikyo/hgmx/server"
@@ -21,13 +22,19 @@ import (
 
 var version = "dev"
 
-func main() {
-	if len(os.Args) > 1 && os.Args[1] == "migrate" {
-		os.Exit(migrateMain(os.Args[2:]))
-	}
+var secrets credential.Registry
 
+func main() {
 	addr := flag.String("addr", "127.0.0.1:8080", "listen address")
 	dir := flag.String("static", "", "serve /static/ from this directory instead of the embedded files")
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "migrate":
+			os.Exit(migrateMain(os.Args[2:]))
+		case "credentials":
+			os.Exit(credential.Command(context.Background(), &secrets, flag.CommandLine, os.Args[2:], nil, os.Stdout))
+		}
+	}
 	flag.Parse()
 
 	p, err := telemetry.FromEnv(slog.NewTextHandler(os.Stderr, nil))

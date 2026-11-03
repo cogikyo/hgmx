@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -17,6 +18,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/cogikyo/hgmx/credential"
 )
 
 // SMTP delivers mail over implicit TLS, not STARTTLS.
@@ -42,30 +45,11 @@ func (s SMTP) Send(ctx context.Context, m Message) error {
 	if err != nil {
 		return err
 	}
-	port := s.Port
-	if port == 0 {
-		port = 465
-	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	dialer := tls.Dialer{
-		NetDialer: &net.Dialer{Timeout: 10 * time.Second},
-		Config:    &tls.Config{ServerName: s.Host, MinVersion: tls.VersionTLS12},
-	}
-	conn, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(s.Host, strconv.Itoa(port)))
+	client, err := s.dial(ctx)
 	if err != nil {
-		return fmt.Errorf("mail: SMTP connect: %w", err)
-	}
-	defer conn.Close()
-	stop := context.AfterFunc(ctx, func() { conn.Close() })
-	defer stop()
-	deadline, _ := ctx.Deadline()
-	if err := conn.SetDeadline(deadline); err != nil {
-		return fmt.Errorf("mail: SMTP deadline: %w", err)
-	}
-	client, err := smtp.NewClient(conn, s.Host)
-	if err != nil {
-		return fmt.Errorf("mail: SMTP greeting: %w", err)
+		return err
 	}
 	defer client.Close()
 	if err := client.Auth(smtp.PlainAuth("", s.User, s.Password, s.Host)); err != nil {
@@ -91,6 +75,71 @@ func (s SMTP) Send(ctx context.Context, m Message) error {
 		return fmt.Errorf("mail: SMTP quit: %w", err)
 	}
 	return nil
+}
+
+// Check authenticates without sending mail; it does not verify delivery.
+func (s SMTP) Check(ctx context.Context) error {
+	if s.Host == "" || s.User == "" || s.Password == "" {
+		return &credential.Failure{Reason: "SMTP host, user and password must all be set"}
+	}
+	if _, err := stdmail.ParseAddress(s.From); err != nil {
+		return &credential.Failure{Reason: "SMTP from address is invalid"}
+	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	client, err := s.dial(ctx)
+	var cert *tls.CertificateVerificationError
+	var timeout net.Error
+	switch {
+	case errors.As(err, &cert):
+		return &credential.Failure{Reason: "SMTP server certificate not trusted for " + s.Host}
+	case errors.As(err, &timeout) && timeout.Timeout():
+		return &credential.Failure{Reason: "SMTP connection timed out"}
+	case err != nil:
+		return &credential.Failure{Reason: "SMTP connection failed"}
+	}
+	defer client.Close()
+	if ok, _ := client.Extension("AUTH"); !ok {
+		return &credential.Failure{Reason: "SMTP server offers no AUTH"}
+	}
+	if err := client.Auth(smtp.PlainAuth("", s.User, s.Password, s.Host)); err != nil {
+		var reply *textproto.Error
+		if errors.As(err, &reply) {
+			return &credential.Failure{Reason: "SMTP authentication rejected", Code: reply.Code}
+		}
+		return &credential.Failure{Reason: "SMTP authentication failed"}
+	}
+	if err := client.Quit(); err != nil {
+		return &credential.Failure{Reason: "SMTP quit failed after authentication"}
+	}
+	return nil
+}
+
+func (s SMTP) dial(ctx context.Context) (*smtp.Client, error) {
+	port := s.Port
+	if port == 0 {
+		port = 465
+	}
+	dialer := tls.Dialer{
+		NetDialer: &net.Dialer{Timeout: 10 * time.Second},
+		Config:    &tls.Config{ServerName: s.Host, MinVersion: tls.VersionTLS12},
+	}
+	conn, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(s.Host, strconv.Itoa(port)))
+	if err != nil {
+		return nil, fmt.Errorf("mail: SMTP connect: %w", err)
+	}
+	context.AfterFunc(ctx, func() { conn.Close() })
+	deadline, _ := ctx.Deadline()
+	if err := conn.SetDeadline(deadline); err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("mail: SMTP deadline: %w", err)
+	}
+	client, err := smtp.NewClient(conn, s.Host)
+	if err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("mail: SMTP greeting: %w", err)
+	}
+	return client, nil
 }
 
 func message(from, to *stdmail.Address, m Message) ([]byte, error) {

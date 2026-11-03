@@ -37,6 +37,8 @@ func init() {
 	rootCmd.AddCommand(updateCobraCmd)
 	rootCmd.AddCommand(skillsCobraCmd)
 	rootCmd.AddCommand(migrateCobraCmd)
+	rootCmd.AddCommand(credentialsCobraCmd)
+	credentialsCobraCmd.AddCommand(credentialsCheckCobraCmd)
 	paletteCobraCmd.Flags().StringVarP(&paletteFormat, "format", "f", "tailwind", "Output format [tailwind, css, lua]")
 	paletteCobraCmd.Flags().StringVarP(&paletteOut, "out", "o", "", "Write to this file instead of stdout")
 }
@@ -69,7 +71,7 @@ var devCobraCmd = &cobra.Command{
 
 var checkCobraCmd = &cobra.Command{
 	Use:   "check",
-	Short: "Runs the generation check, site rules, format check, vet, build and tests",
+	Short: "Runs the generation and credentials checks, site rules, format check, vet, build and tests",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		os.Exit(checkCmd())
@@ -82,6 +84,27 @@ var migrateCobraCmd = &cobra.Command{
 	DisableFlagParsing: true,
 	Run: func(cmd *cobra.Command, args []string) {
 		os.Exit(migrateCmd(args))
+	},
+}
+
+var credentialsCobraCmd = &cobra.Command{
+	Use:   "credentials",
+	Short: "Writes credentials.json from the site's credential declarations",
+	Args:  cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		os.Exit(credentialsCmd())
+	},
+}
+
+var credentialsCheckCobraCmd = &cobra.Command{
+	Use:   "check [name...] [-- site flags...]",
+	Short: "Tests the site's SMTP and Google credentials without printing them",
+	Run: func(cmd *cobra.Command, args []string) {
+		names, flags := args, []string(nil)
+		if i := cmd.ArgsLenAtDash(); i >= 0 {
+			names, flags = args[:i], args[i:]
+		}
+		os.Exit(credentialsCheckCmd(names, flags))
 	},
 }
 
