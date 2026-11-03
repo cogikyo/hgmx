@@ -42,25 +42,29 @@
 // [Invite] also accepts emailed codes and links, but only for existing users.
 // [Open] creates a user on their first verified code or link and allows account deletion.
 // Pass a non-nil mail queue in Invite and Open modes.
+// Config.Google adds Google sign-in in every mode.
+// Register Config.Origin + "/auth/google/callback" with Google.
+// Signed-in users can link Google; Open mode can create Google-only users.
+// Google's email never becomes the user's email.
 //
 // In the site's CLI, call st.AuthCommand(ctx, cfg, args, out).
 // Pass the arguments after "auth"; [Command] does not need Config.Layout.
 // "auth link <email|username>" prints a 30-minute sign-in link; an unknown email creates a user.
-// "auth reset <email|username>" also removes passkeys and sessions and invalidates codes.
+// "auth reset <email|username>" also removes passkeys, linked Google accounts and sessions and invalidates codes.
 // Treat the printed link as a secret; reset also invalidates outstanding links.
 //
 // # Usernames and email
 //
 // Usernames default to email; older accounts get one at their next sign-in.
 // A username contains @ only when it equals the user's own email, ignoring case.
-// Browser sign-in uses email; operator commands also accept usernames.
+// Operator commands accept usernames even for users without an email.
 // Email changes need a mail queue and a link sent to the new address.
 // The change revokes codes and links for both addresses and notifies the old one.
 //
 // # Styling and browser support
 //
 // Auth ships no CSS; the site styles these hooks:
-//   - .auth[data-auth]: page roots (signin, code, link, email, account or forbidden).
+//   - .auth[data-auth]: page roots (signin, code, link, email, account, continue or forbidden).
 //   - .auth-field: field labels, including the delete confirmation.
 //   - .auth-primary, .auth-secondary and .auth-danger: action buttons.
 //   - .auth-note: supporting text; .auth-problem: error messages.
@@ -78,6 +82,7 @@ import (
 	"context"
 	_ "embed"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -90,6 +95,7 @@ import (
 	"github.com/go-webauthn/webauthn/webauthn"
 	"gorm.io/gorm"
 
+	"github.com/cogikyo/hgmx/credential"
 	"github.com/cogikyo/hgmx/mail"
 	"github.com/cogikyo/hgmx/pg"
 	"github.com/cogikyo/hgmx/static"
@@ -122,6 +128,9 @@ type Config struct {
 	Key []byte
 	// Layout wraps auth's pages in the site's document.
 	Layout func(r *http.Request, title string, body templ.Component) templ.Component
+	// Google enables Google sign-in when non-nil.
+	// New then requires the google-client-secret credential.
+	Google *Google
 }
 
 // User is a signed-in account.
@@ -145,6 +154,7 @@ type Auth struct {
 	verifies *limiter
 	begins   *limiter
 	library  string
+	google   *provider
 }
 
 const (
@@ -199,6 +209,14 @@ func New(db *gorm.DB, q *mail.Queue, c Config) (*Auth, error) {
 	}
 	assets := static.Map(assetsPath, map[string][]byte{"passkey.js": passkeyJS})
 	script, _ := assets.URL("passkey.js")
+	var google *provider
+	if c.Google != nil {
+		secret, err := credential.Read("google-client-secret")
+		if err != nil {
+			return nil, fmt.Errorf("auth: Config.Google: %w", err)
+		}
+		google = newProvider(googleKind, googleIssuer, c.Google.ClientID, secret, origin.String()+googleCallback)
+	}
 	return &Auth{
 		db:       db,
 		mail:     q,
@@ -211,6 +229,7 @@ func New(db *gorm.DB, q *mail.Queue, c Config) (*Auth, error) {
 		verifies: newLimiter(20, time.Hour),
 		begins:   newLimiter(30, 10*time.Minute),
 		library:  library(),
+		google:   google,
 	}, nil
 }
 
@@ -228,6 +247,9 @@ func (c Config) check() (*url.URL, error) {
 	}
 	if c.Mode < Operator || c.Mode > Open {
 		return nil, errors.New("auth: Config.Mode must be Operator, Invite or Open")
+	}
+	if c.Google != nil && c.Google.ClientID == "" {
+		return nil, errors.New("auth: Config.Google needs a ClientID")
 	}
 	return &url.URL{Scheme: u.Scheme, Host: u.Host}, nil
 }
@@ -283,6 +305,12 @@ func (a *Auth) Mount(mux *http.ServeMux) {
 	}
 	if a.c.Mode == Open {
 		mux.HandleFunc("POST /auth/account/delete", a.deleteAccount)
+	}
+	if a.google != nil {
+		mux.HandleFunc("POST /auth/google", a.googleSignin)
+		mux.HandleFunc("GET "+googleCallback, a.googleCallback)
+		mux.HandleFunc("POST /auth/account/google", a.googleLink)
+		mux.HandleFunc("POST /auth/account/google/remove", a.googleUnlink)
 	}
 }
 

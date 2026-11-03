@@ -43,6 +43,7 @@ type code struct {
 	Expires   time.Time
 	Consumed  *time.Time
 	SessionID *pg.ID
+	UserID    *pg.ID
 }
 
 func (code) TableName() string { return "auth_codes" }
@@ -57,18 +58,25 @@ func mailSecret(key []byte, id pg.ID, email string) string {
 	return base64.RawURLEncoding.EncodeToString(mac(key, id, "mail", email, ""))
 }
 
-func subject(email string, session *pg.ID) string {
-	if session == nil {
-		return email
+func (c code) subject() string {
+	s := c.Email
+	for _, id := range []*pg.ID{c.SessionID, c.UserID} {
+		if id != nil {
+			s += "\x00" + id.String()
+		}
 	}
-	return email + "\x00" + session.String()
+	return s
 }
 
-func newCode(tx *gorm.DB, key []byte, email, purpose, secret string, life time.Duration, session *pg.ID) (pg.ID, error) {
+func newCode(tx *gorm.DB, key []byte, email, purpose, secret string, life time.Duration, session, user *pg.ID) (pg.ID, error) {
 	now := time.Now()
-	id := pg.NewID()
-	c := code{ID: id, Email: email, Purpose: purpose, Mac: mac(key, id, purpose, subject(email, session), secret), Created: now, Expires: now.Add(life), SessionID: session}
-	return id, tx.Create(&c).Error
+	c := code{ID: pg.NewID(), Email: email, Purpose: purpose, Created: now, Expires: now.Add(life), SessionID: session, UserID: user}
+	c.Mac = mac(key, c.ID, purpose, c.subject(), secret)
+	return c.ID, tx.Create(&c).Error
+}
+
+func revokeCodes(tx *gorm.DB, u User) error {
+	return tx.Exec("UPDATE auth_codes SET consumed = ? WHERE (user_id = ? OR email = ? AND email <> '') AND consumed IS NULL", time.Now(), u.ID, u.Email).Error
 }
 
 func throttled(tx *gorm.DB, email string) (bool, error) {
@@ -112,7 +120,7 @@ func (a *Auth) issueCode(ctx context.Context, email string) (sent, error) {
 		s.code = fmt.Sprintf("%06d", d.Int64())
 		s.deliver = s.known || a.c.Mode == Open
 		// Undelivered codes keep unknown addresses on the same rate-accounting path.
-		id, err := newCode(tx, a.c.Key, email, signin, s.code, codeLife, nil)
+		id, err := newCode(tx, a.c.Key, email, signin, s.code, codeLife, nil, nil)
 		s.link = id.String() + "." + mailSecret(a.c.Key, id, email)
 		return err
 	})
@@ -127,6 +135,8 @@ const (
 	stale
 	exhausted
 	taken
+	unknown
+	linked
 )
 
 type verified struct {
@@ -137,23 +147,28 @@ type verified struct {
 }
 
 func enter(tx *gorm.DB, r *http.Request, email string, create bool) (verified, error) {
-	v := verified{verdict: stale}
 	u, err := findUser(tx, email)
 	if errors.Is(err, pg.ErrNotFound) && create {
 		u, err = createUser(tx, email)
 	}
 	if errors.Is(err, pg.ErrNotFound) {
-		return v, nil
+		return verified{verdict: stale}, nil
 	}
 	if err != nil {
-		return v, err
+		return verified{verdict: stale}, err
 	}
+	return admit(tx, r, u)
+}
+
+func admit(tx *gorm.DB, r *http.Request, u User) (verified, error) {
+	v := verified{verdict: stale}
 	if err := claim(tx, "id", u.ID); err != nil {
 		return v, err
 	}
 	if err := tx.Raw("SELECT EXISTS (SELECT 1 FROM auth_passkeys WHERE user_id = ?)", u.ID).Scan(&v.passkeys).Error; err != nil {
 		return v, err
 	}
+	var err error
 	v.token, err = startSession(tx, r, u.ID)
 	v.verdict, v.user = accepted, u
 	return v, err
@@ -218,30 +233,34 @@ func issueLink(ctx context.Context, db *gorm.DB, key []byte, email string, want 
 			return err
 		}
 		var err error
-		u, err = findUser(tx, email)
-		if want != nil && (errors.Is(err, pg.ErrNotFound) || err == nil && u.ID != *want) {
-			return errMoved
-		}
-		if errors.Is(err, pg.ErrNotFound) {
-			u, err = createUser(tx, email)
+		if want != nil {
+			u, err = hold(tx, *want)
+			if errors.Is(err, pg.ErrNotFound) || err == nil && u.Email != email {
+				return errMoved
+			}
+		} else {
+			u, err = findUser(tx, email)
+			if errors.Is(err, pg.ErrNotFound) {
+				u, err = createUser(tx, email)
+			}
+			if err == nil {
+				u, err = hold(tx, u.ID)
+			}
 		}
 		if err != nil {
 			return err
 		}
 		if reset {
-			if _, err := hold(tx, u.ID); err != nil {
-				return err
-			}
-			for _, q := range []string{"DELETE FROM auth_passkeys WHERE user_id = ?", "DELETE FROM auth_sessions WHERE user_id = ?", "DELETE FROM auth_ceremonies WHERE user_id = ?"} {
+			for _, q := range []string{"DELETE FROM auth_passkeys WHERE user_id = ?", "DELETE FROM auth_sessions WHERE user_id = ?", "DELETE FROM auth_ceremonies WHERE user_id = ?", "DELETE FROM auth_identities WHERE user_id = ?"} {
 				if err := tx.Exec(q, u.ID).Error; err != nil {
 					return err
 				}
 			}
-			if err := tx.Exec("UPDATE auth_codes SET consumed = ? WHERE email = ? AND consumed IS NULL", time.Now(), email).Error; err != nil {
+			if err := revokeCodes(tx, u); err != nil {
 				return err
 			}
 		}
-		id, err = newCode(tx, key, email, link, secret, linkLife, nil)
+		id, err = newCode(tx, key, u.Email, link, secret, linkLife, nil, &u.ID)
 		return err
 	})
 	return id.String() + "." + secret, u, err
@@ -268,7 +287,7 @@ func (a *Auth) spend(tx *gorm.DB, id pg.ID, secret string) (code, bool, error) {
 	if c.Purpose == signin {
 		valid = a.c.Mode.codes() && hmac.Equal([]byte(secret), []byte(mailSecret(a.c.Key, c.ID, c.Email)))
 	} else {
-		valid = hmac.Equal(c.Mac, mac(a.c.Key, c.ID, c.Purpose, subject(c.Email, c.SessionID), secret))
+		valid = hmac.Equal(c.Mac, mac(a.c.Key, c.ID, c.Purpose, c.subject(), secret))
 	}
 	now := time.Now()
 	if !valid || c.Consumed != nil || !now.Before(c.Expires) {
@@ -285,21 +304,38 @@ func (a *Auth) redeem(ctx context.Context, r *http.Request, raw string) (verifie
 	}
 	db := a.db.WithContext(ctx)
 	var c code
-	if err := db.Raw("SELECT email, purpose FROM auth_codes WHERE id = ?", id).Scan(&c).Error; err != nil || c.Email == "" || c.Purpose == verify {
+	if err := db.Raw("SELECT email, purpose, user_id FROM auth_codes WHERE id = ?", id).Scan(&c).Error; err != nil {
 		return v, false, err
 	}
 	mailed := c.Purpose == signin
+	if !mailed && (c.Purpose != link || c.UserID == nil) {
+		return v, false, nil
+	}
 	err := db.Transaction(func(tx *gorm.DB) error {
 		if err := lock(tx, c.Email); err != nil {
 			return err
+		}
+		var u User
+		if !mailed {
+			var err error
+			if u, err = hold(tx, *c.UserID); err != nil {
+				return err
+			}
 		}
 		c, ok, err := a.spend(tx, id, secret)
 		if err != nil || !ok {
 			return err
 		}
-		v, err = enter(tx, r, c.Email, mailed && a.c.Mode == Open)
+		if mailed {
+			v, err = enter(tx, r, c.Email, a.c.Mode == Open)
+		} else {
+			v, err = admit(tx, r, u)
+		}
 		return err
 	})
+	if errors.Is(err, pg.ErrNotFound) {
+		return verified{verdict: stale}, mailed, nil
+	}
 	return v, mailed, err
 }
 

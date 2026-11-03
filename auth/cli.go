@@ -17,7 +17,8 @@ const usage = "usage: auth link <email|username> | auth reset <email|username>"
 // Command takes ["link", who] or ["reset", who], without the "auth" prefix.
 // Who is an email or an existing username; both print a secret, one-use, 30-minute sign-in link.
 // An unknown email creates a user; an unknown username is an error.
-// Reset also removes passkeys and sessions and invalidates codes and links.
+// Links identify users by ID, so an email is not required.
+// Reset also removes passkeys, linked Google accounts and sessions and invalidates codes and links.
 // Config.Layout is not required.
 func Command(ctx context.Context, db *gorm.DB, c Config, args []string, out io.Writer) error {
 	if len(args) != 2 || args[0] != "link" && args[0] != "reset" {
@@ -38,9 +39,6 @@ func Command(ctx context.Context, db *gorm.DB, c Config, args []string, out io.W
 		}
 		if res.RowsAffected == 0 {
 			return fmt.Errorf("auth: no user has the email or username %q", args[1])
-		}
-		if u.Email == "" {
-			return fmt.Errorf("auth: %s has no email, which sign-in links need", name)
 		}
 		email, want = u.Email, &u.ID
 	}

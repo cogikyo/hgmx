@@ -22,7 +22,21 @@ templ signinPage(v signinView) {
 		} else {
 			<button type="button" class="auth-primary" data-auth-passkey="login" data-next={ v.Next }>Sign in with a passkey</button>
 		}
+		if v.Google {
+			<form method="post" action="/auth/google" hx-boost="false">
+				<input type="hidden" name="next" value={ v.Next }/>
+				<button type="submit" class="auth-secondary">Sign in with Google</button>
+			</form>
+		}
 		@alert(v.Problem)
+	</div>
+}
+
+templ continuePage(to string) {
+	<div class="auth" data-auth="continue">
+		<meta http-equiv="refresh" content={ "0; url=" + to }/>
+		<h1>Opening Google</h1>
+		<p class="auth-note"><a href={ templ.URL(to) }>Continue to Google</a></p>
 	</div>
 }
 
@@ -154,6 +168,29 @@ templ accountPage(v accountView) {
 				@reauth("to add or remove passkeys")
 			}
 		</section>
+		if v.Google {
+			<section>
+				<h2>Google</h2>
+				if v.Linked {
+					<p class="auth-note">You can sign in with your linked Google account.</p>
+					if v.KeepGoogle {
+						<p class="auth-note">Google is your only way to sign in. Add a passkey before removing it.</p>
+					} else if v.Recent {
+						<form method="post" action="/auth/account/google/remove">
+							<button type="submit" class="auth-danger">Remove Google</button>
+						</form>
+					} else {
+						@reauth("to remove Google")
+					}
+				} else if v.Recent {
+					<form method="post" action="/auth/account/google" hx-boost="false">
+						<button type="submit" class="auth-secondary">Link Google</button>
+					</form>
+				} else {
+					@reauth("to link Google")
+				}
+			</section>
+		}
 		<section>
 			<h2>Devices</h2>
 			if v.Others > 0 {

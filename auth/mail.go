@@ -66,3 +66,14 @@ func (a *Auth) changedMail(ctx context.Context, from, to string) mail.Message {
 		fmt.Sprintf("The email for your %s account was changed to %s.\n\nIf you didn't do this, review your passkeys and sign out other devices at %s\n", a.c.Name, to, url),
 		changedMail(a.c.Name, to, url))
 }
+
+func (a *Auth) googleMail(ctx context.Context, to string, linked bool) mail.Message {
+	url := a.origin + accountPath
+	change, subject := "removed from", fmt.Sprintf("Google account removed from your %s account", a.c.Name)
+	if linked {
+		change, subject = "linked to", fmt.Sprintf("Google account linked to your %s account", a.c.Name)
+	}
+	return message(ctx, to, subject,
+		fmt.Sprintf("A Google account was %s your %s account.\n\nIf you didn't do this, review your account at %s\n", change, a.c.Name, url),
+		googleMail(a.c.Name, change, url))
+}

@@ -448,6 +448,9 @@ Production never runs `down`; rollback reverts binaries only.
 **Expand, then contract:** add schema compatible with the old binary, deploy code that uses it, and remove obsolete schema in a later deploy after old binaries no longer need it.
 An applied migration can remain after a later step fails, so every intermediate schema must support the old binary.
 
+**After Google identities exist, use the current CLI for account recovery.**
+An older binary's `auth reset` leaves linked Google accounts in place; deploy forward first if the current CLI is not available.
+
 ## Commands
 
 ### hgmx: Latest
@@ -521,6 +524,8 @@ For package loading and Go commands, `check` sets `GOWORK=off` and passes `-mod=
   - `$CREDENTIALS_DIRECTORY/auth-key` takes priority; use a per-site key of at least 32 bytes.
 - **`smtp-password`** is the mail credential, read with `credential.Read("smtp-password")`.
   - `$CREDENTIALS_DIRECTORY/smtp-password` takes priority; if missing, `HGMX_SMTP_PASSWORD` is read instead.
+- **`google-client-secret`** is read by `auth.New` with `credential.Read("google-client-secret")` when `Config.Google` is set.
+  - `$CREDENTIALS_DIRECTORY/google-client-secret` takes priority; if missing, `HGMX_GOOGLE_CLIENT_SECRET` is read instead.
 - **`HGMX_SMTP_HOST`, `HGMX_SMTP_USER`, `HGMX_SMTP_FROM`** configure the site's `mail.SMTP` sender.
   - Use port 465, the default; `mail.SMTP` uses implicit TLS, not STARTTLS.
   - Cloudflare Email Sending uses host `smtp.mx.cloudflare.net` and user `api_token`.

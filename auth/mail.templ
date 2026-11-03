@@ -27,3 +27,8 @@ templ changedMail(site, to, url string) {
 	<p>The email for your { site } account was changed to { to }.</p>
 	<p>If you didn't do this, <a href={ templ.SafeURL(url) }>review your passkeys and sign out other devices</a>.</p>
 }
+
+templ googleMail(site, change, url string) {
+	<p>A Google account was { change } your { site } account.</p>
+	<p>If you didn't do this, <a href={ templ.SafeURL(url) }>review your account</a>.</p>
+}

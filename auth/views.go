@@ -12,6 +12,7 @@ type signinView struct {
 	Codes    bool
 	Email    string
 	SignedIn string
+	Google   bool
 	Problem  string
 }
 
@@ -36,23 +37,26 @@ type passkeyRow struct {
 }
 
 type accountView struct {
-	Script   string
-	Name     string
-	Username string
-	Email    string
-	Mail     bool
-	Next     string
-	Passkeys []passkeyRow
-	Others   int
-	Recent   bool
-	KeepLast bool
-	Delete   bool
-	Problem  string
-	Notice   string
+	Script     string
+	Name       string
+	Username   string
+	Email      string
+	Mail       bool
+	Next       string
+	Passkeys   []passkeyRow
+	Others     int
+	Recent     bool
+	KeepLast   bool
+	Google     bool
+	Linked     bool
+	KeepGoogle bool
+	Delete     bool
+	Problem    string
+	Notice     string
 }
 
 func (a *Auth) signinView(r *http.Request, next, email, problem string) signinView {
-	v := signinView{Script: a.script, Next: next, Codes: a.c.Mode.codes(), Email: email, Problem: problem}
+	v := signinView{Script: a.script, Next: next, Codes: a.c.Mode.codes(), Email: email, Google: a.google != nil, Problem: problem}
 	if s, ok := a.session(r); ok {
 		v.SignedIn = s.user.name()
 	}

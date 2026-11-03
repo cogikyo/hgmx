@@ -25,11 +25,18 @@ func (a *Auth) account(w http.ResponseWriter, r *http.Request) {
 	a.accountPage(w, r, s, http.StatusOK, "")
 }
 
-func (a *Auth) methods(u User, passkeys int64) int64 {
-	if u.Email != "" && a.c.Mode.codes() {
-		passkeys++
+func (a *Auth) methods(db *gorm.DB, u User) (int64, error) {
+	var n struct{ Passkeys, Identities int64 }
+	err := db.Raw(`SELECT (SELECT count(*) FROM auth_passkeys WHERE user_id = ?) AS passkeys,
+	(SELECT count(*) FROM auth_identities WHERE user_id = ? AND kind = ?) AS identities`, u.ID, u.ID, googleKind).Scan(&n).Error
+	total := n.Passkeys
+	if a.google != nil {
+		total += n.Identities
 	}
-	return passkeys
+	if u.Email != "" && a.c.Mode.codes() {
+		total++
+	}
+	return total, err
 }
 
 func (a *Auth) accountPage(w http.ResponseWriter, r *http.Request, s session, status int, problem string) {
@@ -48,19 +55,32 @@ func (a *Auth) renderAccount(w http.ResponseWriter, r *http.Request, s session, 
 	if err != nil {
 		panic(err)
 	}
+	total, err := a.methods(db, s.user)
+	if err != nil {
+		panic(err)
+	}
+	var linked bool
+	if a.google != nil {
+		if err := db.Raw("SELECT EXISTS (SELECT 1 FROM auth_identities WHERE user_id = ? AND kind = ?)", s.user.ID, googleKind).Scan(&linked).Error; err != nil {
+			panic(err)
+		}
+	}
 	v := accountView{
-		Script:   a.script,
-		Name:     s.user.name(),
-		Username: s.user.Username,
-		Email:    s.user.Email,
-		Mail:     a.mail != nil,
-		Next:     next(r.URL.Query().Get("next")),
-		Others:   int(others),
-		Recent:   s.recent(),
-		KeepLast: len(keys) == 1 && a.methods(s.user, 1) == 1,
-		Delete:   a.c.Mode == Open,
-		Problem:  problem,
-		Notice:   notice,
+		Script:     a.script,
+		Name:       s.user.name(),
+		Username:   s.user.Username,
+		Email:      s.user.Email,
+		Mail:       a.mail != nil,
+		Next:       next(r.URL.Query().Get("next")),
+		Others:     int(others),
+		Recent:     s.recent(),
+		KeepLast:   len(keys) == 1 && total == 1,
+		Google:     a.google != nil,
+		Linked:     linked,
+		KeepGoogle: linked && total == 1,
+		Delete:     a.c.Mode == Open,
+		Problem:    problem,
+		Notice:     notice,
 	}
 	for _, k := range keys {
 		v.Passkeys = append(v.Passkeys, passkeyRow{ID: encodeID(k.ID), Name: k.Name, Created: k.Created, Used: k.Used})
@@ -102,7 +122,7 @@ func (a *Auth) deleteAccount(w http.ResponseWriter, r *http.Request) {
 		if !ok || !cur.recent() || u.Email != s.user.Email {
 			return errStale
 		}
-		if err := tx.Exec("UPDATE auth_codes SET consumed = ? WHERE email = ? AND consumed IS NULL", time.Now(), s.user.Email).Error; err != nil {
+		if err := revokeCodes(tx, u); err != nil {
 			return err
 		}
 		return tx.Exec("DELETE FROM auth_users WHERE id = ?", s.user.ID).Error
@@ -222,7 +242,7 @@ func (a *Auth) issueVerify(ctx context.Context, r *http.Request, user pg.ID, to 
 			return err
 		}
 		secret := rand.Text()
-		id, err := newCode(tx, a.c.Key, to, verify, secret, linkLife, &cur.id)
+		id, err := newCode(tx, a.c.Key, to, verify, secret, linkLife, &cur.id, nil)
 		s.link, s.deliver = id.String()+"."+secret, true
 		return err
 	})

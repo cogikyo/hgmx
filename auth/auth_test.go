@@ -40,7 +40,7 @@ func addCode(t *testing.T, a *Auth, email, secret string) string {
 	var id pg.ID
 	err := a.db.Transaction(func(tx *gorm.DB) error {
 		var err error
-		id, err = newCode(tx, a.c.Key, email, signin, secret, codeLife, nil)
+		id, err = newCode(tx, a.c.Key, email, signin, secret, codeLife, nil, nil)
 		return err
 	})
 	if err != nil {
@@ -435,7 +435,7 @@ func pending(t *testing.T, a *Auth, user pg.ID, to string) string {
 	var id pg.ID
 	err = a.db.Transaction(func(tx *gorm.DB) error {
 		var err error
-		id, err = newCode(tx, a.c.Key, to, verify, "s", linkLife, &s.id)
+		id, err = newCode(tx, a.c.Key, to, verify, "s", linkLife, &s.id, nil)
 		return err
 	})
 	if err != nil {

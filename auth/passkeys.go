@@ -330,11 +330,11 @@ func (a *Auth) remove(w http.ResponseWriter, r *http.Request) {
 		if err := tx.Where("id = ? AND user_id = ?", id, s.user.ID).Take(&k).Error; err != nil {
 			return err
 		}
-		var n int64
-		if err := tx.Model(&passkey{}).Where("user_id = ?", s.user.ID).Count(&n).Error; err != nil {
+		n, err := a.methods(tx, u)
+		if err != nil {
 			return err
 		}
-		if a.methods(u, n) <= 1 {
+		if n <= 1 {
 			last = true
 			return nil
 		}

@@ -13,6 +13,7 @@ import (
 var Track = migrate.Track{Name: "auth", Steps: []migrate.Step{
 	{Version: 1, Name: "accounts", Up: accountsUp, Down: accountsDown},
 	{Version: 2, Name: "usernames", Up: usernamesUp, Down: usernamesDown},
+	{Version: 3, Name: "identities", Up: identitiesUp, Down: identitiesDown},
 }}
 
 func accountsUp(_ context.Context, db *gorm.DB) error {
@@ -101,6 +102,41 @@ ALTER TABLE auth_users DROP COLUMN username, ALTER COLUMN email SET NOT NULL;
 `).Error
 }
 
+func identitiesUp(_ context.Context, db *gorm.DB) error {
+	return db.Exec(`
+CREATE TABLE auth_identities (
+	user_id uuid NOT NULL REFERENCES auth_users ON DELETE CASCADE,
+	kind text NOT NULL,
+	subject text NOT NULL,
+	created timestamptz NOT NULL,
+	PRIMARY KEY (kind, subject)
+);
+CREATE INDEX auth_identities_user ON auth_identities (user_id);
+
+CREATE TABLE auth_flows (
+	id bytea PRIMARY KEY,
+	provider text NOT NULL,
+	intent text NOT NULL CHECK (intent IN ('signin', 'link')),
+	verifier text NOT NULL,
+	nonce text NOT NULL,
+	session_id uuid,
+	next text NOT NULL,
+	expires timestamptz NOT NULL
+);
+
+ALTER TABLE auth_codes ADD COLUMN user_id uuid;
+CREATE INDEX auth_codes_user ON auth_codes (user_id);
+`).Error
+}
+
+func identitiesDown(_ context.Context, db *gorm.DB) error {
+	return db.Exec(`
+ALTER TABLE auth_codes DROP COLUMN user_id;
+DROP TABLE auth_flows;
+DROP TABLE auth_identities;
+`).Error
+}
+
 // sweep runs outside address locks; SKIP LOCKED avoids waiting on active rows.
 func sweep(db *gorm.DB, library string) error {
 	now := time.Now()
@@ -112,6 +148,7 @@ func sweep(db *gorm.DB, library string) error {
 		{"DELETE FROM auth_codes WHERE id IN (SELECT id FROM auth_codes WHERE created < ? FOR UPDATE SKIP LOCKED)", []any{now.Add(-retention)}},
 		{"DELETE FROM auth_sessions WHERE id IN (SELECT id FROM auth_sessions WHERE expires <= ? OR seen <= ? FOR UPDATE SKIP LOCKED)", []any{now, now.Add(-idleLife)}},
 		{"DELETE FROM auth_ceremonies WHERE id IN (SELECT id FROM auth_ceremonies WHERE expires <= ? OR library <> ? FOR UPDATE SKIP LOCKED)", []any{now, library}},
+		{"DELETE FROM auth_flows WHERE id IN (SELECT id FROM auth_flows WHERE expires <= ? FOR UPDATE SKIP LOCKED)", []any{now}},
 	} {
 		if err := db.Exec(q.sql, q.args...).Error; err != nil {
 			return err
