@@ -14,6 +14,7 @@ var Track = migrate.Track{Name: "auth", Steps: []migrate.Step{
 	{Version: 1, Name: "accounts", Up: accountsUp, Down: accountsDown},
 	{Version: 2, Name: "usernames", Up: usernamesUp, Down: usernamesDown},
 	{Version: 3, Name: "identities", Up: identitiesUp, Down: identitiesDown},
+	{Version: 4, Name: "hosts", Up: hostsUp, Down: hostsDown},
 }}
 
 func accountsUp(_ context.Context, db *gorm.DB) error {
@@ -134,6 +135,24 @@ func identitiesDown(_ context.Context, db *gorm.DB) error {
 ALTER TABLE auth_codes DROP COLUMN user_id;
 DROP TABLE auth_flows;
 DROP TABLE auth_identities;
+`).Error
+}
+
+func hostsUp(_ context.Context, db *gorm.DB) error {
+	return db.Exec(`
+ALTER TABLE auth_sessions ADD COLUMN origin text;
+ALTER TABLE auth_codes ADD COLUMN origin text;
+ALTER TABLE auth_flows ADD COLUMN origin text;
+CREATE INDEX auth_sessions_user_origin ON auth_sessions (user_id, origin);
+`).Error
+}
+
+func hostsDown(_ context.Context, db *gorm.DB) error {
+	return db.Exec(`
+DROP INDEX auth_sessions_user_origin;
+ALTER TABLE auth_flows DROP COLUMN origin;
+ALTER TABLE auth_codes DROP COLUMN origin;
+ALTER TABLE auth_sessions DROP COLUMN origin;
 `).Error
 }
 

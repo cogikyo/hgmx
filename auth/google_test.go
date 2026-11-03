@@ -65,14 +65,14 @@ func (f *fakeGoogle) as(c fakeClaims) {
 	f.next, f.deny = c, false
 }
 
-func (f *fakeGoogle) provider(redirect string) *provider {
+func (f *fakeGoogle) provider() *provider {
 	return newProvider(googleKind, oidc.ProviderConfig{
 		IssuerURL:  f.issuer,
 		AuthURL:    f.issuer + "/auth",
 		TokenURL:   f.issuer + "/token",
 		JWKSURL:    f.issuer + "/keys",
 		Algorithms: []string{oidc.RS256},
-	}, "client", "secret", redirect)
+	}, "client", "secret")
 }
 
 func (f *fakeGoogle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -129,12 +129,12 @@ type googleRig struct {
 
 func withGoogle(t *testing.T, mode Mode) googleRig {
 	a := setup(t)
-	a.c.Mode = mode
+	at(a, apex).mode = mode
 	fake := newFakeGoogle()
 	srv := httptest.NewServer(fake)
 	t.Cleanup(srv.Close)
 	fake.start(srv.URL)
-	a.google = fake.provider(a.origin + googleCallback)
+	a.google = fake.provider()
 	mux := http.NewServeMux()
 	a.Mount(mux)
 	return googleRig{a: a, mux: mux, fake: fake}
@@ -192,7 +192,7 @@ func (g googleRig) link(t *testing.T, session *http.Cookie, c fakeClaims) *httpt
 }
 
 func (g googleRig) session(t *testing.T, user pg.ID) *http.Cookie {
-	token, err := startSession(g.a.db, httptest.NewRequest("GET", "/", nil), user)
+	token, err := startSession(g.a.db, httptest.NewRequest("GET", "/", nil), at(g.a, apex), user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,7 +275,7 @@ func TestResetKillsLink(t *testing.T) {
 	session := g.session(t, u.ID)
 	g.fake.as(fakeClaims{Sub: "s2"})
 	to, flow := g.begin(t, "/auth/account/google", session)
-	if _, _, err := issueLink(t.Context(), g.a.db, g.a.c.Key, email, nil, true); err != nil {
+	if _, _, err := issueLink(t.Context(), g.a.db, g.a.key, at(g.a, apex), email, nil, true); err != nil {
 		t.Fatal(err)
 	}
 	g.finish(t, to, flow, session)
@@ -293,9 +293,9 @@ func TestResetGoogleOnly(t *testing.T) {
 			t.Fatalf("%s: %d", sub, w.Code)
 		}
 	}
-	command := func(args ...string) string {
+	command := func(verb, who string) string {
 		var out strings.Builder
-		if err := Command(t.Context(), g.a.db, g.a.c, args, &out); err != nil {
+		if err := Command(t.Context(), g.a.db, config(), []string{verb, "--origin", apex, who}, &out); err != nil {
 			t.Fatal(err)
 		}
 		token, _, _ := strings.Cut(strings.SplitN(out.String(), "#", 2)[1], "\n")
@@ -308,7 +308,7 @@ func TestResetGoogleOnly(t *testing.T) {
 	if err := g.a.db.Raw("SELECT (SELECT count(*) FROM auth_identities WHERE subject = 's1') + (SELECT count(*) FROM auth_sessions WHERE user_id = ?)", g.owner(t, "s1")).Scan(&n).Error; err != nil || n != 0 {
 		t.Fatalf("after reset: %d %v", n, err)
 	}
-	v, _, err := g.a.redeem(t.Context(), httptest.NewRequest("POST", "/auth/link", nil), token)
+	v, _, err := g.a.redeem(t.Context(), httptest.NewRequest("POST", "/auth/link", nil), at(g.a, apex), token)
 	if err != nil || v.verdict != accepted || v.user.Username != "s1" || v.user.Email != "" {
 		t.Fatalf("reset link: %v %+v", err, v)
 	}

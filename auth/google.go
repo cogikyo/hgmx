@@ -44,7 +44,7 @@ type provider struct {
 	verifier *oidc.IDTokenVerifier
 }
 
-func newProvider(kind string, issuer oidc.ProviderConfig, id, secret, redirect string) *provider {
+func newProvider(kind string, issuer oidc.ProviderConfig, id, secret string) *provider {
 	client := &http.Client{Timeout: 10 * time.Second}
 	p := issuer.NewProvider(oidc.ClientContext(context.Background(), client))
 	return &provider{
@@ -54,15 +54,21 @@ func newProvider(kind string, issuer oidc.ProviderConfig, id, secret, redirect s
 			ClientID:     id,
 			ClientSecret: secret,
 			Endpoint:     p.Endpoint(),
-			RedirectURL:  redirect,
 			Scopes:       []string{oidc.ScopeOpenID, "email"},
 		},
 		verifier: p.Verifier(&oidc.Config{ClientID: id}),
 	}
 }
 
+func (p *provider) config(origin string) oauth2.Config {
+	c := p.oauth
+	c.RedirectURL = origin + googleCallback
+	return c
+}
+
 type flow struct {
 	ID        []byte
+	Origin    string
 	Provider  string
 	Intent    string
 	Verifier  string
@@ -80,13 +86,13 @@ type identity struct {
 	verified bool
 }
 
-func (a *Auth) startFlow(w http.ResponseWriter, r *http.Request, intent string, session *pg.ID, to string) {
+func (a *Auth) startFlow(w http.ResponseWriter, r *http.Request, h *host, intent string, session *pg.ID, to string) {
 	db := a.db.WithContext(r.Context())
 	if err := sweep(db, a.library); err != nil {
 		panic(err)
 	}
 	state := token()
-	f := flow{ID: hash(state), Provider: a.google.kind, Intent: intent, Verifier: oauth2.GenerateVerifier(), Nonce: token(), SessionID: session, Next: to, Expires: time.Now().Add(flowLife)}
+	f := flow{ID: hash(state), Origin: h.origin, Provider: a.google.kind, Intent: intent, Verifier: oauth2.GenerateVerifier(), Nonce: token(), SessionID: session, Next: to, Expires: time.Now().Add(flowLife)}
 	if err := db.Create(&f).Error; err != nil {
 		panic(err)
 	}
@@ -95,10 +101,11 @@ func (a *Auth) startFlow(w http.ResponseWriter, r *http.Request, intent string, 
 		opts = append(opts, oauth2.SetAuthURLParam("prompt", "select_account"))
 	}
 	setCookie(w, flowCookie, state, flowLife)
-	a.page(w, r, http.StatusOK, "Continue to Google", continuePage(a.google.oauth.AuthCodeURL(state, opts...)))
+	c := a.google.config(h.origin)
+	a.continuePage(w, r, h, c.AuthCodeURL(state, opts...))
 }
 
-func (a *Auth) takeFlow(w http.ResponseWriter, r *http.Request) (flow, bool) {
+func (a *Auth) takeFlow(w http.ResponseWriter, r *http.Request, h *host) (flow, bool) {
 	var f flow
 	c, err := r.Cookie(flowCookie)
 	if err != nil {
@@ -109,7 +116,7 @@ func (a *Auth) takeFlow(w http.ResponseWriter, r *http.Request) (flow, bool) {
 	if subtle.ConstantTimeCompare([]byte(state), []byte(c.Value)) != 1 {
 		return f, false
 	}
-	if err := a.db.WithContext(r.Context()).Raw("DELETE FROM auth_flows WHERE id = ? RETURNING *", hash(state)).Scan(&f).Error; err != nil {
+	if err := a.db.WithContext(r.Context()).Raw("DELETE FROM auth_flows WHERE id = ? AND origin = ? RETURNING *", hash(state), h.origin).Scan(&f).Error; err != nil {
 		panic(err)
 	}
 	return f, f.ID != nil && f.Provider == a.google.kind && time.Now().Before(f.Expires)
@@ -118,7 +125,8 @@ func (a *Auth) takeFlow(w http.ResponseWriter, r *http.Request) (flow, bool) {
 func (p *provider) identify(ctx context.Context, f flow, code string) (identity, error) {
 	var id identity
 	ctx = oidc.ClientContext(ctx, p.client)
-	t, err := p.oauth.Exchange(ctx, code, oauth2.VerifierOption(f.Verifier))
+	c := p.config(f.Origin)
+	t, err := c.Exchange(ctx, code, oauth2.VerifierOption(f.Verifier))
 	if err != nil {
 		return id, err
 	}
@@ -181,7 +189,7 @@ func createNamed(tx *gorm.DB, base string) (User, error) {
 	return u, errors.New("auth: no free username")
 }
 
-func (a *Auth) enterGoogle(ctx context.Context, r *http.Request, id identity) (verified, error) {
+func (a *Auth) enterGoogle(ctx context.Context, r *http.Request, h *host, id identity) (verified, error) {
 	v := verified{verdict: stale}
 	err := a.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		user, found, err := owner(tx, googleKind, id.subject)
@@ -196,7 +204,7 @@ func (a *Auth) enterGoogle(ctx context.Context, r *http.Request, id identity) (v
 				return err
 			}
 		} else {
-			if a.c.Mode != Open {
+			if h.mode != Open {
 				v.verdict = unknown
 				return nil
 			}
@@ -214,20 +222,24 @@ func (a *Auth) enterGoogle(ctx context.Context, r *http.Request, id identity) (v
 				return err
 			}
 		}
-		v.token, err = startSession(tx, r, v.user.ID)
+		if !h.admits(v.user) {
+			v.verdict = denied
+			return errDenied
+		}
+		v.token, err = startSession(tx, r, h, v.user.ID)
 		v.verdict = accepted
 		return err
 	})
 	if errors.Is(err, pg.ErrNotFound) || errors.Is(err, pg.ErrDuplicate) {
 		return verified{verdict: stale}, nil
 	}
-	return v, err
+	return v, admitted(err)
 }
 
-func (a *Auth) linkGoogle(ctx context.Context, r *http.Request, f flow, id identity) (verdict, User, error) {
+func (a *Auth) linkGoogle(ctx context.Context, r *http.Request, h *host, f flow, id identity) (verdict, User, error) {
 	v := stale
 	var u User
-	s, ok := a.session(r)
+	s, ok := a.session(r, h)
 	if !ok || f.SessionID == nil || s.id != *f.SessionID {
 		return v, u, nil
 	}
@@ -236,8 +248,8 @@ func (a *Auth) linkGoogle(ctx context.Context, r *http.Request, f flow, id ident
 		if u, err = hold(tx, s.user.ID); err != nil {
 			return err
 		}
-		cur, ok, err := current(tx, r, u.ID)
-		if err != nil || !ok || cur.id != s.id || !cur.recent() {
+		cur, err := live(tx, r, h, u.ID)
+		if err != nil || cur.id != s.id || !cur.recent() {
 			return err
 		}
 		user, found, err := owner(tx, googleKind, id.subject)
@@ -260,57 +272,57 @@ func (a *Auth) linkGoogle(ctx context.Context, r *http.Request, f flow, id ident
 		return addIdentity(tx, u.ID, googleKind, id.subject)
 	})
 	switch {
-	case errors.Is(err, pg.ErrNotFound):
+	case errors.Is(err, pg.ErrNotFound), errors.Is(err, errStale):
 		return stale, u, nil
+	case errors.Is(err, errDenied):
+		return denied, u, nil
 	case errors.Is(err, pg.ErrDuplicate):
 		return taken, u, nil
 	}
 	return v, u, err
 }
 
-func (a *Auth) googleSignin(w http.ResponseWriter, r *http.Request) {
+func (a *Auth) googleSignin(w http.ResponseWriter, r *http.Request, h *host) {
 	to := next(r.FormValue("next"))
-	if !a.begins.allow(r) {
-		a.page(w, r, http.StatusTooManyRequests, "Sign in", signinPage(a.signinView(r, to, "", "Too many sign-in attempts. Try again in a few minutes.")))
+	if !h.begins.allow(r) {
+		a.signinPage(w, r, h, http.StatusTooManyRequests, to, "", "Too many sign-in attempts. Try again in a few minutes.")
 		return
 	}
-	a.startFlow(w, r, signin, nil, to)
+	a.startFlow(w, r, h, signin, nil, to)
 }
 
-func (a *Auth) googleLink(w http.ResponseWriter, r *http.Request) {
-	s, ok := a.session(r)
+func (a *Auth) googleLink(w http.ResponseWriter, r *http.Request, h *host) {
+	s, ok := a.signedIn(w, r, h)
 	if !ok {
-		a.toSignin(w, r)
 		return
 	}
 	if !s.recent() {
-		a.accountPage(w, r, s, http.StatusForbidden, "Sign in again to link Google.")
+		a.accountPage(w, r, h, s, http.StatusForbidden, "Sign in again to link Google.")
 		return
 	}
-	if !a.begins.allow(r) {
-		a.accountPage(w, r, s, http.StatusTooManyRequests, "Too many attempts. Try again in a few minutes.")
+	if !h.begins.allow(r) {
+		a.accountPage(w, r, h, s, http.StatusTooManyRequests, "Too many attempts. Try again in a few minutes.")
 		return
 	}
-	a.startFlow(w, r, link, &s.id, accountPath)
+	a.startFlow(w, r, h, link, &s.id, accountPath)
 }
 
-func (a *Auth) googleCallback(w http.ResponseWriter, r *http.Request) {
-	f, ok := a.takeFlow(w, r)
+func (a *Auth) googleCallback(w http.ResponseWriter, r *http.Request, h *host) {
+	f, ok := a.takeFlow(w, r, h)
 	if !ok {
-		a.page(w, r, http.StatusBadRequest, "Sign in", signinPage(a.signinView(r, accountPath, "", "Google sign-in took too long or started in another browser. Try again.")))
+		a.signinPage(w, r, h, http.StatusBadRequest, accountPath, "", "Google sign-in took too long or started in another browser. Try again.")
 		return
 	}
 	fail := func(status int, msg string) {
 		if f.Intent == signin {
-			a.page(w, r, status, "Sign in", signinPage(a.signinView(r, f.Next, "", msg)))
+			a.signinPage(w, r, h, status, f.Next, "", msg)
 			return
 		}
-		s, ok := a.session(r)
+		s, ok := a.signedIn(w, r, h)
 		if !ok {
-			a.toSignin(w, r)
 			return
 		}
-		a.accountPage(w, r, s, status, msg)
+		a.accountPage(w, r, h, s, status, msg)
 	}
 	q := r.URL.Query()
 	if q.Get("error") != "" {
@@ -324,14 +336,16 @@ func (a *Auth) googleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if f.Intent == link {
-		v, u, err := a.linkGoogle(r.Context(), r, f, id)
+		v, u, err := a.linkGoogle(r.Context(), r, h, f, id)
 		if err != nil {
 			panic(err)
 		}
 		switch v {
 		case accepted:
-			a.notify(a.googleMail(r.Context(), u.Email, true))
+			a.notify(a.googleMail(r.Context(), h, u.Email, true))
 			http.Redirect(w, r, accountPath, http.StatusSeeOther)
+		case denied:
+			a.forbid(w, r, h, u)
 		case taken:
 			fail(http.StatusConflict, "That Google account is linked to another account here.")
 		case linked:
@@ -341,7 +355,7 @@ func (a *Auth) googleCallback(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	v, err := a.enterGoogle(r.Context(), r, id)
+	v, err := a.enterGoogle(r.Context(), r, h, id)
 	if err != nil {
 		panic(err)
 	}
@@ -349,6 +363,8 @@ func (a *Auth) googleCallback(w http.ResponseWriter, r *http.Request) {
 	case accepted:
 		setCookie(w, sessionCookie, v.token, sessionLife)
 		http.Redirect(w, r, f.Next, http.StatusSeeOther)
+	case denied:
+		a.forbid(w, r, h, v.user)
 	case unknown:
 		fail(http.StatusForbidden, "No account here uses that Google account. Sign in another way, then link Google from your account page.")
 	case taken:
@@ -358,14 +374,13 @@ func (a *Auth) googleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (a *Auth) googleUnlink(w http.ResponseWriter, r *http.Request) {
-	s, ok := a.session(r)
+func (a *Auth) googleUnlink(w http.ResponseWriter, r *http.Request, h *host) {
+	s, ok := a.signedIn(w, r, h)
 	if !ok {
-		a.toSignin(w, r)
 		return
 	}
 	if !s.recent() {
-		a.accountPage(w, r, s, http.StatusForbidden, "Sign in again to remove Google.")
+		a.accountPage(w, r, h, s, http.StatusForbidden, "Sign in again to remove Google.")
 		return
 	}
 	var u User
@@ -375,7 +390,10 @@ func (a *Auth) googleUnlink(w http.ResponseWriter, r *http.Request) {
 		if u, err = hold(tx, s.user.ID); err != nil {
 			return err
 		}
-		n, err := a.methods(tx, u)
+		if _, err := live(tx, r, h, u.ID); err != nil {
+			return err
+		}
+		n, err := a.methods(tx, h, u)
 		if err != nil {
 			return err
 		}
@@ -385,21 +403,21 @@ func (a *Auth) googleUnlink(w http.ResponseWriter, r *http.Request) {
 		}
 		res := tx.Exec("DELETE FROM auth_identities WHERE user_id = ? AND kind = ?", u.ID, googleKind)
 		if res.Error == nil && res.RowsAffected == 0 {
-			return pg.ErrNotFound
+			return errMissing
 		}
 		return res.Error
 	})
-	if errors.Is(err, pg.ErrNotFound) {
+	if errors.Is(err, errMissing) {
 		http.Redirect(w, r, accountPath, http.StatusSeeOther)
 		return
 	}
-	if err != nil {
-		panic(err)
-	}
-	if last {
-		a.accountPage(w, r, s, http.StatusConflict, "Google is your only way to sign in. Add a passkey before removing it.")
+	if a.refused(w, r, h, s, err) {
 		return
 	}
-	a.notify(a.googleMail(r.Context(), u.Email, false))
+	if last {
+		a.accountPage(w, r, h, s, http.StatusConflict, "Google is your only way to sign in. Add a passkey before removing it.")
+		return
+	}
+	a.notify(a.googleMail(r.Context(), h, u.Email, false))
 	http.Redirect(w, r, accountPath, http.StatusSeeOther)
 }

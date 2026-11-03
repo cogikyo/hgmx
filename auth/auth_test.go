@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"crypto/sha256"
 	"errors"
 	"io"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/a-h/templ"
+	"github.com/go-webauthn/webauthn/protocol/webauthncbor"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"gorm.io/gorm"
 
@@ -18,39 +20,54 @@ import (
 	"github.com/cogikyo/hgmx/pg/pgtest"
 )
 
-func setup(t *testing.T) *Auth {
-	t.Setenv("PGDATABASE", "pgtest")
-	db := pgtest.Open(t)
-	if err := migrate.Command(t.Context(), db, []migrate.Track{Track}, []string{"up"}, io.Discard); err != nil {
-		t.Fatal(err)
+const (
+	apex  = "https://example.com"
+	admin = "https://admin.example.com"
+)
+
+func config() Config {
+	layout := func(_ *http.Request, _ string, body templ.Component) templ.Component { return body }
+	return Config{
+		Name:  "Test",
+		Key:   []byte(strings.Repeat("k", 32)),
+		Hosts: []Host{{Origin: apex, Layout: layout}, {Origin: admin, Layout: layout}},
 	}
-	a, err := New(db, nil, Config{
-		Name:   "Test",
-		Origin: "https://example.com",
-		Key:    []byte(strings.Repeat("k", 32)),
-		Layout: func(_ *http.Request, _ string, body templ.Component) templ.Component { return body },
-	})
+}
+
+func open(t *testing.T, db *gorm.DB) *Auth {
+	a, err := New(db, nil, config())
 	if err != nil {
 		t.Fatal(err)
 	}
 	return a
 }
 
+func setup(t *testing.T) *Auth {
+	t.Setenv("PGDATABASE", "pgtest")
+	db := pgtest.Open(t)
+	if err := migrate.Command(t.Context(), db, []migrate.Track{Track}, []string{"up"}, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	return open(t, db)
+}
+
+func at(a *Auth, origin string) *host { return a.hosts[origin] }
+
 func addCode(t *testing.T, a *Auth, email, secret string) string {
-	var id pg.ID
+	var c code
 	err := a.db.Transaction(func(tx *gorm.DB) error {
 		var err error
-		id, err = newCode(tx, a.c.Key, email, signin, secret, codeLife, nil, nil)
+		c, err = newCode(tx, a.key, code{Origin: apex, Email: email, Purpose: signin}, secret, codeLife)
 		return err
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	return id.String() + "." + mailSecret(a.c.Key, id, email)
+	return c.ID.String() + "." + mailSecret(a.key, c)
 }
 
 func try(t *testing.T, a *Auth, email, guess string) verdict {
-	v, err := a.checkCode(t.Context(), httptest.NewRequest("POST", "/auth/code/verify", nil), email, guess)
+	v, err := a.checkCode(t.Context(), httptest.NewRequest("POST", "/auth/code/verify", nil), at(a, apex), email, guess)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +75,7 @@ func try(t *testing.T, a *Auth, email, guess string) verdict {
 }
 
 func follow(t *testing.T, a *Auth, token string) verdict {
-	v, _, err := a.redeem(t.Context(), httptest.NewRequest("POST", "/auth/link", nil), token)
+	v, _, err := a.redeem(t.Context(), httptest.NewRequest("POST", "/auth/link", nil), at(a, apex), token)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +84,7 @@ func follow(t *testing.T, a *Auth, token string) verdict {
 
 func invite(t *testing.T, email string) *Auth {
 	a := setup(t)
-	a.c.Mode = Invite
+	at(a, apex).mode = Invite
 	if _, err := createUser(a.db, email); err != nil {
 		t.Fatal(err)
 	}
@@ -134,11 +151,11 @@ func TestCodeAndLinkPaired(t *testing.T) {
 	}
 	got := make(chan result, 2)
 	go func() {
-		v, err := a.checkCode(t.Context(), r, email, "333333")
+		v, err := a.checkCode(t.Context(), r, at(a, apex), email, "333333")
 		got <- result{v, err}
 	}()
 	go func() {
-		v, _, err := a.redeem(t.Context(), r, link)
+		v, _, err := a.redeem(t.Context(), r, at(a, apex), link)
 		got <- result{v, err}
 	}()
 	x, y := <-got, <-got
@@ -165,15 +182,15 @@ func TestCeremonySingleUse(t *testing.T) {
 	a := setup(t)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("POST", "/auth/passkey/begin", nil)
-	if err := a.saveCeremony(w, r, login, nil, &webauthn.SessionData{Challenge: "c"}); err != nil {
+	if err := a.saveCeremony(w, r, login, nil, &webauthn.SessionData{Challenge: "c", Origin: apex}); err != nil {
 		t.Fatal(err)
 	}
 	cookie := w.Result().Cookies()[0].Value
 
-	if _, ok, err := takeCeremony(a.db, cookie, login, a.library); err != nil || !ok {
+	if _, ok, err := takeCeremony(a.db, at(a, apex), cookie, login, a.library); err != nil || !ok {
 		t.Fatalf("first take: ok %v, err %v", ok, err)
 	}
-	if _, ok, err := takeCeremony(a.db, cookie, login, a.library); err != nil || ok {
+	if _, ok, err := takeCeremony(a.db, at(a, apex), cookie, login, a.library); err != nil || ok {
 		t.Fatalf("second take: ok %v, err %v; want a consumed ceremony", ok, err)
 	}
 }
@@ -197,7 +214,7 @@ func TestFinishLoginRequiresOwner(t *testing.T) {
 	cred.Authenticator.SignCount = 7
 	finish := func(user pg.ID) error {
 		return a.db.Transaction(func(tx *gorm.DB) error {
-			_, err := finishLogin(tx, r, user, &cred)
+			_, err := finishLogin(tx, r, at(a, apex), user, &cred)
 			return err
 		})
 	}
@@ -223,7 +240,7 @@ func TestFinishLoginRequiresOwner(t *testing.T) {
 func TestResetBeatsRedeem(t *testing.T) {
 	a := setup(t)
 	const email = "op@example.com"
-	raw, _, err := issueLink(t.Context(), a.db, a.c.Key, email, nil, false)
+	raw, _, err := issueLink(t.Context(), a.db, a.key, at(a, apex), email, nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -242,7 +259,7 @@ func TestResetBeatsRedeem(t *testing.T) {
 	}
 	done := make(chan result, 1)
 	go func() {
-		v, _, err := a.redeem(t.Context(), httptest.NewRequest("POST", "/auth/link", nil), raw)
+		v, _, err := a.redeem(t.Context(), httptest.NewRequest("POST", "/auth/link", nil), at(a, apex), raw)
 		done <- result{v.verdict == accepted, err}
 	}()
 	for deadline := time.Now().Add(5 * time.Second); ; {
@@ -295,16 +312,8 @@ func TestOldBinaryRows(t *testing.T) {
 	up(Track.Steps)
 	insert("after@example.com")
 
-	a, err := New(db, nil, Config{
-		Name:   "Test",
-		Origin: "https://example.com",
-		Key:    []byte(strings.Repeat("k", 32)),
-		Layout: func(_ *http.Request, _ string, body templ.Component) templ.Component { return body },
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	a.c.Mode = Invite
+	a := open(t, db)
+	at(a, apex).mode = Invite
 	for _, email := range []string{"before@example.com", "after@example.com"} {
 		addCode(t, a, email, "111111")
 		if got := try(t, a, email, "111111"); got != accepted {
@@ -335,7 +344,7 @@ func TestUsernameAt(t *testing.T) {
 	}
 
 	a := setup(t)
-	a.c.Mode = Invite
+	at(a, apex).mode = Invite
 	for _, email := range []string{"\u017f@example.com", "s@example.com", "S@example.org"} {
 		if _, err := createUser(a.db, email); err != nil {
 			t.Fatalf("default username for %q: %v", email, err)
@@ -349,7 +358,7 @@ func TestUsernameAt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ch, err := a.confirm(t.Context(), pending(t, a, u.ID, "new@example.com"))
+	ch, err := a.confirm(t.Context(), at(a, apex), pending(t, a, u.ID, "new@example.com"))
 	if err != nil || ch.verdict != accepted {
 		t.Fatalf("confirm: verdict %d, err %v; want accepted", ch.verdict, err)
 	}
@@ -369,12 +378,12 @@ func TestLastMethodRace(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, id := range []string{"k1", "k2"} {
-		k := passkey{ID: []byte(id), UserID: u.ID, Name: id, Credential: pg.JSON[webauthn.Credential]{V: webauthn.Credential{ID: []byte(id)}}, Created: u.Created}
+		k := passkey{ID: []byte(id), UserID: u.ID, Name: id, Credential: pg.JSON[webauthn.Credential]{V: attested(t, a.rp, id)}, Created: u.Created}
 		if err := a.db.Create(&k).Error; err != nil {
 			t.Fatal(err)
 		}
 	}
-	token, err := startSession(a.db, httptest.NewRequest("POST", "/", nil), u.ID)
+	token, err := startSession(a.db, httptest.NewRequest("POST", "/", nil), at(a, apex), u.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -391,7 +400,7 @@ func TestLastMethodRace(t *testing.T) {
 			r.SetPathValue("id", encodeID([]byte(id)))
 			r.AddCookie(&http.Cookie{Name: sessionCookie, Value: token})
 			w := httptest.NewRecorder()
-			a.remove(w, r)
+			a.remove(w, r, at(a, apex))
 			codes <- w.Code
 		}()
 	}
@@ -424,24 +433,24 @@ func TestLastMethodRace(t *testing.T) {
 }
 
 func pending(t *testing.T, a *Auth, user pg.ID, to string) string {
-	token, err := startSession(a.db, httptest.NewRequest("POST", "/", nil), user)
+	token, err := startSession(a.db, httptest.NewRequest("POST", "/", nil), at(a, apex), user)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, _, err := lookup(a.db, token)
+	s, _, err := lookup(a.db, apex, token)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var id pg.ID
+	var c code
 	err = a.db.Transaction(func(tx *gorm.DB) error {
 		var err error
-		id, err = newCode(tx, a.c.Key, to, verify, "s", linkLife, &s.id, nil)
+		c, err = newCode(tx, a.key, code{Origin: apex, Email: to, Purpose: verify, SessionID: &s.id}, "s", linkLife)
 		return err
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	return id.String() + ".s"
+	return c.ID.String() + ".s"
 }
 
 func TestOldResetCancelsEmailChange(t *testing.T) {
@@ -465,11 +474,20 @@ func TestOldResetCancelsEmailChange(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ch, err := a.confirm(t.Context(), raw)
+	ch, err := a.confirm(t.Context(), at(a, apex), raw)
 	if err != nil || ch.verdict == accepted {
 		t.Fatalf("confirm after a v1 reset: verdict %d, err %v; want refused", ch.verdict, err)
 	}
 	if got, err := findUser(a.db, "victim@example.com"); err != nil || got.ID != u.ID {
 		t.Fatalf("victim's email after the refused change: %v, %v", got, err)
 	}
+}
+
+func attested(t *testing.T, rp, id string) webauthn.Credential {
+	sum := sha256.Sum256([]byte(rp))
+	object, err := webauthncbor.Marshal(map[string]any{"fmt": "none", "attStmt": map[string]any{}, "authData": append(sum[:], 1, 0, 0, 0, 0)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return webauthn.Credential{ID: []byte(id), Attestation: webauthn.CredentialAttestation{Object: object}}
 }

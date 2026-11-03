@@ -1,6 +1,6 @@
-// Package auth provides per-site passwordless accounts and revocable sessions.
-// Sites own access policy; [Auth.Require] takes an allow check.
-// Use one Auth per database: sessions are not scoped to an origin.
+// Package auth provides passwordless accounts and origin-bound sessions.
+// Use one Auth for all hosts that share a database.
+// [Host.Allow] gates each host; [Auth.Require] adds route-level checks.
 //
 // # Site wiring
 //
@@ -21,12 +21,14 @@
 //
 //	var a *auth.Auth
 //	a, err := st.Auth(queue, auth.Config{
-//		Name: "Example", Origin: "https://example.com", Mode: auth.Open,
-//		Key: []byte(key),
-//		Layout: func(r *http.Request, t string, b templ.Component) templ.Component {
-//			u, _ := a.User(r)
-//			return layout(t, u, b)
-//		},
+//		Name: "Example", Key: []byte(key),
+//		Hosts: []auth.Host{{
+//			Origin: "https://example.com", Mode: auth.Open,
+//			Layout: func(r *http.Request, t string, b templ.Component) templ.Component {
+//				u, _ := a.User(r)
+//				return layout(t, u, b)
+//			},
+//		}},
 //	})
 //	if err != nil { return err }
 //	a.Mount(mux)
@@ -43,15 +45,17 @@
 // [Open] creates a user on their first verified code or link and allows account deletion.
 // Pass a non-nil mail queue in Invite and Open modes.
 // Config.Google adds Google sign-in in every mode.
-// Register Config.Origin + "/auth/google/callback" with Google.
+// Register every Host.Origin + "/auth/google/callback" with Google.
 // Signed-in users can link Google; Open mode can create Google-only users.
 // Google's email never becomes the user's email.
 //
 // In the site's CLI, call st.AuthCommand(ctx, cfg, args, out).
-// Pass the arguments after "auth"; [Command] does not need Config.Layout.
-// "auth link <email|username>" prints a 30-minute sign-in link; an unknown email creates a user.
-// "auth reset <email|username>" also removes passkeys, linked Google accounts and sessions and invalidates codes.
-// Treat the printed link as a secret; reset also invalidates outstanding links.
+// Pass the arguments after "auth"; [Command] does not need Host.Layout.
+// Use "auth link [--origin URL] <who>" or "auth reset [--origin URL] <who>".
+// --origin selects a host and is required only with more than one host.
+// Who is an email or existing username; an unknown email creates a user.
+// Both print a secret, one-use sign-in link that expires in 30 minutes.
+// Reset unlinks Google and revokes passkeys, sessions, codes and links on all hosts.
 //
 // # Usernames and email
 //
@@ -70,15 +74,27 @@
 //   - .auth-note: supporting text; .auth-problem: error messages.
 //   - .auth-passkeys: the passkey list.
 //
-// Passkey buttons use data-auth-passkey="login" or "register" and data-next.
-// Keep data-auth-link-token, data-auth-problem and the data-auth page root.
 // Auth serves passkey.js and loads it on the pages that need it.
 // The site's CSP must allow script-src 'self' and connect-src 'self'.
 // Passkeys need Chrome 129, Safari 18.4 or Firefox 119 or later.
 // Older browsers can use email codes in Invite and Open modes.
+//
+// # Overriding a page
+//
+// Set Host.Views.Signin to a func(SigninView) templ.Component to replace sign-in.
+// Unset Views fields keep the defaults; start from the body in views.templ.
+// Keep the model's feature and safety guards, such as Codes and KeepLast.
+// Keep form methods, actions, field names and hidden next values.
+// Keep data-auth-passkey="login" or "register" buttons and their data-next.
+// Keep data-auth-link-token and data-auth-problem hooks.
+// Keep autocomplete="username webauthn" on the email input for passkey autofill.
+// Google sign-in and linking forms need hx-boost="false" for full-page navigation.
+// Return only the body, with no data-auth root or script tag of its own.
+// Auth owns the root, script loading and Host.Layout call.
 package auth
 
 import (
+	"bytes"
 	"context"
 	_ "embed"
 	"errors"
@@ -87,10 +103,10 @@ import (
 	"net/http"
 	"net/url"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"time"
 
-	"github.com/a-h/templ"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"gorm.io/gorm"
@@ -115,25 +131,21 @@ const (
 
 func (m Mode) codes() bool { return m != Operator }
 
-// Config describes one site's accounts.
+// Config describes shared accounts and their host policies.
 type Config struct {
 	// Name is the site name shown by passkey managers and in mail.
 	Name string
-	// Origin is the public HTTPS origin; HTTP is allowed only on loopback hosts.
-	// Its hostname is the WebAuthn RP ID.
-	Origin string
-	// Mode is Operator unless set to Invite or Open.
-	Mode Mode
 	// Key is the HMAC key for codes and links, at least 32 bytes.
 	Key []byte
-	// Layout wraps auth's pages in the site's document.
-	Layout func(r *http.Request, title string, body templ.Component) templ.Component
 	// Google enables Google sign-in when non-nil.
 	// New then requires the google-client-secret credential.
 	Google *Google
+	// Hosts must share a registrable domain or use localhost names.
+	// A single loopback IP is also allowed; at least one host is required.
+	Hosts []Host
 }
 
-// User is a signed-in account.
+// User is an account shared by all configured hosts.
 type User struct {
 	ID       pg.ID
 	Email    string // Mailbox-verified or operator-supplied address; "" if none.
@@ -143,18 +155,17 @@ type User struct {
 
 // Auth serves sign-in, the account page and session lookups.
 type Auth struct {
-	db       *gorm.DB
-	mail     *mail.Queue
-	c        Config
-	origin   string
-	wa       *webauthn.WebAuthn
-	assets   *static.Server
-	script   string
-	sends    *limiter
-	verifies *limiter
-	begins   *limiter
-	library  string
-	google   *provider
+	db      *gorm.DB
+	mail    *mail.Queue
+	name    string
+	key     []byte
+	hosts   map[string]*host
+	rp      string
+	wa      *webauthn.WebAuthn
+	assets  *static.Server
+	script  string
+	library string
+	google  *provider
 }
 
 const (
@@ -176,27 +187,32 @@ const (
 //go:embed passkey.js
 var passkeyJS []byte
 
-// Anyone allows every signed-in user.
+// Anyone adds no route-level restriction to Require.
 func Anyone(*http.Request, User) bool { return true }
 
 // New checks c and prepares handlers; it does not migrate the database.
-// A nil q is allowed only in Operator mode and disables mail notices.
+// A nil q is allowed only when every host is Operator and disables mail notices.
 // The caller owns q and must close it on shutdown.
 func New(db *gorm.DB, q *mail.Queue, c Config) (*Auth, error) {
-	origin, err := c.check()
+	hosts, rp, err := c.check()
 	if err != nil {
 		return nil, err
 	}
-	if c.Layout == nil {
-		return nil, errors.New("auth: Config.Layout is required")
+	origins := make([]string, 0, len(hosts))
+	for _, h := range hosts {
+		if h.layout == nil {
+			return nil, fmt.Errorf("auth: host %s needs a Layout", h.origin)
+		}
+		if h.mode.codes() && q == nil {
+			return nil, fmt.Errorf("auth: host %s: Invite and Open modes need a mail queue", h.origin)
+		}
+		origins = append(origins, h.origin)
 	}
-	if c.Mode.codes() && q == nil {
-		return nil, errors.New("auth: Invite and Open modes need a mail queue")
-	}
+	slices.Sort(origins)
 	wa, err := webauthn.New(&webauthn.Config{
-		RPID:                  origin.Hostname(),
+		RPID:                  rp,
 		RPDisplayName:         c.Name,
-		RPOrigins:             []string{origin.String()},
+		RPOrigins:             origins,
 		AttestationPreference: protocol.PreferNoAttestation,
 		AuthenticatorSelection: protocol.AuthenticatorSelection{
 			ResidentKey:        protocol.ResidentKeyRequirementRequired,
@@ -215,43 +231,34 @@ func New(db *gorm.DB, q *mail.Queue, c Config) (*Auth, error) {
 		if err != nil {
 			return nil, fmt.Errorf("auth: Config.Google: %w", err)
 		}
-		google = newProvider(googleKind, googleIssuer, c.Google.ClientID, secret, origin.String()+googleCallback)
+		google = newProvider(googleKind, googleIssuer, c.Google.ClientID, secret)
 	}
 	return &Auth{
-		db:       db,
-		mail:     q,
-		c:        c,
-		origin:   origin.String(),
-		wa:       wa,
-		assets:   assets,
-		script:   script,
-		sends:    newLimiter(20, time.Hour),
-		verifies: newLimiter(20, time.Hour),
-		begins:   newLimiter(30, 10*time.Minute),
-		library:  library(),
-		google:   google,
+		db:      db,
+		mail:    q,
+		name:    c.Name,
+		key:     bytes.Clone(c.Key),
+		hosts:   hosts,
+		rp:      rp,
+		wa:      wa,
+		assets:  assets,
+		script:  script,
+		library: library(),
+		google:  google,
 	}, nil
 }
 
-func (c Config) check() (*url.URL, error) {
+func (c Config) check() (map[string]*host, string, error) {
 	if c.Name == "" {
-		return nil, errors.New("auth: Config.Name is required")
-	}
-	u, err := url.Parse(c.Origin)
-	if err != nil || u.Host == "" || u.User != nil || strings.TrimSuffix(u.Path, "/") != "" || u.RawQuery != "" || u.Fragment != "" ||
-		!(u.Scheme == "https" || u.Scheme == "http" && loopback(u.Hostname())) {
-		return nil, errors.New("auth: Config.Origin must be https://host, or http:// on localhost")
+		return nil, "", errors.New("auth: Config.Name is required")
 	}
 	if len(c.Key) < 32 {
-		return nil, errors.New("auth: Config.Key must be at least 32 bytes")
-	}
-	if c.Mode < Operator || c.Mode > Open {
-		return nil, errors.New("auth: Config.Mode must be Operator, Invite or Open")
+		return nil, "", errors.New("auth: Config.Key must be at least 32 bytes")
 	}
 	if c.Google != nil && c.Google.ClientID == "" {
-		return nil, errors.New("auth: Config.Google needs a ClientID")
+		return nil, "", errors.New("auth: Config.Google needs a ClientID")
 	}
-	return &url.URL{Scheme: u.Scheme, Host: u.Host}, nil
+	return parseHosts(c.Hosts)
 }
 
 func loopback(host string) bool {
@@ -280,65 +287,88 @@ func library() string {
 
 // Mount registers the /auth/ pages and endpoints on mux.
 func (a *Auth) Mount(mux *http.ServeMux) {
+	handle := func(pattern string, serve func(http.ResponseWriter, *http.Request, *host)) {
+		mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
+			h, ok := a.host(r)
+			if !ok {
+				misdirected(w)
+				return
+			}
+			serve(w, r, h)
+		})
+	}
 	mux.Handle("GET "+assetsPath, a.assets)
-	mux.HandleFunc("GET "+signinPath, a.signin)
-	if a.c.Mode.codes() {
-		mux.HandleFunc("POST /auth/code", a.sendCode)
-		mux.HandleFunc("POST /auth/code/verify", a.verifyCode)
-	}
-	mux.HandleFunc("POST /auth/passkey/begin", a.loginBegin)
-	mux.HandleFunc("POST /auth/passkey/finish", a.loginFinish)
-	mux.HandleFunc("GET /auth/link", a.showLink)
-	mux.HandleFunc("POST /auth/link", a.redeemLink)
-	mux.HandleFunc("POST /auth/signout", a.signout)
-	mux.HandleFunc("GET "+accountPath, a.account)
-	mux.HandleFunc("POST /auth/account/passkeys/begin", a.addBegin)
-	mux.HandleFunc("POST /auth/account/passkeys/finish", a.addFinish)
-	mux.HandleFunc("POST /auth/account/passkeys/{id}/rename", a.rename)
-	mux.HandleFunc("POST /auth/account/passkeys/{id}/remove", a.remove)
-	mux.HandleFunc("POST /auth/account/signout-others", a.signoutOthers)
-	mux.HandleFunc("POST /auth/account/username", a.setUsername)
+	handle("GET "+signinPath, a.signin)
+	handle("POST /auth/code", a.sendCode)
+	handle("POST /auth/code/verify", a.verifyCode)
+	handle("POST /auth/passkey/begin", a.loginBegin)
+	handle("POST /auth/passkey/finish", a.loginFinish)
+	handle("GET /auth/link", a.showLink)
+	handle("POST /auth/link", a.redeemLink)
+	handle("POST /auth/signout", a.signout)
+	handle("GET "+accountPath, a.account)
+	handle("POST /auth/account/passkeys/begin", a.addBegin)
+	handle("POST /auth/account/passkeys/finish", a.addFinish)
+	handle("POST /auth/account/passkeys/{id}/rename", a.rename)
+	handle("POST /auth/account/passkeys/{id}/remove", a.remove)
+	handle("POST /auth/account/signout-others", a.signoutOthers)
+	handle("POST /auth/account/username", a.setUsername)
+	handle("POST /auth/account/delete", a.deleteAccount)
 	if a.mail != nil {
-		mux.HandleFunc("POST /auth/account/email", a.changeEmail)
-		mux.HandleFunc("GET "+confirmPath, a.showConfirm)
-		mux.HandleFunc("POST "+confirmPath, a.confirmEmail)
-	}
-	if a.c.Mode == Open {
-		mux.HandleFunc("POST /auth/account/delete", a.deleteAccount)
+		handle("POST /auth/account/email", a.changeEmail)
+		handle("GET "+confirmPath, a.showConfirm)
+		handle("POST "+confirmPath, a.confirmEmail)
 	}
 	if a.google != nil {
-		mux.HandleFunc("POST /auth/google", a.googleSignin)
-		mux.HandleFunc("GET "+googleCallback, a.googleCallback)
-		mux.HandleFunc("POST /auth/account/google", a.googleLink)
-		mux.HandleFunc("POST /auth/account/google/remove", a.googleUnlink)
+		handle("POST /auth/google", a.googleSignin)
+		handle("GET "+googleCallback, a.googleCallback)
+		handle("POST /auth/account/google", a.googleLink)
+		handle("POST /auth/account/google/remove", a.googleUnlink)
 	}
 }
 
 type sessionKey struct{}
 
-// Require serves h to signed-in users that allow accepts; others sign in or get 403.
-// Pass Anyone to admit every signed-in user.
-func (a *Auth) Require(allow func(*http.Request, User) bool, h http.Handler) http.Handler {
+type cached struct {
+	host    *host
+	session session
+}
+
+// Require serves handler to signed-in users that allow accepts; others sign in or get 403.
+// Pass Anyone to add no route-level restriction; Host.Allow still applies.
+func (a *Auth) Require(allow func(*http.Request, User) bool, handler http.Handler) http.Handler {
 	if allow == nil {
 		panic("auth: Require needs an allow check; use auth.Anyone for any signed-in user")
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		s, ok := a.session(r)
+		h, ok := a.host(r)
+		if !ok {
+			misdirected(w)
+			return
+		}
+		s, ok := a.session(r, h)
 		if !ok {
 			http.Redirect(w, r, signinPath+"?"+url.Values{"next": {r.URL.RequestURI()}}.Encode(), http.StatusSeeOther)
 			return
 		}
-		r = r.WithContext(context.WithValue(r.Context(), sessionKey{}, s))
-		if !allow(r, s.user) {
-			a.page(w, r, http.StatusForbidden, "Not allowed", forbidden(s.user.name()))
+		r = r.WithContext(context.WithValue(r.Context(), sessionKey{}, cached{h, s}))
+		if !h.admits(s.user) || !allow(r, s.user) {
+			a.forbid(w, r, h, s.user)
 			return
 		}
-		h.ServeHTTP(w, r)
+		handler.ServeHTTP(w, r)
 	})
 }
 
 // User returns the signed-in user, reusing Require's lookup when present.
 func (a *Auth) User(r *http.Request) (User, bool) {
-	s, ok := a.session(r)
-	return s.user, ok
+	h, ok := a.host(r)
+	if !ok {
+		return User{}, false
+	}
+	s, ok := a.session(r, h)
+	if !ok || !h.admits(s.user) {
+		return User{}, false
+	}
+	return s.user, true
 }

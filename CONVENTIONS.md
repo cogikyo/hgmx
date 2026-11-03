@@ -451,6 +451,18 @@ An applied migration can remain after a later step fails, so every intermediate 
 **After Google identities exist, use the current CLI for account recovery.**
 An older binary's `auth reset` leaves linked Google accounts in place; deploy forward first if the current CLI is not available.
 
+**Auth v4 cutover requires a fresh sign-in.**
+Sessions without an origin are refused, so everyone signs in once more.
+Pending codes, links, Google flows and passkey ceremonies from the previous binary must restart.
+
+**Applying auth v4 under a running previous binary** changes cached `SELECT *` and `RETURNING *` result types.
+Each affected cached statement fails once per pooled connection with `cached plan must not change result type`; retrying that statement on the same connection succeeds.
+A retry can hit another connection's stale plan first.
+
+**Rollback past the multi-host release weakens isolation.**
+The previous binary accepts new sessions without host binding or `Host.Allow`, and its sign-out-others reaches sibling hosts.
+Recover by deploying forward, not by staying rolled back; sessions created during rollback have no origin and are refused again on roll-forward.
+
 ## Commands
 
 ### hgmx: Latest

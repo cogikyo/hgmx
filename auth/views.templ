@@ -2,156 +2,180 @@ package auth
 
 import "net/url"
 
-templ signinPage(v signinView) {
-	<div class="auth" data-auth="signin">
-		<script type="module" src={ v.Script }></script>
-		<h1>Sign in</h1>
-		if v.SignedIn != "" {
-			<p class="auth-note">You're signed in as { v.SignedIn }. Sign in again to confirm it's you.</p>
+templ root(name, script string, body templ.Component) {
+	<div class="auth" data-auth={ name }>
+		if script != "" {
+			<script type="module" src={ script }></script>
 		}
-		if v.Codes {
-			<form method="post" action="/auth/code">
-				<input type="hidden" name="next" value={ v.Next }/>
-				<label class="auth-field">
-					<span>Email</span>
-					<input type="email" name="email" value={ v.Email } autocomplete="username webauthn" required autofocus/>
-				</label>
-				<button type="submit" class="auth-primary">Email me a code</button>
-			</form>
-			<button type="button" class="auth-secondary" data-auth-passkey="login" data-next={ v.Next }>Sign in with a passkey</button>
-		} else {
-			<button type="button" class="auth-primary" data-auth-passkey="login" data-next={ v.Next }>Sign in with a passkey</button>
-		}
-		if v.Google {
-			<form method="post" action="/auth/google" hx-boost="false">
-				<input type="hidden" name="next" value={ v.Next }/>
-				<button type="submit" class="auth-secondary">Sign in with Google</button>
-			</form>
-		}
-		@alert(v.Problem)
+		@body
 	</div>
 }
 
-templ continuePage(to string) {
+templ continueRoot(to string, body templ.Component) {
 	<div class="auth" data-auth="continue">
 		<meta http-equiv="refresh" content={ "0; url=" + to }/>
-		<h1>Opening Google</h1>
-		<p class="auth-note"><a href={ templ.URL(to) }>Continue to Google</a></p>
+		@body
 	</div>
 }
 
-templ codePage(v codeView) {
-	<div class="auth" data-auth="code">
-		<h1>Check your email</h1>
-		if v.Open {
-			<p class="auth-note">We emailed a sign-in link and a 6-digit code to { v.Email }. They expire in 10 minutes.</p>
-		} else {
-			<p class="auth-note">If { v.Email } has an account here, we emailed it a sign-in link and a 6-digit code. They expire in 10 minutes.</p>
-		}
-		<form method="post" action="/auth/code/verify">
-			<input type="hidden" name="email" value={ v.Email }/>
+templ signinBody(v SigninView) {
+	<h1>Sign in</h1>
+	if v.SignedIn != "" {
+		<p class="auth-note">You're signed in as { v.SignedIn }. Sign in again to confirm it's you.</p>
+	}
+	if v.Codes {
+		<form method="post" action="/auth/code">
 			<input type="hidden" name="next" value={ v.Next }/>
 			<label class="auth-field">
-				<span>Code</span>
-				<input name="code" inputmode="numeric" autocomplete="one-time-code" required autofocus/>
+				<span>Email</span>
+				<input type="email" name="email" value={ v.Email } autocomplete="username webauthn" required autofocus/>
 			</label>
-			<button type="submit" class="auth-primary">Sign in</button>
+			<button type="submit" class="auth-primary">Email me a code</button>
 		</form>
-		@alert(v.Problem)
-		<form method="post" action="/auth/code">
-			<input type="hidden" name="email" value={ v.Email }/>
+		<button type="button" class="auth-secondary" data-auth-passkey="login" data-next={ v.Next }>Sign in with a passkey</button>
+	} else {
+		<button type="button" class="auth-primary" data-auth-passkey="login" data-next={ v.Next }>Sign in with a passkey</button>
+	}
+	if v.Google {
+		<form method="post" action="/auth/google" hx-boost="false">
 			<input type="hidden" name="next" value={ v.Next }/>
-			<button type="submit" class="auth-secondary">Send a new code</button>
+			<button type="submit" class="auth-secondary">Sign in with Google</button>
 		</form>
-		<a href={ templ.URL(signinPath + "?" + url.Values{"next": {v.Next}}.Encode()) }>Use a different email</a>
-	</div>
+	}
+	@alert(v.Problem)
 }
 
-templ linkPage(v linkView) {
-	<div class="auth" data-auth="link">
-		<script type="module" src={ v.Script }></script>
-		<h1>Sign in with your link</h1>
-		<p class="auth-note">This link signs you in once. Then add a passkey so you can sign in without it.</p>
-		<form method="post" action="/auth/link">
-			<input type="hidden" name="token" data-auth-link-token/>
-			<input type="hidden" name="next" value={ v.Next }/>
-			<button type="submit" class="auth-primary">Sign in</button>
-		</form>
-		@alert(v.Problem)
-	</div>
+templ continueBody(v ContinueView) {
+	<h1>Opening Google</h1>
+	<p class="auth-note"><a href={ templ.URL(v.URL) }>Continue to Google</a></p>
 }
 
-templ confirmPage(v linkView) {
-	<div class="auth" data-auth="email">
-		<script type="module" src={ v.Script }></script>
-		<h1>Confirm your new email</h1>
-		<p class="auth-note">This link changes your account's email once.</p>
-		<form method="post" action="/auth/email">
-			<input type="hidden" name="token" data-auth-link-token/>
-			<button type="submit" class="auth-primary">Confirm email</button>
-		</form>
-		@alert(v.Problem)
-	</div>
+templ codeBody(v CodeView) {
+	<h1>Check your email</h1>
+	if v.Open {
+		<p class="auth-note">We emailed a sign-in link and a 6-digit code to { v.Email }. They expire in 10 minutes.</p>
+	} else {
+		<p class="auth-note">If { v.Email } has an account here, we emailed it a sign-in link and a 6-digit code. They expire in 10 minutes.</p>
+	}
+	<form method="post" action="/auth/code/verify">
+		<input type="hidden" name="email" value={ v.Email }/>
+		<input type="hidden" name="next" value={ v.Next }/>
+		<label class="auth-field">
+			<span>Code</span>
+			<input name="code" inputmode="numeric" autocomplete="one-time-code" required autofocus/>
+		</label>
+		<button type="submit" class="auth-primary">Sign in</button>
+	</form>
+	@alert(v.Problem)
+	<form method="post" action="/auth/code">
+		<input type="hidden" name="email" value={ v.Email }/>
+		<input type="hidden" name="next" value={ v.Next }/>
+		<button type="submit" class="auth-secondary">Send a new code</button>
+	</form>
+	<a href={ templ.URL(signinPath + "?" + url.Values{"next": {v.Next}}.Encode()) }>Use a different email</a>
 }
 
-templ accountPage(v accountView) {
-	<div class="auth" data-auth="account">
-		<script type="module" src={ v.Script }></script>
-		<h1>Account</h1>
-		<p class="auth-note">Signed in as { v.Name }</p>
-		@alert(v.Problem)
-		if v.Notice != "" {
-			<p class="auth-note" role="status">{ v.Notice }</p>
+templ linkBody(v LinkView) {
+	<h1>Sign in with your link</h1>
+	<p class="auth-note">This link signs you in once. Then add a passkey so you can sign in without it.</p>
+	<form method="post" action="/auth/link">
+		<input type="hidden" name="token" data-auth-link-token/>
+		<input type="hidden" name="next" value={ v.Next }/>
+		<button type="submit" class="auth-primary">Sign in</button>
+	</form>
+	@alert(v.Problem)
+}
+
+templ emailBody(v LinkView) {
+	<h1>Confirm your new email</h1>
+	<p class="auth-note">This link changes your account's email once.</p>
+	<form method="post" action="/auth/email">
+		<input type="hidden" name="token" data-auth-link-token/>
+		<button type="submit" class="auth-primary">Confirm email</button>
+	</form>
+	@alert(v.Problem)
+}
+
+templ accountBody(v AccountView) {
+	<h1>Account</h1>
+	<p class="auth-note">Signed in as { v.Name }</p>
+	@alert(v.Problem)
+	if v.Notice != "" {
+		<p class="auth-note" role="status">{ v.Notice }</p>
+	}
+	<section>
+		<h2>Username</h2>
+		<form method="post" action="/auth/account/username">
+			<label class="auth-field">
+				<span>Username</span>
+				<input name="username" value={ v.Username } maxlength="254" autocomplete="nickname" required/>
+			</label>
+			<button type="submit" class="auth-secondary">Save</button>
+		</form>
+		<p class="auth-note">Letters, digits, dots, dashes and underscores, or your own email.</p>
+	</section>
+	<section>
+		<h2>Email</h2>
+		if v.Email != "" {
+			<p class="auth-note">{ v.Email }</p>
+		} else {
+			<p class="auth-note">No email on this account.</p>
 		}
-		<section>
-			<h2>Username</h2>
-			<form method="post" action="/auth/account/username">
-				<label class="auth-field">
-					<span>Username</span>
-					<input name="username" value={ v.Username } maxlength="254" autocomplete="nickname" required/>
-				</label>
-				<button type="submit" class="auth-secondary">Save</button>
-			</form>
-			<p class="auth-note">Letters, digits, dots, dashes and underscores, or your own email.</p>
-		</section>
-		<section>
-			<h2>Email</h2>
-			if v.Email != "" {
-				<p class="auth-note">{ v.Email }</p>
+		if v.Mail {
+			if v.Recent {
+				<form method="post" action="/auth/account/email">
+					<label class="auth-field">
+						<span>New email</span>
+						<input type="email" name="email" autocomplete="email" required/>
+					</label>
+					<button type="submit" class="auth-secondary">Change email</button>
+				</form>
 			} else {
-				<p class="auth-note">No email on this account.</p>
+				@reauth("to change your email")
 			}
-			if v.Mail {
-				if v.Recent {
-					<form method="post" action="/auth/account/email">
+		}
+	</section>
+	<section>
+		<h2>Passkeys</h2>
+		if len(v.Passkeys) == 0 {
+			<p class="auth-note">Add a passkey to sign in with your fingerprint, face or device PIN.</p>
+		}
+		<ul class="auth-passkeys">
+			for _, k := range v.Passkeys {
+				<li>
+					<form method="post" action={ "/auth/account/passkeys/" + k.ID + "/rename" }>
 						<label class="auth-field">
-							<span>New email</span>
-							<input type="email" name="email" autocomplete="email" required/>
+							<span>Name</span>
+							<input name="name" value={ k.Name } maxlength="64" required/>
 						</label>
-						<button type="submit" class="auth-secondary">Change email</button>
+						<button type="submit" class="auth-secondary">Rename</button>
 					</form>
-				} else {
-					@reauth("to change your email")
-				}
-			}
-		</section>
-		<section>
-			<h2>Passkeys</h2>
-			if len(v.Passkeys) == 0 {
-				<p class="auth-note">Add a passkey to sign in with your fingerprint, face or device PIN.</p>
-			}
-			<ul class="auth-passkeys">
-				for _, k := range v.Passkeys {
-					<li>
-						<form method="post" action={ "/auth/account/passkeys/" + k.ID + "/rename" }>
-							<label class="auth-field">
-								<span>Name</span>
-								<input name="name" value={ k.Name } maxlength="64" required/>
-							</label>
-							<button type="submit" class="auth-secondary">Rename</button>
+					<p class="auth-note">Added { date(k.Created) }. { used(k.Used) }</p>
+					if v.Recent && !v.KeepLast {
+						<form method="post" action={ "/auth/account/passkeys/" + k.ID + "/remove" }>
+							<button type="submit" class="auth-danger">Remove</button>
 						</form>
+					}
+				</li>
+			}
+		</ul>
+		if v.KeepLast {
+			<p class="auth-note">Your only passkey can't be removed. Add another one first.</p>
+		}
+		if v.Recent {
+			<button type="button" class="auth-primary" data-auth-passkey="register" data-next={ v.Next }>Add a passkey</button>
+		} else {
+			@reauth("to add or remove passkeys")
+		}
+		if len(v.Older) > 0 {
+			<h3>Older passkeys</h3>
+			<p class="auth-note">These were saved for an earlier address of this site and can't sign you in here.</p>
+			<ul class="auth-passkeys">
+				for _, k := range v.Older {
+					<li>
+						<p>{ k.Name }</p>
 						<p class="auth-note">Added { date(k.Created) }. { used(k.Used) }</p>
-						if v.Recent && !v.KeepLast {
+						if v.Recent {
 							<form method="post" action={ "/auth/account/passkeys/" + k.ID + "/remove" }>
 								<button type="submit" class="auth-danger">Remove</button>
 							</form>
@@ -159,79 +183,69 @@ templ accountPage(v accountView) {
 					</li>
 				}
 			</ul>
-			if v.KeepLast {
-				<p class="auth-note">Your only passkey can't be removed. Add another one first.</p>
-			}
-			if v.Recent {
-				<button type="button" class="auth-primary" data-auth-passkey="register" data-next={ v.Next }>Add a passkey</button>
-			} else {
-				@reauth("to add or remove passkeys")
-			}
-		</section>
-		if v.Google {
-			<section>
-				<h2>Google</h2>
-				if v.Linked {
-					<p class="auth-note">You can sign in with your linked Google account.</p>
-					if v.KeepGoogle {
-						<p class="auth-note">Google is your only way to sign in. Add a passkey before removing it.</p>
-					} else if v.Recent {
-						<form method="post" action="/auth/account/google/remove">
-							<button type="submit" class="auth-danger">Remove Google</button>
-						</form>
-					} else {
-						@reauth("to remove Google")
-					}
+		}
+	</section>
+	if v.Google {
+		<section>
+			<h2>Google</h2>
+			if v.Linked {
+				<p class="auth-note">You can sign in with your linked Google account.</p>
+				if v.KeepGoogle {
+					<p class="auth-note">Google is your only way to sign in. Add a passkey before removing it.</p>
 				} else if v.Recent {
-					<form method="post" action="/auth/account/google" hx-boost="false">
-						<button type="submit" class="auth-secondary">Link Google</button>
+					<form method="post" action="/auth/account/google/remove">
+						<button type="submit" class="auth-danger">Remove Google</button>
 					</form>
 				} else {
-					@reauth("to link Google")
+					@reauth("to remove Google")
 				}
-			</section>
-		}
-		<section>
-			<h2>Devices</h2>
-			if v.Others > 0 {
-				<p class="auth-note">Also signed in on { devices(v.Others) }.</p>
-				<form method="post" action="/auth/account/signout-others">
-					<button type="submit" class="auth-secondary">Sign out other devices</button>
+			} else if v.Recent {
+				<form method="post" action="/auth/account/google" hx-boost="false">
+					<button type="submit" class="auth-secondary">Link Google</button>
 				</form>
 			} else {
-				<p class="auth-note">You're not signed in anywhere else.</p>
+				@reauth("to link Google")
 			}
-			<form method="post" action="/auth/signout">
-				<button type="submit" class="auth-secondary">Sign out</button>
-			</form>
 		</section>
-		if v.Delete {
-			<section>
-				<h2>Delete account</h2>
-				if v.Recent {
-					<form method="post" action="/auth/account/delete">
-						<label class="auth-field">
-							<input type="checkbox" name="confirm" value="yes" required/>
-							<span>Delete my account and its passkeys</span>
-						</label>
-						<button type="submit" class="auth-danger">Delete account</button>
-					</form>
-				} else {
-					@reauth("to delete your account")
-				}
-			</section>
+	}
+	<section>
+		<h2>Devices</h2>
+		if v.Others > 0 {
+			<p class="auth-note">Also signed in on { devices(v.Others) }.</p>
+			<form method="post" action="/auth/account/signout-others">
+				<button type="submit" class="auth-secondary">Sign out other devices</button>
+			</form>
+		} else {
+			<p class="auth-note">You're not signed in anywhere else.</p>
 		}
-	</div>
-}
-
-templ forbidden(email string) {
-	<div class="auth" data-auth="forbidden">
-		<h1>Not allowed</h1>
-		<p class="auth-note">{ email } can't open this page.</p>
 		<form method="post" action="/auth/signout">
 			<button type="submit" class="auth-secondary">Sign out</button>
 		</form>
-	</div>
+	</section>
+	if v.Delete {
+		<section>
+			<h2>Delete account</h2>
+			if v.Recent {
+				<form method="post" action="/auth/account/delete">
+					<label class="auth-field">
+						<input type="checkbox" name="confirm" value="yes" required/>
+						<span>Delete my account and its passkeys</span>
+					</label>
+					<button type="submit" class="auth-danger">Delete account</button>
+				</form>
+			} else {
+				@reauth("to delete your account")
+			}
+		</section>
+	}
+}
+
+templ forbiddenBody(v ForbiddenView) {
+	<h1>Not allowed</h1>
+	<p class="auth-note">{ v.Name } can't open this page.</p>
+	<form method="post" action="/auth/signout">
+		<button type="submit" class="auth-secondary">Sign out</button>
+	</form>
 }
 
 templ alert(msg string) {

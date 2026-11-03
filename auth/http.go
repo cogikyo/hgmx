@@ -2,30 +2,59 @@ package auth
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
 
 	"github.com/a-h/templ"
 
+	"github.com/cogikyo/hgmx/pg"
 	"github.com/cogikyo/hgmx/render"
 )
 
-func (a *Auth) page(w http.ResponseWriter, r *http.Request, status int, title string, body templ.Component) {
+func (a *Auth) page(w http.ResponseWriter, r *http.Request, h *host, status int, title string, body templ.Component) {
 	w.Header().Set("Cache-Control", "no-store")
-	err := render.HTML(w, r, status, a.c.Layout(r, title, body))
+	err := render.HTML(w, r, status, h.layout(r, title, body))
 	if err == nil || r.Context().Err() != nil {
 		return
 	}
 	panic(err)
 }
 
-func (a *Auth) signin(w http.ResponseWriter, r *http.Request) {
-	a.page(w, r, http.StatusOK, "Sign in", signinPage(a.signinView(r, next(r.URL.Query().Get("next")), "", "")))
+func (a *Auth) signin(w http.ResponseWriter, r *http.Request, h *host) {
+	a.signinPage(w, r, h, http.StatusOK, next(r.URL.Query().Get("next")), "", "")
 }
 
 func (a *Auth) toSignin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, signinPath+"?"+url.Values{"next": {accountPath}}.Encode(), http.StatusSeeOther)
+}
+
+func (a *Auth) signedIn(w http.ResponseWriter, r *http.Request, h *host) (session, bool) {
+	s, ok := a.session(r, h)
+	switch {
+	case !ok:
+		a.toSignin(w, r)
+	case !h.admits(s.user):
+		a.forbid(w, r, h, s.user)
+	default:
+		return s, true
+	}
+	return s, false
+}
+
+func (a *Auth) refused(w http.ResponseWriter, r *http.Request, h *host, s session, err error) bool {
+	switch {
+	case err == nil:
+		return false
+	case errors.Is(err, errStale), errors.Is(err, pg.ErrNotFound):
+		a.toSignin(w, r)
+	case errors.Is(err, errDenied):
+		a.forbid(w, r, h, s.user)
+	default:
+		panic(err)
+	}
+	return true
 }
 
 func writeJSON(w http.ResponseWriter, v any) {
