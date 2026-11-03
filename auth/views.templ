@@ -30,9 +30,9 @@ templ codePage(v codeView) {
 	<div class="auth" data-auth="code">
 		<h1>Check your email</h1>
 		if v.Open {
-			<p class="auth-note">We emailed a 6-digit code to { v.Email }. It expires in 10 minutes.</p>
+			<p class="auth-note">We emailed a sign-in link and a 6-digit code to { v.Email }. They expire in 10 minutes.</p>
 		} else {
-			<p class="auth-note">If { v.Email } has an account here, we emailed it a 6-digit code. It expires in 10 minutes.</p>
+			<p class="auth-note">If { v.Email } has an account here, we emailed it a sign-in link and a 6-digit code. They expire in 10 minutes.</p>
 		}
 		<form method="post" action="/auth/code/verify">
 			<input type="hidden" name="email" value={ v.Email }/>
@@ -60,6 +60,7 @@ templ linkPage(v linkView) {
 		<p class="auth-note">This link signs you in once. Then add a passkey so you can sign in without it.</p>
 		<form method="post" action="/auth/link">
 			<input type="hidden" name="token" data-auth-link-token/>
+			<input type="hidden" name="next" value={ v.Next }/>
 			<button type="submit" class="auth-primary">Sign in</button>
 		</form>
 		@alert(v.Problem)

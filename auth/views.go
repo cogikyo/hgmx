@@ -24,6 +24,7 @@ type codeView struct {
 
 type linkView struct {
 	Script  string
+	Next    string
 	Problem string
 }
 

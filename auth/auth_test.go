@@ -36,14 +36,17 @@ func setup(t *testing.T) *Auth {
 	return a
 }
 
-func addCode(t *testing.T, a *Auth, email, secret string) {
+func addCode(t *testing.T, a *Auth, email, secret string) string {
+	var id pg.ID
 	err := a.db.Transaction(func(tx *gorm.DB) error {
-		_, err := newCode(tx, a.c.Key, email, signin, secret, codeLife)
+		var err error
+		id, err = newCode(tx, a.c.Key, email, signin, secret, codeLife)
 		return err
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+	return id.String() + "." + mailSecret(a.c.Key, id, email)
 }
 
 func try(t *testing.T, a *Auth, email, guess string) verdict {
@@ -54,14 +57,28 @@ func try(t *testing.T, a *Auth, email, guess string) verdict {
 	return v.verdict
 }
 
-func TestWrongCodeBudget(t *testing.T) {
+func follow(t *testing.T, a *Auth, token string) verdict {
+	v, _, err := a.redeem(t.Context(), httptest.NewRequest("POST", "/auth/link", nil), token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return v.verdict
+}
+
+func invite(t *testing.T, email string) *Auth {
 	a := setup(t)
-	const email = "a@example.com"
+	a.c.Mode = Invite
 	if _, err := createUser(a.db, email); err != nil {
 		t.Fatal(err)
 	}
+	return a
+}
 
-	addCode(t, a, email, "111111")
+func TestWrongCodeBudget(t *testing.T) {
+	const email = "a@example.com"
+	a := invite(t, email)
+
+	first := addCode(t, a, email, "111111")
 	for i := range triesPerCode {
 		if got := try(t, a, email, "000000"); got != wrong {
 			t.Fatalf("first code, wrong try %d: verdict %d, want wrong", i+1, got)
@@ -75,9 +92,72 @@ func TestWrongCodeBudget(t *testing.T) {
 	for range triesPerDay - triesPerCode {
 		try(t, a, email, "000000")
 	}
-	addCode(t, a, email, "333333")
+	latest := addCode(t, a, email, "333333")
 	if got := try(t, a, email, "333333"); got != exhausted {
 		t.Fatalf("fresh code after %d wrong tries across codes: verdict %d, want exhausted", triesPerDay, got)
+	}
+	if got := follow(t, a, latest+"x"); got != stale {
+		t.Fatalf("wrong link secret: verdict %d, want stale", got)
+	}
+	for _, link := range []string{first, latest} {
+		if got := follow(t, a, link); got != accepted {
+			t.Fatalf("link after the code budget is spent: verdict %d, want accepted", got)
+		}
+	}
+}
+
+func TestCodeAndLinkPaired(t *testing.T) {
+	const email = "b@example.com"
+	a := invite(t, email)
+
+	link := addCode(t, a, email, "111111")
+	if got := try(t, a, email, "111111"); got != accepted {
+		t.Fatalf("code: verdict %d, want accepted", got)
+	}
+	if got := follow(t, a, link); got != stale {
+		t.Fatalf("link after its code: verdict %d, want stale", got)
+	}
+
+	link = addCode(t, a, email, "222222")
+	if got := follow(t, a, link); got != accepted {
+		t.Fatalf("link: verdict %d, want accepted", got)
+	}
+	if got := try(t, a, email, "222222"); got != stale {
+		t.Fatalf("code after its link: verdict %d, want stale", got)
+	}
+
+	link = addCode(t, a, email, "333333")
+	r := httptest.NewRequest("POST", "/auth/code/verify", nil)
+	type result struct {
+		v   verified
+		err error
+	}
+	got := make(chan result, 2)
+	go func() {
+		v, err := a.checkCode(t.Context(), r, email, "333333")
+		got <- result{v, err}
+	}()
+	go func() {
+		v, _, err := a.redeem(t.Context(), r, link)
+		got <- result{v, err}
+	}()
+	x, y := <-got, <-got
+	if x.err != nil || y.err != nil || (x.v.verdict == accepted) == (y.v.verdict == accepted) {
+		t.Fatalf("concurrent code and link: verdicts %d and %d, errors %v and %v; want exactly one accepted", x.v.verdict, y.v.verdict, x.err, y.err)
+	}
+}
+
+func TestNextStaysOnSite(t *testing.T) {
+	for raw, want := range map[string]string{
+		`/a/../\evil.example/`: accountPath,
+		`/a/..//evil.example/`: accountPath,
+		`/members/?u=//x`:      `/members/?u=//x`,
+	} {
+		w := httptest.NewRecorder()
+		http.Redirect(w, httptest.NewRequest("POST", "/auth/link", nil), next(raw), http.StatusSeeOther)
+		if got := w.Header().Get("Location"); got != want {
+			t.Errorf("next(%q) redirects to %q, want %q", raw, got, want)
+		}
 	}
 }
 
@@ -162,8 +242,8 @@ func TestResetBeatsRedeem(t *testing.T) {
 	}
 	done := make(chan result, 1)
 	go func() {
-		_, ok, err := a.redeem(t.Context(), httptest.NewRequest("POST", "/auth/link", nil), raw)
-		done <- result{ok, err}
+		v, _, err := a.redeem(t.Context(), httptest.NewRequest("POST", "/auth/link", nil), raw)
+		done <- result{v.verdict == accepted, err}
 	}()
 	for deadline := time.Now().Add(5 * time.Second); ; {
 		var waiting int64

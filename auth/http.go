@@ -44,8 +44,8 @@ func problem(w http.ResponseWriter, status int, msg string) {
 }
 
 func next(raw string) string {
-	u, err := url.Parse(raw)
-	if err != nil || !strings.HasPrefix(raw, "/") || strings.HasPrefix(raw, "//") || strings.HasPrefix(raw, "/\\") || u.Scheme != "" || u.Host != "" {
+	p, _, _ := strings.Cut(raw, "?")
+	if _, err := url.Parse(raw); err != nil || !strings.HasPrefix(raw, "/") || strings.Contains(raw, `\`) || strings.Contains(p, "//") {
 		return accountPath
 	}
 	return raw

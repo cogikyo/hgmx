@@ -5,11 +5,13 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"math/big"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -27,6 +29,8 @@ const (
 	triesPerCode   = 5
 	triesPerDay    = 10
 )
+
+var digits = regexp.MustCompile(`^[0-9]{6}$`)
 
 type code struct {
 	ID       pg.ID
@@ -47,6 +51,10 @@ func mac(key []byte, id pg.ID, purpose, email, secret string) []byte {
 	return m.Sum(nil)
 }
 
+func mailSecret(key []byte, id pg.ID, email string) string {
+	return base64.RawURLEncoding.EncodeToString(mac(key, id, "mail", email, ""))
+}
+
 func newCode(tx *gorm.DB, key []byte, email, purpose, secret string, life time.Duration) (pg.ID, error) {
 	now := time.Now()
 	id := pg.NewID()
@@ -56,6 +64,7 @@ func newCode(tx *gorm.DB, key []byte, email, purpose, secret string, life time.D
 
 type sent struct {
 	code    string
+	link    string
 	limited bool
 	deliver bool
 	known   bool
@@ -93,7 +102,8 @@ FROM auth_codes WHERE email = ? AND purpose = ? AND created > ?`,
 		s.code = fmt.Sprintf("%06d", d.Int64())
 		s.deliver = s.known || a.c.Mode == Open
 		// Undelivered codes keep unknown addresses on the same rate-accounting path.
-		_, err = newCode(tx, a.c.Key, email, signin, s.code, codeLife)
+		id, err := newCode(tx, a.c.Key, email, signin, s.code, codeLife)
+		s.link = id.String() + "." + mailSecret(a.c.Key, id, email)
 		return err
 	})
 	return s, err
@@ -110,8 +120,29 @@ const (
 
 type verified struct {
 	verdict  verdict
+	user     User
 	token    string
 	passkeys bool
+}
+
+func enter(tx *gorm.DB, r *http.Request, email string, create bool) (verified, error) {
+	v := verified{verdict: stale}
+	u, err := findUser(tx, email)
+	if errors.Is(err, pg.ErrNotFound) && create {
+		u, err = createUser(tx, email)
+	}
+	if errors.Is(err, pg.ErrNotFound) {
+		return v, nil
+	}
+	if err != nil {
+		return v, err
+	}
+	if err := tx.Raw("SELECT EXISTS (SELECT 1 FROM auth_passkeys WHERE user_id = ?)", u.ID).Scan(&v.passkeys).Error; err != nil {
+		return v, err
+	}
+	v.token, err = startSession(tx, r, u.ID)
+	v.verdict, v.user = accepted, u
+	return v, err
 }
 
 func (a *Auth) checkCode(ctx context.Context, r *http.Request, email, guess string) (verified, error) {
@@ -152,21 +183,7 @@ func (a *Auth) checkCode(ctx context.Context, r *http.Request, email, guess stri
 		if err := tx.Exec("UPDATE auth_codes SET consumed = ? WHERE id = ?", now, c.ID).Error; err != nil {
 			return err
 		}
-		u, err := findUser(tx, email)
-		if errors.Is(err, pg.ErrNotFound) && a.c.Mode == Open {
-			u, err = createUser(tx, email)
-		}
-		if errors.Is(err, pg.ErrNotFound) {
-			v.verdict = stale
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		if err := tx.Raw("SELECT EXISTS (SELECT 1 FROM auth_passkeys WHERE user_id = ?)", u.ID).Scan(&v.passkeys).Error; err != nil {
-			return err
-		}
-		v.token, err = startSession(tx, r, u.ID)
+		v, err = enter(tx, r, email, a.c.Mode == Open)
 		return err
 	})
 	return v, err
@@ -206,19 +223,19 @@ func issueLink(ctx context.Context, db *gorm.DB, key []byte, email string, reset
 	return id.String() + "." + secret, err
 }
 
-func (a *Auth) redeem(ctx context.Context, r *http.Request, raw string) (string, bool, error) {
+func (a *Auth) redeem(ctx context.Context, r *http.Request, raw string) (verified, bool, error) {
+	v := verified{verdict: stale}
+	var mailed bool
 	idText, secret, _ := strings.Cut(raw, ".")
 	id, err := pg.ParseID(idText)
 	if err != nil || secret == "" {
-		return "", false, nil
+		return v, mailed, nil
 	}
 	db := a.db.WithContext(ctx)
 	var email string
-	if err := db.Raw("SELECT email FROM auth_codes WHERE id = ? AND purpose = ?", id, link).Scan(&email).Error; err != nil || email == "" {
-		return "", false, err
+	if err := db.Raw("SELECT email FROM auth_codes WHERE id = ?", id).Scan(&email).Error; err != nil || email == "" {
+		return v, mailed, err
 	}
-	var t string
-	ok := false
 	err = db.Transaction(func(tx *gorm.DB) error {
 		if err := lock(tx, email); err != nil {
 			return err
@@ -232,28 +249,24 @@ func (a *Auth) redeem(ctx context.Context, r *http.Request, raw string) (string,
 		if err != nil {
 			return err
 		}
-		now := time.Now()
-		if c.Consumed != nil || !now.Before(c.Expires) || c.Attempts >= triesPerCode {
-			return nil
+		mailed = c.Purpose == signin
+		var valid bool
+		if mailed {
+			valid = a.c.Mode.codes() && hmac.Equal([]byte(secret), []byte(mailSecret(a.c.Key, c.ID, c.Email)))
+		} else {
+			valid = hmac.Equal(c.Mac, mac(a.c.Key, c.ID, link, c.Email, secret))
 		}
-		if !hmac.Equal(c.Mac, mac(a.c.Key, c.ID, link, c.Email, secret)) {
-			return tx.Exec("UPDATE auth_codes SET attempts = attempts + 1 WHERE id = ?", c.ID).Error
+		now := time.Now()
+		if !valid || c.Consumed != nil || !now.Before(c.Expires) {
+			return nil
 		}
 		if err := tx.Exec("UPDATE auth_codes SET consumed = ? WHERE id = ?", now, c.ID).Error; err != nil {
 			return err
 		}
-		u, err := findUser(tx, c.Email)
-		if errors.Is(err, pg.ErrNotFound) {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		t, err = startSession(tx, r, u.ID)
-		ok = err == nil
+		v, err = enter(tx, r, c.Email, mailed && a.c.Mode == Open)
 		return err
 	})
-	return t, ok, err
+	return v, mailed, err
 }
 
 func (a *Auth) sendCode(w http.ResponseWriter, r *http.Request) {
@@ -277,7 +290,7 @@ func (a *Auth) sendCode(w http.ResponseWriter, r *http.Request) {
 		a.page(w, r, http.StatusTooManyRequests, "Enter your code", codePage(v))
 		return
 	}
-	m := a.codeMail(r.Context(), email, s.code)
+	m := a.codeMail(r.Context(), email, s.code, a.origin+"/auth/link?"+url.Values{"next": {v.Next}}.Encode()+"#"+s.link)
 	if s.deliver {
 		a.mail.Enqueue(m)
 	}
@@ -293,6 +306,16 @@ func (a *Auth) verifyCode(w http.ResponseWriter, r *http.Request) {
 	}
 	v.Email = email
 	guess := strings.Join(strings.Fields(r.FormValue("code")), "")
+	if !digits.MatchString(guess) {
+		v.Problem = "Enter the 6-digit code from the email."
+		a.page(w, r, http.StatusUnprocessableEntity, "Enter your code", codePage(v))
+		return
+	}
+	if !a.verifies.allow(r) {
+		v.Problem = "Too many tries from this network. Try again later."
+		a.page(w, r, http.StatusTooManyRequests, "Enter your code", codePage(v))
+		return
+	}
 	res, err := a.checkCode(r.Context(), r, email, guess)
 	if err != nil {
 		panic(err)
@@ -312,24 +335,31 @@ func (a *Auth) verifyCode(w http.ResponseWriter, r *http.Request) {
 		v.Problem = "That code has expired or was replaced. Ask for a new one."
 		a.page(w, r, http.StatusUnprocessableEntity, "Enter your code", codePage(v))
 	case exhausted:
-		v.Problem = "Too many wrong codes for this address. Try again tomorrow."
+		v.Problem = "Too many wrong codes for this address. Use the link in the email, or try again tomorrow."
 		a.page(w, r, http.StatusTooManyRequests, "Enter your code", codePage(v))
 	}
 }
 
 func (a *Auth) showLink(w http.ResponseWriter, r *http.Request) {
-	a.page(w, r, http.StatusOK, "Sign in", linkPage(linkView{Script: a.script}))
+	a.page(w, r, http.StatusOK, "Sign in", linkPage(linkView{Script: a.script, Next: r.URL.Query().Get("next")}))
 }
 
 func (a *Auth) redeemLink(w http.ResponseWriter, r *http.Request) {
-	t, ok, err := a.redeem(r.Context(), r, r.FormValue("token"))
+	v, mailed, err := a.redeem(r.Context(), r, r.FormValue("token"))
 	if err != nil {
 		panic(err)
 	}
-	if !ok {
-		a.page(w, r, http.StatusNotFound, "Sign in", linkPage(linkView{Script: a.script, Problem: "This link has expired or was already used. Ask for a new one."}))
+	if v.verdict != accepted {
+		a.page(w, r, http.StatusNotFound, "Sign in", linkPage(linkView{Script: a.script, Next: r.FormValue("next"), Problem: "This link has expired or was already used. Ask for a new one."}))
 		return
 	}
-	setCookie(w, sessionCookie, t, sessionLife)
-	http.Redirect(w, r, accountPath+"?"+url.Values{"next": {"/"}}.Encode(), http.StatusSeeOther)
+	to := accountPath + "?" + url.Values{"next": {"/"}}.Encode()
+	if mailed {
+		if v.passkeys {
+			a.notify(a.signedInMail(r.Context(), v.user.Email))
+		}
+		to = next(r.FormValue("next"))
+	}
+	setCookie(w, sessionCookie, v.token, sessionLife)
+	http.Redirect(w, r, to, http.StatusSeeOther)
 }

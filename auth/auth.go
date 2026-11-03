@@ -6,7 +6,7 @@
 //
 // Run [Track] before the site's migration track, never at server startup.
 // Read the site's auth-key with credential.Read("auth-key").
-// Its development fallback is HGMX_AUTH_KEY; the key needs at least 32 bytes.
+// Its fallback is HGMX_AUTH_KEY; the key needs at least 32 bytes.
 // Start queue with mail.NewQueue and pass queue.Close to server.Run's after hooks.
 // Keep gorm in store/ by adding Store methods:
 //
@@ -39,8 +39,8 @@
 // # Modes and operator commands
 //
 // [Operator], the zero value, accepts only passkeys and CLI sign-in links.
-// [Invite] also accepts email codes, but only for existing users.
-// [Open] creates a user on their first verified code and allows account deletion.
+// [Invite] also accepts emailed codes and links, but only for existing users.
+// [Open] creates a user on their first verified code or link and allows account deletion.
 // Pass a non-nil mail queue in Invite and Open modes.
 //
 // In the site's CLI, call st.AuthCommand(ctx, cfg, args, out).
@@ -93,9 +93,9 @@ type Mode int
 const (
 	// Operator is the default: passkeys and CLI sign-in links only.
 	Operator Mode = iota
-	// Invite adds email codes for existing users; auth link creates users.
+	// Invite adds emailed codes and links for existing users.
 	Invite
-	// Open creates users on their first verified code and allows account deletion.
+	// Open creates users on code or link sign-in and allows account deletion.
 	Open
 )
 
@@ -125,16 +125,17 @@ type User struct {
 
 // Auth serves sign-in, the account page and session lookups.
 type Auth struct {
-	db      *gorm.DB
-	mail    *mail.Queue
-	c       Config
-	origin  string
-	wa      *webauthn.WebAuthn
-	assets  *static.Server
-	script  string
-	sends   *limiter
-	begins  *limiter
-	library string
+	db       *gorm.DB
+	mail     *mail.Queue
+	c        Config
+	origin   string
+	wa       *webauthn.WebAuthn
+	assets   *static.Server
+	script   string
+	sends    *limiter
+	verifies *limiter
+	begins   *limiter
+	library  string
 }
 
 const (
@@ -189,16 +190,17 @@ func New(db *gorm.DB, q *mail.Queue, c Config) (*Auth, error) {
 	assets := static.Map(assetsPath, map[string][]byte{"passkey.js": passkeyJS})
 	script, _ := assets.URL("passkey.js")
 	return &Auth{
-		db:      db,
-		mail:    q,
-		c:       c,
-		origin:  origin.String(),
-		wa:      wa,
-		assets:  assets,
-		script:  script,
-		sends:   newLimiter(20, time.Hour),
-		begins:  newLimiter(30, 10*time.Minute),
-		library: library(),
+		db:       db,
+		mail:     q,
+		c:        c,
+		origin:   origin.String(),
+		wa:       wa,
+		assets:   assets,
+		script:   script,
+		sends:    newLimiter(20, time.Hour),
+		verifies: newLimiter(20, time.Hour),
+		begins:   newLimiter(30, 10*time.Minute),
+		library:  library(),
 	}, nil
 }
 

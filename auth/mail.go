@@ -25,19 +25,19 @@ func message(ctx context.Context, to, subject, text string, html templ.Component
 	return mail.Message{To: to, Subject: subject, Text: text, HTML: b.String()}
 }
 
-func (a *Auth) codeMail(ctx context.Context, to, code string) mail.Message {
+func (a *Auth) codeMail(ctx context.Context, to, code, link string) mail.Message {
 	return message(ctx, to,
 		fmt.Sprintf("%s is your %s sign-in code", code, a.c.Name),
-		fmt.Sprintf("Your %s sign-in code is %s.\n\nIt expires in 10 minutes. If you didn't ask for it, you can ignore this email.\n", a.c.Name, code),
-		codeMail(a.c.Name, code))
+		fmt.Sprintf("Your %s sign-in code is %s.\n\nOr sign in with this link: %s\n\nBoth expire in 10 minutes and work once. If you didn't ask for them, you can ignore this email.\n", a.c.Name, code, link),
+		codeMail(a.c.Name, code, link))
 }
 
 func (a *Auth) signedInMail(ctx context.Context, to string) mail.Message {
 	when := time.Now().UTC().Format("2 Jan 2006 15:04 MST")
 	url := a.origin + accountPath
 	return message(ctx, to,
-		fmt.Sprintf("New sign-in to %s with an email code", a.c.Name),
-		fmt.Sprintf("Someone signed in to your %s account with an email code on %s.\n\nIf it wasn't you, review your passkeys and sign out other devices at %s\n", a.c.Name, when, url),
+		fmt.Sprintf("New sign-in to %s by email", a.c.Name),
+		fmt.Sprintf("Someone signed in to your %s account by email on %s.\n\nIf it wasn't you, review your passkeys and sign out other devices at %s\n", a.c.Name, when, url),
 		signedInMail(a.c.Name, when, url))
 }
 
