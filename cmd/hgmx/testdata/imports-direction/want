@@ -1,3 +1,4 @@
+.agents/skills/ [hgmx-skills] hgmx skills not installed
 go.mod [hgmx-tool] missing tool github.com/cogikyo/hgmx/cmd/hgmx
 middleware/middleware.go:3:10 [imports/direction] middleware imports views/nav (views); middleware may import site packages only from middleware, store and domain packages
 store/cache/cache.go:3:10 [imports/direction] store/cache imports billing; store may import site packages only from store

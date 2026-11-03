@@ -467,6 +467,21 @@ It prints the old → new hgmx version and suggests `go tool hgmx gen` before `g
 The library and CLI then use the same module version and cannot drift.
 For a first install, run `go get -tool github.com/cogikyo/hgmx/cmd/hgmx@master`.
 
+### hgmx: Skills
+
+**Each site commits the agent skills of its pinned hgmx version, unedited.**
+`go tool hgmx skills` writes them to `.agents/skills/<name>/` and records a SHA-256 of each written file in `.agents/skills/hgmx.sum`, in `sha256sum` format.
+When `.claude/` exists, it also links `.claude/skills/<name>` to the skill folder, relative to the physical `.claude/skills/` folder.
+`go tool hgmx update` runs it after the module bump.
+
+Put site-specific guidance in `SITE.md` beside a skill; hgmx never writes or removes it.
+Edited managed files or conflicting unowned files stop the sync before skill files are changed.
+The message tells you to move changes into `SITE.md`, delete the file, then rerun `go tool hgmx skills`.
+Sync re-hashes skill files before replacing or removing them; a change found then stops the sync, but earlier writes remain.
+Writes use sibling `.<name>.hgmx-<random>` temp files before renaming.
+A skill hgmx no longer ships loses its unedited files and its managed link; its folder stays while `SITE.md` remains.
+The `hgmx-skills` rule in `go tool hgmx check` fails on missing, stale, edited or dropped managed files, incorrect links, or stale fingerprints.
+
 ### Layout: No Justfile
 
 **No justfile anywhere.** Run the shared hgmx commands from the site's module root.

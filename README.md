@@ -47,6 +47,14 @@ Generation and formatting use templ in-process; the site's templ version must ma
 Database tests use `pgtest.Open(t)`; put `initdb` and `pg_ctl` on PATH.
 Missing executables or a socket bind failure skip the test unless `HGMX_PGTEST=require`; other startup failures fail.
 
+## Agent Skills
+
+hgmx ships harness-neutral agent skills for building sites and integrating Stripe payments.
+Run `go tool hgmx skills` to install them in `.agents/skills/`; `go tool hgmx update` re-syncs them when updating hgmx.
+When `.claude/` exists, hgmx also links the skills into `.claude/skills/`.
+Put site-specific rules in `SITE.md` beside a skill's `SKILL.md`; they override the skill, and hgmx never changes them.
+Do not edit managed copies: the `hgmx-skills` check reports drift, and sync stops on edits with instructions to move them into `SITE.md`.
+
 ## Accounts
 
 `auth` provides per-site passwordless accounts with passkeys, email codes and revocable sessions.

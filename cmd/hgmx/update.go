@@ -247,6 +247,14 @@ func updateCmd() int {
 	}
 	s = updated
 	log.Info("hgmx " + old + " → " + s.version(hgmxPath))
+	log.Info("Running go tool hgmx skills")
+	cmd := exec.CommandContext(ctx, "go", "tool", "hgmx", "--log-level", logLevel, "skills")
+	cmd.Dir, cmd.Env = s.dir, moduleEnv()
+	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+	if err := cmd.Run(); err != nil {
+		log.Error("Skill sync failed after the update; resolve the files above, then run go tool hgmx skills", slog.String("error", err.Error()))
+		return 1
+	}
 	next := "go tool hgmx check"
 	if oldTempl != s.version(templPath) {
 		next = "go tool hgmx gen, then " + next

@@ -1,2 +1,3 @@
+.agents/skills/ [hgmx-skills] hgmx skills not installed
 go.mod [hgmx-tool] missing tool github.com/cogikyo/hgmx/cmd/hgmx
 views/page_templ.go:18:2 [slog/context] slog.Info drops the context; ctx is in scope

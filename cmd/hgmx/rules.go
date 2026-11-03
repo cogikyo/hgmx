@@ -36,6 +36,11 @@ var (
 		"the site's go.mod pins the hgmx library and CLI together so they cannot drift",
 		"run go tool hgmx update; for a first install, run go get -tool github.com/cogikyo/hgmx/cmd/hgmx@master",
 	}
+	ruleHgmxSkills = &rule{
+		"hgmx-skills",
+		"every site carries the agent skills of its pinned hgmx version unedited, and keeps site-specific guidance in SITE.md beside each skill",
+		"run go tool hgmx skills",
+	}
 	ruleJustfile = &rule{
 		"layout/no-justfile",
 		"hgmx commands replace per-site justfiles, so every site runs the same gen, dev, check and migrate",
@@ -114,7 +119,7 @@ var (
 )
 
 var rules = []*rule{
-	ruleHgmxLatest, ruleHgmxTool,
+	ruleHgmxLatest, ruleHgmxTool, ruleHgmxSkills,
 	ruleJustfile, ruleInternal, ruleGoVersion, ruleTemplVersion,
 	ruleDirection, ruleStoreOnly, ruleLiveModels,
 	ruleAutoMigrate, ruleGlobal, ruleSlogContext, ruleExit,
@@ -174,6 +179,9 @@ func runRules(s site) ([]finding, error) {
 		return nil, err
 	}
 	if err := a.hgmx(); err != nil {
+		return nil, err
+	}
+	if err := a.skills(); err != nil {
 		return nil, err
 	}
 	if err := a.templRules(); err != nil {

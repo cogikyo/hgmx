@@ -1,2 +1,3 @@
+.agents/skills/ [hgmx-skills] hgmx skills not installed
 go.mod [hgmx-tool] missing tool github.com/cogikyo/hgmx/cmd/hgmx
 routes/routes.go:3:8 [gorm/store-only] routes imports gorm.io/gorm; gorm stays inside store/

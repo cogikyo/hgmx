@@ -1,2 +1,3 @@
+.agents/skills/ [hgmx-skills] hgmx skills not installed
 go.mod [hgmx-tool] missing tool github.com/cogikyo/hgmx/cmd/hgmx
 store/store.go:5:5 [gorm/no-global] package-level DB holds a *gorm.DB

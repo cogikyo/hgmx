@@ -1,2 +1,3 @@
+.agents/skills/ [hgmx-skills] hgmx skills not installed
 go.mod [hgmx-tool] missing tool github.com/cogikyo/hgmx/cmd/hgmx
 store/migrations/migrations.go:3:10 [migrate/no-live-models] store/migrations imports billing, which imports store

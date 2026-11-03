@@ -1,3 +1,4 @@
+.agents/skills/ [hgmx-skills] hgmx skills not installed
 go.mod [hgmx-tool] missing tool github.com/cogikyo/hgmx/cmd/hgmx
 routes/routes.go:10:2 [slog/context] slog.Info drops the context; r is in scope
 routes/routes.go:16:3 [slog/context] log.Warn drops the context; ctx is in scope
