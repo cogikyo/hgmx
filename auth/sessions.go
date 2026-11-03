@@ -57,14 +57,15 @@ func lookup(db *gorm.DB, token string) (session, time.Time, error) {
 		Seen        time.Time
 		UserID      pg.ID
 		Email       string
+		Username    string
 		UserCreated time.Time
 	}
 	err := db.Raw(`
-SELECT s.id, s.created, s.seen, u.id AS user_id, u.email, u.created AS user_created
+SELECT s.id, s.created, s.seen, u.id AS user_id, coalesce(u.email, '') AS email, coalesce(u.username, '') AS username, u.created AS user_created
 FROM auth_sessions s JOIN auth_users u ON u.id = s.user_id
 WHERE s.token_hash = ? AND s.expires > ? AND s.seen > ?`,
 		hash(token), now, now.Add(-idleLife)).Take(&row).Error
-	s := session{id: row.ID, created: row.Created, user: User{ID: row.UserID, Email: row.Email, Created: row.UserCreated}}
+	s := session{id: row.ID, created: row.Created, user: User{ID: row.UserID, Email: row.Email, Username: row.Username, Created: row.UserCreated}}
 	return s, row.Seen, err
 }
 

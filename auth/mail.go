@@ -12,7 +12,7 @@ import (
 )
 
 func (a *Auth) notify(m mail.Message) {
-	if a.mail != nil {
+	if a.mail != nil && m.To != "" {
 		a.mail.Enqueue(m)
 	}
 }
@@ -50,4 +50,19 @@ func (a *Auth) passkeyMail(ctx context.Context, to, name string, added bool) mai
 	return message(ctx, to, subject,
 		fmt.Sprintf("The passkey %q was %s your %s account.\n\nIf you didn't do this, review your passkeys at %s\n", name, change, a.c.Name, url),
 		passkeyMail(a.c.Name, name, change, url))
+}
+
+func (a *Auth) verifyMail(ctx context.Context, to, link string) mail.Message {
+	return message(ctx, to,
+		fmt.Sprintf("Confirm your new %s email", a.c.Name),
+		fmt.Sprintf("Confirm %s as the email for your %s account with this link: %s\n\nThe link expires in 30 minutes and works once. If you didn't ask for this, you can ignore this email.\n", to, a.c.Name, link),
+		verifyMail(a.c.Name, to, link))
+}
+
+func (a *Auth) changedMail(ctx context.Context, from, to string) mail.Message {
+	url := a.origin + accountPath
+	return message(ctx, from,
+		fmt.Sprintf("Your %s email was changed", a.c.Name),
+		fmt.Sprintf("The email for your %s account was changed to %s.\n\nIf you didn't do this, review your passkeys and sign out other devices at %s\n", a.c.Name, to, url),
+		changedMail(a.c.Name, to, url))
 }

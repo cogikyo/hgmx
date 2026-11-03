@@ -40,7 +40,7 @@ func addCode(t *testing.T, a *Auth, email, secret string) string {
 	var id pg.ID
 	err := a.db.Transaction(func(tx *gorm.DB) error {
 		var err error
-		id, err = newCode(tx, a.c.Key, email, signin, secret, codeLife)
+		id, err = newCode(tx, a.c.Key, email, signin, secret, codeLife, nil)
 		return err
 	})
 	if err != nil {
@@ -223,7 +223,7 @@ func TestFinishLoginRequiresOwner(t *testing.T) {
 func TestResetBeatsRedeem(t *testing.T) {
 	a := setup(t)
 	const email = "op@example.com"
-	raw, err := issueLink(t.Context(), a.db, a.c.Key, email, false)
+	raw, _, err := issueLink(t.Context(), a.db, a.c.Key, email, nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -273,5 +273,203 @@ func TestResetBeatsRedeem(t *testing.T) {
 	a.db.Table("auth_sessions").Count(&sessions)
 	if sessions != 0 {
 		t.Fatalf("%d sessions survive the reset, want 0", sessions)
+	}
+}
+
+func TestOldBinaryRows(t *testing.T) {
+	t.Setenv("PGDATABASE", "pgtest")
+	db := pgtest.Open(t)
+	up := func(steps []migrate.Step) {
+		if err := migrate.Command(t.Context(), db, []migrate.Track{{Name: Track.Name, Steps: steps}}, []string{"up"}, io.Discard); err != nil {
+			t.Fatal(err)
+		}
+	}
+	insert := func(email string) {
+		err := db.Exec("INSERT INTO auth_users (id, email, handle, created) VALUES (?, ?, ?, now())", pg.NewID(), email, []byte(email)).Error
+		if err != nil {
+			t.Fatalf("v1-shaped insert of %s: %v", email, err)
+		}
+	}
+	up(Track.Steps[:1])
+	insert("before@example.com")
+	up(Track.Steps)
+	insert("after@example.com")
+
+	a, err := New(db, nil, Config{
+		Name:   "Test",
+		Origin: "https://example.com",
+		Key:    []byte(strings.Repeat("k", 32)),
+		Layout: func(_ *http.Request, _ string, body templ.Component) templ.Component { return body },
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.c.Mode = Invite
+	for _, email := range []string{"before@example.com", "after@example.com"} {
+		addCode(t, a, email, "111111")
+		if got := try(t, a, email, "111111"); got != accepted {
+			t.Fatalf("%s: verdict %d, want accepted", email, got)
+		}
+		u, err := findUser(a.db, email)
+		if err != nil || u.Username != email {
+			t.Fatalf("%s after sign-in: username %q, err %v; want the email", email, u.Username, err)
+		}
+	}
+}
+
+func TestUsernameAt(t *testing.T) {
+	for _, c := range []struct {
+		name, email string
+		ok          bool
+	}{
+		{"Me@Example.com", "me@example.com", true},
+		{"you@example.com", "me@example.com", false},
+		{"you@example.com", "", false},
+		{"me\uff20example.com", "me@example.com", false},
+		{"s@example.com", "\u017f@example.com", false},
+		{"cullyn.k-2_", "me@example.com", true},
+	} {
+		if got := validName(c.name, c.email); got != c.ok {
+			t.Errorf("validName(%q, %q) = %v, want %v", c.name, c.email, got, c.ok)
+		}
+	}
+
+	a := setup(t)
+	a.c.Mode = Invite
+	for _, email := range []string{"\u017f@example.com", "s@example.com", "S@example.org"} {
+		if _, err := createUser(a.db, email); err != nil {
+			t.Fatalf("default username for %q: %v", email, err)
+		}
+	}
+	if _, err := createUser(a.db, "s@example.org"); !errors.Is(err, pg.ErrDuplicate) {
+		t.Fatalf("username differing only in ASCII case: err %v, want ErrDuplicate", err)
+	}
+
+	u, err := createUser(a.db, "old@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ch, err := a.confirm(t.Context(), pending(t, a, u.ID, "new@example.com"))
+	if err != nil || ch.verdict != accepted {
+		t.Fatalf("confirm: verdict %d, err %v; want accepted", ch.verdict, err)
+	}
+	if _, err := createUser(a.db, "old@example.com"); err != nil {
+		t.Fatalf("a new user for the released address: %v", err)
+	}
+	got, err := findUser(a.db, "new@example.com")
+	if err != nil || got.Username != "new@example.com" {
+		t.Fatalf("after the email change: username %q, err %v; want the new email", got.Username, err)
+	}
+}
+
+func TestLastMethodRace(t *testing.T) {
+	a := setup(t)
+	u, err := createUser(a.db, "op@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"k1", "k2"} {
+		k := passkey{ID: []byte(id), UserID: u.ID, Name: id, Credential: pg.JSON[webauthn.Credential]{V: webauthn.Credential{ID: []byte(id)}}, Created: u.Created}
+		if err := a.db.Create(&k).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	token, err := startSession(a.db, httptest.NewRequest("POST", "/", nil), u.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	block := a.db.Begin()
+	defer block.Rollback()
+	if _, err := hold(block, u.ID); err != nil {
+		t.Fatal(err)
+	}
+	codes := make(chan int, 2)
+	for _, id := range []string{"k1", "k2"} {
+		go func() {
+			r := httptest.NewRequest("POST", "/auth/account/passkeys/"+encodeID([]byte(id))+"/remove", nil)
+			r.SetPathValue("id", encodeID([]byte(id)))
+			r.AddCookie(&http.Cookie{Name: sessionCookie, Value: token})
+			w := httptest.NewRecorder()
+			a.remove(w, r)
+			codes <- w.Code
+		}()
+	}
+	for deadline := time.Now().Add(5 * time.Second); ; {
+		var waiting int64
+		if err := a.db.Raw("SELECT count(*) FROM pg_locks WHERE NOT granted").Scan(&waiting).Error; err != nil {
+			t.Fatal(err)
+		}
+		if waiting >= 2 {
+			break
+		}
+		if len(codes) > 0 || time.Now().After(deadline) {
+			t.Fatal("removals did not wait on the user row")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if err := block.Commit().Error; err != nil {
+		t.Fatal(err)
+	}
+
+	x, y := <-codes, <-codes
+	if x+y != http.StatusSeeOther+http.StatusConflict {
+		t.Fatalf("concurrent removals of the last two passkeys: statuses %d and %d, want one 303 and one 409", x, y)
+	}
+	var left int64
+	a.db.Model(&passkey{}).Where("user_id = ?", u.ID).Count(&left)
+	if left != 1 {
+		t.Fatalf("%d passkeys left, want 1", left)
+	}
+}
+
+func pending(t *testing.T, a *Auth, user pg.ID, to string) string {
+	token, err := startSession(a.db, httptest.NewRequest("POST", "/", nil), user)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, _, err := lookup(a.db, token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var id pg.ID
+	err = a.db.Transaction(func(tx *gorm.DB) error {
+		var err error
+		id, err = newCode(tx, a.c.Key, to, verify, "s", linkLife, &s.id)
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return id.String() + ".s"
+}
+
+func TestOldResetCancelsEmailChange(t *testing.T) {
+	a := setup(t)
+	u, err := createUser(a.db, "victim@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := pending(t, a, u.ID, "attacker@example.com")
+
+	for _, q := range []string{
+		"DELETE FROM auth_passkeys WHERE user_id = ?",
+		"DELETE FROM auth_sessions WHERE user_id = ?",
+		"DELETE FROM auth_ceremonies WHERE user_id = ?",
+	} {
+		if err := a.db.Exec(q, u.ID).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := a.db.Exec("UPDATE auth_codes SET consumed = now() WHERE email = ? AND consumed IS NULL", u.Email).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	ch, err := a.confirm(t.Context(), raw)
+	if err != nil || ch.verdict == accepted {
+		t.Fatalf("confirm after a v1 reset: verdict %d, err %v; want refused", ch.verdict, err)
+	}
+	if got, err := findUser(a.db, "victim@example.com"); err != nil || got.ID != u.ID {
+		t.Fatalf("victim's email after the refused change: %v, %v", got, err)
 	}
 }

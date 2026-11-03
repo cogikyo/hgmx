@@ -113,6 +113,10 @@ func (a *Auth) loginFinish(w http.ResponseWriter, r *http.Request) {
 		_, cred, err := a.wa.ValidatePasskeyLogin(func(id, handle []byte) (webauthn.User, error) {
 			// Lock user before credential to avoid a cycle with account deletion.
 			// KEY SHARE permits passkey removal's NO KEY UPDATE user lock.
+			// Fill the username before KEY SHARE to avoid concurrent lock upgrades.
+			if load = claim(tx, "handle", handle); load != nil {
+				return nil, load
+			}
 			if load = tx.Exec("SELECT 1 FROM auth_users WHERE handle = ? FOR KEY SHARE", handle).Error; load != nil {
 				return nil, load
 			}
@@ -231,8 +235,10 @@ func (a *Auth) addFinish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var name string
+	var u User
 	err = db.Transaction(func(tx *gorm.DB) error {
-		if err := lock(tx, h.Email); err != nil {
+		var err error
+		if u, err = hold(tx, h.ID); err != nil {
 			return err
 		}
 		// Reset may have revoked the session while the ceremony was in flight.
@@ -250,7 +256,7 @@ func (a *Auth) addFinish(w http.ResponseWriter, r *http.Request) {
 		name = fmt.Sprintf("Passkey %d", n+1)
 		return tx.Create(&passkey{ID: cred.ID, UserID: h.ID, Name: name, Credential: pg.JSON[webauthn.Credential]{V: *cred}, Created: time.Now()}).Error
 	})
-	if errors.Is(err, errStale) {
+	if errors.Is(err, errStale) || errors.Is(err, pg.ErrNotFound) {
 		problem(w, http.StatusForbidden, "Your sign-in changed while adding the passkey. Sign in again.")
 		return
 	}
@@ -261,7 +267,7 @@ func (a *Auth) addFinish(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		panic(err)
 	}
-	a.notify(a.passkeyMail(r.Context(), h.Email, name, true))
+	a.notify(a.passkeyMail(r.Context(), u.Email, name, true))
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -313,24 +319,24 @@ func (a *Auth) remove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var name string
+	var u User
 	last := false
 	err := a.db.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Exec("SELECT 1 FROM auth_users WHERE id = ? FOR NO KEY UPDATE", s.user.ID).Error; err != nil {
+		var err error
+		if u, err = hold(tx, s.user.ID); err != nil {
 			return err
 		}
 		var k passkey
 		if err := tx.Where("id = ? AND user_id = ?", id, s.user.ID).Take(&k).Error; err != nil {
 			return err
 		}
-		if a.c.Mode == Operator {
-			var n int64
-			if err := tx.Model(&passkey{}).Where("user_id = ?", s.user.ID).Count(&n).Error; err != nil {
-				return err
-			}
-			if n <= 1 {
-				last = true
-				return nil
-			}
+		var n int64
+		if err := tx.Model(&passkey{}).Where("user_id = ?", s.user.ID).Count(&n).Error; err != nil {
+			return err
+		}
+		if a.methods(u, n) <= 1 {
+			last = true
+			return nil
 		}
 		name = k.Name
 		return tx.Delete(&passkey{}, "id = ? AND user_id = ?", id, s.user.ID).Error
@@ -346,7 +352,7 @@ func (a *Auth) remove(w http.ResponseWriter, r *http.Request) {
 		a.accountPage(w, r, s, http.StatusConflict, "This is your only way to sign in. Add another passkey before removing it.")
 		return
 	}
-	a.notify(a.passkeyMail(r.Context(), s.user.Email, name, false))
+	a.notify(a.passkeyMail(r.Context(), u.Email, name, false))
 	http.Redirect(w, r, accountPath, http.StatusSeeOther)
 }
 

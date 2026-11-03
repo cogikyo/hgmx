@@ -37,7 +37,10 @@ type passkeyRow struct {
 
 type accountView struct {
 	Script   string
+	Name     string
+	Username string
 	Email    string
+	Mail     bool
 	Next     string
 	Passkeys []passkeyRow
 	Others   int
@@ -45,12 +48,13 @@ type accountView struct {
 	KeepLast bool
 	Delete   bool
 	Problem  string
+	Notice   string
 }
 
 func (a *Auth) signinView(r *http.Request, next, email, problem string) signinView {
 	v := signinView{Script: a.script, Next: next, Codes: a.c.Mode.codes(), Email: email, Problem: problem}
 	if s, ok := a.session(r); ok {
-		v.SignedIn = s.user.Email
+		v.SignedIn = s.user.name()
 	}
 	return v
 }

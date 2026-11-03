@@ -12,6 +12,7 @@ import (
 // Track is the auth schema; list it before the site's own track.
 var Track = migrate.Track{Name: "auth", Steps: []migrate.Step{
 	{Version: 1, Name: "accounts", Up: accountsUp, Down: accountsDown},
+	{Version: 2, Name: "usernames", Up: usernamesUp, Down: usernamesDown},
 }}
 
 func accountsUp(_ context.Context, db *gorm.DB) error {
@@ -74,6 +75,29 @@ DROP TABLE auth_ceremonies;
 DROP TABLE auth_codes;
 DROP TABLE auth_passkeys;
 DROP TABLE auth_users;
+`).Error
+}
+
+func usernamesUp(_ context.Context, db *gorm.DB) error {
+	return db.Exec(`
+ALTER TABLE auth_users ALTER COLUMN email DROP NOT NULL, ADD COLUMN username text;
+CREATE UNIQUE INDEX auth_users_username ON auth_users (lower(username COLLATE "C"));
+
+ALTER TABLE auth_codes
+	ADD COLUMN session_id uuid,
+	DROP CONSTRAINT auth_codes_purpose_check,
+	ADD CONSTRAINT auth_codes_purpose_check CHECK (purpose IN ('signin', 'link', 'verify'));
+`).Error
+}
+
+func usernamesDown(_ context.Context, db *gorm.DB) error {
+	return db.Exec(`
+DELETE FROM auth_codes WHERE purpose = 'verify';
+ALTER TABLE auth_codes
+	DROP COLUMN session_id,
+	DROP CONSTRAINT auth_codes_purpose_check,
+	ADD CONSTRAINT auth_codes_purpose_check CHECK (purpose IN ('signin', 'link'));
+ALTER TABLE auth_users DROP COLUMN username, ALTER COLUMN email SET NOT NULL;
 `).Error
 }
 

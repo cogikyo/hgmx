@@ -16,3 +16,14 @@ templ passkeyMail(site, name, change, url string) {
 	<p>The passkey “{ name }” was { change } your { site } account.</p>
 	<p>If you didn't do this, <a href={ templ.SafeURL(url) }>review your passkeys</a>.</p>
 }
+
+templ verifyMail(site, to, link string) {
+	<p>Confirm { to } as the email for your { site } account.</p>
+	<p><a href={ templ.SafeURL(link) }>Confirm this email</a></p>
+	<p>The link expires in 30 minutes and works once. If you didn't ask for this, you can ignore this email.</p>
+}
+
+templ changedMail(site, to, url string) {
+	<p>The email for your { site } account was changed to { to }.</p>
+	<p>If you didn't do this, <a href={ templ.SafeURL(url) }>review your passkeys and sign out other devices</a>.</p>
+}

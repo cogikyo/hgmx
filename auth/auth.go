@@ -45,14 +45,22 @@
 //
 // In the site's CLI, call st.AuthCommand(ctx, cfg, args, out).
 // Pass the arguments after "auth"; [Command] does not need Config.Layout.
-// "auth link <email>" creates a missing user and prints a 30-minute sign-in link.
-// "auth reset <email>" also removes passkeys and sessions and invalidates codes.
+// "auth link <email|username>" prints a 30-minute sign-in link; an unknown email creates a user.
+// "auth reset <email|username>" also removes passkeys and sessions and invalidates codes.
 // Treat the printed link as a secret; reset also invalidates outstanding links.
+//
+// # Usernames and email
+//
+// Usernames default to email; older accounts get one at their next sign-in.
+// A username contains @ only when it equals the user's own email, ignoring case.
+// Browser sign-in uses email; operator commands also accept usernames.
+// Email changes need a mail queue and a link sent to the new address.
+// The change revokes codes and links for both addresses and notifies the old one.
 //
 // # Styling and browser support
 //
 // Auth ships no CSS; the site styles these hooks:
-//   - .auth[data-auth]: page roots (signin, code, link, account or forbidden).
+//   - .auth[data-auth]: page roots (signin, code, link, email, account or forbidden).
 //   - .auth-field: field labels, including the delete confirmation.
 //   - .auth-primary, .auth-secondary and .auth-danger: action buttons.
 //   - .auth-note: supporting text; .auth-problem: error messages.
@@ -118,9 +126,10 @@ type Config struct {
 
 // User is a signed-in account.
 type User struct {
-	ID      pg.ID
-	Email   string
-	Created time.Time
+	ID       pg.ID
+	Email    string // Mailbox-verified or operator-supplied address; "" if none.
+	Username string
+	Created  time.Time
 }
 
 // Auth serves sign-in, the account page and session lookups.
@@ -142,6 +151,7 @@ const (
 	prefix       = "/auth/"
 	signinPath   = prefix + "signin"
 	accountPath  = prefix + "account"
+	confirmPath  = prefix + "email"
 	assetsPath   = prefix + "static/"
 	recent       = 10 * time.Minute
 	ceremonyLife = 5 * time.Minute
@@ -265,6 +275,12 @@ func (a *Auth) Mount(mux *http.ServeMux) {
 	mux.HandleFunc("POST /auth/account/passkeys/{id}/rename", a.rename)
 	mux.HandleFunc("POST /auth/account/passkeys/{id}/remove", a.remove)
 	mux.HandleFunc("POST /auth/account/signout-others", a.signoutOthers)
+	mux.HandleFunc("POST /auth/account/username", a.setUsername)
+	if a.mail != nil {
+		mux.HandleFunc("POST /auth/account/email", a.changeEmail)
+		mux.HandleFunc("GET "+confirmPath, a.showConfirm)
+		mux.HandleFunc("POST "+confirmPath, a.confirmEmail)
+	}
 	if a.c.Mode == Open {
 		mux.HandleFunc("POST /auth/account/delete", a.deleteAccount)
 	}
@@ -286,7 +302,7 @@ func (a *Auth) Require(allow func(*http.Request, User) bool, h http.Handler) htt
 		}
 		r = r.WithContext(context.WithValue(r.Context(), sessionKey{}, s))
 		if !allow(r, s.user) {
-			a.page(w, r, http.StatusForbidden, "Not allowed", forbidden(s.user.Email))
+			a.page(w, r, http.StatusForbidden, "Not allowed", forbidden(s.user.name()))
 			return
 		}
 		h.ServeHTTP(w, r)

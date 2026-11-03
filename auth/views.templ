@@ -67,12 +67,60 @@ templ linkPage(v linkView) {
 	</div>
 }
 
+templ confirmPage(v linkView) {
+	<div class="auth" data-auth="email">
+		<script type="module" src={ v.Script }></script>
+		<h1>Confirm your new email</h1>
+		<p class="auth-note">This link changes your account's email once.</p>
+		<form method="post" action="/auth/email">
+			<input type="hidden" name="token" data-auth-link-token/>
+			<button type="submit" class="auth-primary">Confirm email</button>
+		</form>
+		@alert(v.Problem)
+	</div>
+}
+
 templ accountPage(v accountView) {
 	<div class="auth" data-auth="account">
 		<script type="module" src={ v.Script }></script>
 		<h1>Account</h1>
-		<p class="auth-note">Signed in as { v.Email }</p>
+		<p class="auth-note">Signed in as { v.Name }</p>
 		@alert(v.Problem)
+		if v.Notice != "" {
+			<p class="auth-note" role="status">{ v.Notice }</p>
+		}
+		<section>
+			<h2>Username</h2>
+			<form method="post" action="/auth/account/username">
+				<label class="auth-field">
+					<span>Username</span>
+					<input name="username" value={ v.Username } maxlength="254" autocomplete="nickname" required/>
+				</label>
+				<button type="submit" class="auth-secondary">Save</button>
+			</form>
+			<p class="auth-note">Letters, digits, dots, dashes and underscores, or your own email.</p>
+		</section>
+		<section>
+			<h2>Email</h2>
+			if v.Email != "" {
+				<p class="auth-note">{ v.Email }</p>
+			} else {
+				<p class="auth-note">No email on this account.</p>
+			}
+			if v.Mail {
+				if v.Recent {
+					<form method="post" action="/auth/account/email">
+						<label class="auth-field">
+							<span>New email</span>
+							<input type="email" name="email" autocomplete="email" required/>
+						</label>
+						<button type="submit" class="auth-secondary">Change email</button>
+					</form>
+				} else {
+					@reauth("to change your email")
+				}
+			}
+		</section>
 		<section>
 			<h2>Passkeys</h2>
 			if len(v.Passkeys) == 0 {
