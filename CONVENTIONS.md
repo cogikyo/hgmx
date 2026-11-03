@@ -517,10 +517,10 @@ For package loading and Go commands, `check` sets `GOWORK=off` and passes `-mod=
 - **`HGMX_TRUSTED_PROXY`** is the proxy allowed to supply `CF-Connecting-IP`: an IP or CIDR; invalid values stop startup.
   - `clientip.From` reads it once at startup; auth's per-IP limits use that address.
   - When unset, the connection's peer address is used instead.
-- **`HGMX_AUTH_KEY`** is the development fallback for `credential.Read("auth-key")`.
+- **`HGMX_AUTH_KEY`** is read by `credential.Read("auth-key")` when the credential file is missing.
   - `$CREDENTIALS_DIRECTORY/auth-key` takes priority; use a per-site key of at least 32 bytes.
 - **`smtp-password`** is the mail credential, read with `credential.Read("smtp-password")`.
-  - `$CREDENTIALS_DIRECTORY/smtp-password` takes priority; `HGMX_SMTP_PASSWORD` is the development fallback.
+  - `$CREDENTIALS_DIRECTORY/smtp-password` takes priority; if missing, `HGMX_SMTP_PASSWORD` is read instead.
 - **`HGMX_SMTP_HOST`, `HGMX_SMTP_USER`, `HGMX_SMTP_FROM`** configure the site's `mail.SMTP` sender.
   - Use port 465, the default; `mail.SMTP` uses implicit TLS, not STARTTLS.
   - Cloudflare Email Sending uses host `smtp.mx.cloudflare.net` and user `api_token`.
