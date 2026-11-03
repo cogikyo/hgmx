@@ -2,7 +2,6 @@ package auth
 
 import (
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/a-h/templ"
@@ -81,6 +80,13 @@ type PasskeyRow struct {
 	Used    *time.Time
 }
 
+type SessionRow struct {
+	ID      string
+	Device  string
+	Seen    time.Time
+	Current bool
+}
+
 type AccountView struct {
 	Name       string
 	Username   string
@@ -89,7 +95,7 @@ type AccountView struct {
 	Next       string
 	Passkeys   []PasskeyRow // Usable with the current RP ID.
 	Older      []PasskeyRow // Remove-only keys unusable with this RP ID.
-	Others     int          // Other live sessions on this origin only.
+	Sessions   []SessionRow // Browser and app sessions here, current included.
 	Recent     bool         // Signed in within the last 10 minutes.
 	KeepLast   bool         // The sole sign-in method is a passkey.
 	Google     bool
@@ -143,11 +149,4 @@ func used(t *time.Time) string {
 		return "Not used yet."
 	}
 	return "Last used " + date(*t) + "."
-}
-
-func devices(n int) string {
-	if n == 1 {
-		return "1 other device"
-	}
-	return strconv.Itoa(n) + " other devices"
 }

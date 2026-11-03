@@ -192,7 +192,7 @@ func (g googleRig) link(t *testing.T, session *http.Cookie, c fakeClaims) *httpt
 }
 
 func (g googleRig) session(t *testing.T, user pg.ID) *http.Cookie {
-	token, err := startSession(g.a.db, httptest.NewRequest("GET", "/", nil), at(g.a, apex), user)
+	token, err := startSession(g.a.db, caller{host: at(g.a, apex)}, user)
 	if err != nil {
 		t.Fatal(err)
 	}

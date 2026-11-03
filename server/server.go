@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"time"
 
+	"connectrpc.com/connect/v2"
+
 	"github.com/cogikyo/hgmx/telemetry"
 )
 
@@ -18,7 +20,6 @@ var drainTimeout = 5 * time.Second
 
 const stopTimeout = 8 * time.Second
 
-// Site configures the root handler around an application mux.
 type Site struct {
 	Version string
 	CSP     CSP
@@ -28,6 +29,9 @@ type Site struct {
 	// Recovery serves it as 500 without rendering templates.
 	InternalError string
 	Telemetry     *telemetry.Pipeline
+	// RPC identifies mounted services for RPC recovery and unknown-service faults.
+	// Set it after registration; it does not mount handlers.
+	RPC *connect.Server
 }
 
 // Handler wraps mux with telemetry, panic recovery and cross-origin protection.
@@ -46,7 +50,12 @@ func (s Site) Handler(mux *http.ServeMux) http.Handler {
 	if b := p.Beacon(); b.Head() != "" {
 		root.Handle(telemetry.Path, b)
 	}
-	app := p.Handler(recovery(p.Logger(), internalError(s.InternalError), http.NewCrossOriginProtection().Handler(mux)))
+	fallback, routes := internalError(s.InternalError), http.Handler(mux)
+	if s.RPC != nil {
+		rpc := newRPC(s.RPC)
+		fallback, routes = rpc.fallback(fallback), rpc.route(mux)
+	}
+	app := p.Handler(recovery(p.Logger(), fallback, http.NewCrossOriginProtection().Handler(routes)))
 	return security(s.CSP.Header(), s.Allow, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if h, pattern := root.Handler(r); pattern != "" {
 			h.ServeHTTP(w, r)

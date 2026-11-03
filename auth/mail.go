@@ -32,6 +32,13 @@ func (a *Auth) codeMail(ctx context.Context, to, code, link string) mail.Message
 		codeMail(a.name, code, link))
 }
 
+func (a *Auth) appCodeMail(ctx context.Context, to, code string) mail.Message {
+	return message(ctx, to,
+		fmt.Sprintf("%s is your %s sign-in code", code, a.name),
+		fmt.Sprintf("Your %s sign-in code is %s.\n\nEnter it in the app. It expires in 10 minutes and works once. If you didn't ask for it, you can ignore this email.\n", a.name, code),
+		appCodeMail(a.name, code))
+}
+
 func (a *Auth) signedInMail(ctx context.Context, h *host, to string) mail.Message {
 	when := time.Now().UTC().Format("2 Jan 2006 15:04 MST")
 	url := h.origin + accountPath

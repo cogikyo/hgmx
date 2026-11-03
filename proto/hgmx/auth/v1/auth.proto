@@ -1,0 +1,257 @@
+syntax = "proto3";
+
+package hgmx.auth.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/cogikyo/hgmx/proto/hgmx/auth/v1;authv1";
+
+service AuthService {
+  rpc BeginPasskeySignin(BeginPasskeySigninRequest) returns (BeginPasskeySigninResponse);
+  rpc FinishPasskeySignin(FinishPasskeySigninRequest) returns (FinishPasskeySigninResponse);
+  rpc BeginPasskeyAdd(BeginPasskeyAddRequest) returns (BeginPasskeyAddResponse);
+  rpc FinishPasskeyAdd(FinishPasskeyAddRequest) returns (FinishPasskeyAddResponse);
+  rpc RenamePasskey(RenamePasskeyRequest) returns (RenamePasskeyResponse);
+  rpc RemovePasskey(RemovePasskeyRequest) returns (RemovePasskeyResponse);
+  rpc BeginGoogleSignin(BeginGoogleSigninRequest) returns (BeginGoogleSigninResponse);
+  rpc FinishGoogleSignin(FinishGoogleSigninRequest) returns (FinishGoogleSigninResponse);
+  rpc BeginGoogleLink(BeginGoogleLinkRequest) returns (BeginGoogleLinkResponse);
+  rpc FinishGoogleLink(FinishGoogleLinkRequest) returns (FinishGoogleLinkResponse);
+  rpc UnlinkGoogle(UnlinkGoogleRequest) returns (UnlinkGoogleResponse);
+  rpc SendCode(SendCodeRequest) returns (SendCodeResponse);
+  rpc VerifyCode(VerifyCodeRequest) returns (VerifyCodeResponse);
+  rpc GetAccount(GetAccountRequest) returns (GetAccountResponse);
+  rpc SetUsername(SetUsernameRequest) returns (SetUsernameResponse);
+  rpc ChangeEmail(ChangeEmailRequest) returns (ChangeEmailResponse);
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
+  rpc RevokeSession(RevokeSessionRequest) returns (RevokeSessionResponse);
+  rpc RevokeOtherSessions(RevokeOtherSessionsRequest) returns (RevokeOtherSessionsResponse);
+  rpc SignOut(SignOutRequest) returns (SignOutResponse);
+  rpc DeleteAccount(DeleteAccountRequest) returns (DeleteAccountResponse);
+}
+
+message SessionGrant {
+  string token = 1;
+  google.protobuf.Timestamp expires_at = 2;
+  Account account = 3;
+}
+
+message Account {
+  string id = 1;
+  optional string email = 2;
+  string username = 3;
+  string display_name = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp recent_until = 6;
+  repeated Passkey passkeys = 7;
+  repeated Identity identities = 8;
+  Capabilities capabilities = 9;
+}
+
+message Passkey {
+  string id = 1;
+  string name = 2;
+  google.protobuf.Timestamp created_at = 3;
+  optional google.protobuf.Timestamp used_at = 4;
+  bool usable = 5;
+  bool removable = 6;
+}
+
+enum Provider {
+  PROVIDER_UNSPECIFIED = 0;
+  PROVIDER_GOOGLE = 1;
+}
+
+message Identity {
+  Provider provider = 1;
+  bool removable = 2;
+}
+
+message Capabilities {
+  bool email_codes = 1;
+  bool change_email = 2;
+  bool google = 3;
+  bool delete_account = 4;
+}
+
+message PasskeyOptions {
+  string ceremony = 1;
+  bytes public_key_options_json = 2;
+}
+
+message BeginPasskeySigninRequest {}
+
+message BeginPasskeySigninResponse {
+  PasskeyOptions options = 1;
+}
+
+message FinishPasskeySigninRequest {
+  string ceremony = 1;
+  bytes credential_json = 2;
+  string label = 3;
+}
+
+message FinishPasskeySigninResponse {
+  SessionGrant grant = 1;
+}
+
+message BeginPasskeyAddRequest {}
+
+message BeginPasskeyAddResponse {
+  PasskeyOptions options = 1;
+}
+
+message FinishPasskeyAddRequest {
+  string ceremony = 1;
+  bytes credential_json = 2;
+}
+
+message FinishPasskeyAddResponse {
+  Account account = 1;
+}
+
+message RenamePasskeyRequest {
+  string passkey_id = 1;
+  string name = 2;
+}
+
+message RenamePasskeyResponse {
+  Account account = 1;
+}
+
+message RemovePasskeyRequest {
+  string passkey_id = 1;
+}
+
+message RemovePasskeyResponse {
+  Account account = 1;
+}
+
+message GoogleFlow {
+  string flow = 1;
+  string nonce = 2;
+}
+
+message BeginGoogleSigninRequest {}
+
+message BeginGoogleSigninResponse {
+  GoogleFlow flow = 1;
+}
+
+message FinishGoogleSigninRequest {
+  string flow = 1;
+  string id_token = 2;
+  string label = 3;
+}
+
+message FinishGoogleSigninResponse {
+  SessionGrant grant = 1;
+}
+
+message BeginGoogleLinkRequest {}
+
+message BeginGoogleLinkResponse {
+  GoogleFlow flow = 1;
+}
+
+message FinishGoogleLinkRequest {
+  string flow = 1;
+  string id_token = 2;
+}
+
+message FinishGoogleLinkResponse {
+  Account account = 1;
+}
+
+message UnlinkGoogleRequest {}
+
+message UnlinkGoogleResponse {
+  Account account = 1;
+}
+
+message SendCodeRequest {
+  string email = 1;
+}
+
+message SendCodeResponse {}
+
+message VerifyCodeRequest {
+  string email = 1;
+  string code = 2;
+  string label = 3;
+}
+
+message VerifyCodeResponse {
+  SessionGrant grant = 1;
+}
+
+message GetAccountRequest {}
+
+message GetAccountResponse {
+  Account account = 1;
+}
+
+message SetUsernameRequest {
+  string username = 1;
+}
+
+message SetUsernameResponse {
+  Account account = 1;
+}
+
+message ChangeEmailRequest {
+  string email = 1;
+}
+
+message ChangeEmailResponse {}
+
+enum ClientKind {
+  CLIENT_KIND_UNSPECIFIED = 0;
+  CLIENT_KIND_BROWSER = 1;
+  CLIENT_KIND_IOS = 2;
+  CLIENT_KIND_ANDROID = 3;
+}
+
+message Session {
+  string id = 1;
+  string label = 2;
+  ClientKind kind = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp seen_at = 5;
+  google.protobuf.Timestamp expires_at = 6;
+  bool current = 7;
+}
+
+message ListSessionsRequest {}
+
+message ListSessionsResponse {
+  repeated Session sessions = 1;
+}
+
+message RevokeSessionRequest {
+  string session_id = 1;
+}
+
+message RevokeSessionResponse {}
+
+message RevokeOtherSessionsRequest {}
+
+message RevokeOtherSessionsResponse {}
+
+message SignOutRequest {}
+
+message SignOutResponse {}
+
+message DeleteAccountRequest {
+  bool confirm = 1;
+}
+
+message DeleteAccountResponse {}
+
+message SignInAgain {
+  string message = 1;
+}
+
+message LastSignInMethod {
+  string message = 1;
+}

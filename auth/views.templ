@@ -210,8 +210,22 @@ templ accountBody(v AccountView) {
 	}
 	<section>
 		<h2>Devices</h2>
-		if v.Others > 0 {
-			<p class="auth-note">Also signed in on { devices(v.Others) }.</p>
+		<ul class="auth-sessions">
+			for _, d := range v.Sessions {
+				<li>
+					<p>{ d.Device }</p>
+					if d.Current {
+						<p class="auth-note">This device.</p>
+					} else {
+						<p class="auth-note">Last active { date(d.Seen) }.</p>
+						<form method="post" action={ "/auth/account/sessions/" + d.ID + "/revoke" }>
+							<button type="submit" class="auth-secondary">Sign out</button>
+						</form>
+					}
+				</li>
+			}
+		</ul>
+		if len(v.Sessions) > 1 {
 			<form method="post" action="/auth/account/signout-others">
 				<button type="submit" class="auth-secondary">Sign out other devices</button>
 			</form>

@@ -7,6 +7,12 @@ templ codeMail(site, code, link string) {
 	<p>Both expire in 10 minutes and work once. If you didn't ask for them, you can ignore this email.</p>
 }
 
+templ appCodeMail(site, code string) {
+	<p>Your { site } sign-in code is</p>
+	<p><strong>{ code }</strong></p>
+	<p>Enter it in the app. It expires in 10 minutes and works once. If you didn't ask for it, you can ignore this email.</p>
+}
+
 templ signedInMail(site, when, url string) {
 	<p>Someone signed in to your { site } account by email on { when }.</p>
 	<p>If it wasn't you, <a href={ templ.SafeURL(url) }>review your passkeys and sign out other devices</a>.</p>

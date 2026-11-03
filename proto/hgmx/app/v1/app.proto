@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package hgmx.app.v1;
+
+option go_package = "github.com/cogikyo/hgmx/proto/hgmx/app/v1;appv1";
+
+service AppService {
+  rpc GetConfiguration(GetConfigurationRequest) returns (GetConfigurationResponse);
+}
+
+message GetConfigurationRequest {}
+
+message GetConfigurationResponse {
+  repeated int32 api_majors = 1;
+  repeated string methods = 2;
+  int64 minimum_build = 3;
+  string store_url = 4;
+  bool update_required = 5;
+}
+
+message UpdateRequired {
+  int64 minimum_build = 1;
+  string store_url = 2;
+  string message = 3;
+}

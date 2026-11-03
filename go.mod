@@ -3,6 +3,7 @@ module github.com/cogikyo/hgmx
 go 1.27.0
 
 require (
+	connectrpc.com/connect/v2 v2.0.2
 	github.com/a-h/templ v0.3.1100
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/fatih/color v1.19.0
@@ -15,6 +16,7 @@ require (
 	golang.org/x/net v0.61.0
 	golang.org/x/oauth2 v0.37.0
 	golang.org/x/tools v0.51.0
+	google.golang.org/protobuf v1.36.12
 	gorm.io/driver/postgres v1.6.3
 	gorm.io/gorm v1.31.2
 )

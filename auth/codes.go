@@ -17,6 +17,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/cogikyo/hgmx/clientip"
 	"github.com/cogikyo/hgmx/pg"
 )
 
@@ -148,9 +149,9 @@ type verified struct {
 	passkeys bool
 }
 
-func enter(tx *gorm.DB, r *http.Request, h *host, email string) (verified, error) {
+func enter(tx *gorm.DB, c caller, email string) (verified, error) {
 	u, err := findUser(tx, email)
-	if errors.Is(err, pg.ErrNotFound) && h.mode == Open {
+	if errors.Is(err, pg.ErrNotFound) && c.host.mode == Open {
 		u, err = createUser(tx, email)
 	}
 	if errors.Is(err, pg.ErrNotFound) {
@@ -159,12 +160,12 @@ func enter(tx *gorm.DB, r *http.Request, h *host, email string) (verified, error
 	if err != nil {
 		return verified{verdict: stale}, err
 	}
-	return admit(tx, r, h, u)
+	return admit(tx, c, u)
 }
 
-func admit(tx *gorm.DB, r *http.Request, h *host, u User) (verified, error) {
+func admit(tx *gorm.DB, c caller, u User) (verified, error) {
 	v := verified{verdict: stale}
-	if !h.admits(u) {
+	if !c.host.admits(u) {
 		return verified{verdict: denied, user: u}, errDenied
 	}
 	if err := claim(tx, "id", u.ID); err != nil {
@@ -174,12 +175,12 @@ func admit(tx *gorm.DB, r *http.Request, h *host, u User) (verified, error) {
 		return v, err
 	}
 	var err error
-	v.token, err = startSession(tx, r, h, u.ID)
+	v.token, err = startSession(tx, c, u.ID)
 	v.verdict, v.user = accepted, u
 	return v, err
 }
 
-func (a *Auth) checkCode(ctx context.Context, r *http.Request, h *host, email, guess string) (verified, error) {
+func (a *Auth) checkCode(ctx context.Context, k caller, email, guess string) (verified, error) {
 	var v verified
 	err := a.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := lock(tx, email); err != nil {
@@ -197,7 +198,7 @@ func (a *Auth) checkCode(ctx context.Context, r *http.Request, h *host, email, g
 			return nil
 		}
 		var c code
-		err = tx.Where("origin = ? AND email = ? AND purpose = ? AND created > ?", h.origin, email, signin, now.Add(-retention)).
+		err = tx.Where("origin = ? AND email = ? AND purpose = ? AND created > ?", k.host.origin, email, signin, now.Add(-retention)).
 			Order("created DESC, id DESC").Take(&c).Error
 		if errors.Is(err, pg.ErrNotFound) {
 			v.verdict = stale
@@ -217,7 +218,7 @@ func (a *Auth) checkCode(ctx context.Context, r *http.Request, h *host, email, g
 		if err := tx.Exec("UPDATE auth_codes SET consumed = ? WHERE id = ?", now, c.ID).Error; err != nil {
 			return err
 		}
-		v, err = enter(tx, r, h, email)
+		v, err = enter(tx, k, email)
 		return err
 	})
 	return v, admitted(err)
@@ -266,7 +267,7 @@ func issueLink(ctx context.Context, db *gorm.DB, key []byte, h *host, email stri
 			return errDenied
 		}
 		if reset {
-			for _, q := range []string{"DELETE FROM auth_passkeys WHERE user_id = ?", "DELETE FROM auth_sessions WHERE user_id = ?", "DELETE FROM auth_ceremonies WHERE user_id = ?", "DELETE FROM auth_identities WHERE user_id = ?"} {
+			for _, q := range []string{"DELETE FROM auth_passkeys WHERE user_id = ?", flowsOf, "DELETE FROM auth_sessions WHERE user_id = ?", "DELETE FROM auth_ceremonies WHERE user_id = ?", "DELETE FROM auth_identities WHERE user_id = ?"} {
 				if err := tx.Exec(q, u.ID).Error; err != nil {
 					return err
 				}
@@ -343,9 +344,9 @@ func (a *Auth) redeem(ctx context.Context, r *http.Request, h *host, raw string)
 			return err
 		}
 		if mailed {
-			v, err = enter(tx, r, h, c.Email)
+			v, err = enter(tx, browser(r, h), c.Email)
 		} else {
-			v, err = admit(tx, r, h, u)
+			v, err = admit(tx, browser(r, h), u)
 		}
 		return err
 	})
@@ -367,7 +368,7 @@ func (a *Auth) sendCode(w http.ResponseWriter, r *http.Request, h *host) {
 		return
 	}
 	v.Email = email
-	if !h.sends.allow(r) {
+	if !h.sends.allow(clientip.From(r)) {
 		a.signinPage(w, r, h, http.StatusTooManyRequests, v.Next, email, "Too many codes from this network. Try again later.")
 		return
 	}
@@ -405,12 +406,12 @@ func (a *Auth) verifyCode(w http.ResponseWriter, r *http.Request, h *host) {
 		a.codePage(w, r, h, http.StatusUnprocessableEntity, v)
 		return
 	}
-	if !h.verifies.allow(r) {
+	if !h.verifies.allow(clientip.From(r)) {
 		v.Problem = "Too many tries from this network. Try again later."
 		a.codePage(w, r, h, http.StatusTooManyRequests, v)
 		return
 	}
-	res, err := a.checkCode(r.Context(), r, h, email, guess)
+	res, err := a.checkCode(r.Context(), browser(r, h), email, guess)
 	if err != nil {
 		panic(err)
 	}

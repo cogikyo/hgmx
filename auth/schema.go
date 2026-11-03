@@ -15,6 +15,7 @@ var Track = migrate.Track{Name: "auth", Steps: []migrate.Step{
 	{Version: 2, Name: "usernames", Up: usernamesUp, Down: usernamesDown},
 	{Version: 3, Name: "identities", Up: identitiesUp, Down: identitiesDown},
 	{Version: 4, Name: "hosts", Up: hostsUp, Down: hostsDown},
+	{Version: 5, Name: "apps", Up: appsUp, Down: appsDown},
 }}
 
 func accountsUp(_ context.Context, db *gorm.DB) error {
@@ -156,6 +157,48 @@ ALTER TABLE auth_sessions DROP COLUMN origin;
 `).Error
 }
 
+func appsUp(_ context.Context, db *gorm.DB) error {
+	return db.Exec(`
+ALTER TABLE auth_sessions ADD COLUMN client_id text, ADD COLUMN label text;
+ALTER TABLE auth_ceremonies
+	ADD COLUMN client_id text,
+	ADD COLUMN origin text,
+	ADD COLUMN session_id uuid,
+	ADD CONSTRAINT auth_ceremonies_native_scope
+		CHECK ((client_id IS NULL AND origin IS NULL AND session_id IS NULL)
+			OR (client_id IS NOT NULL AND origin IS NOT NULL
+				AND ((kind = 'login' AND session_id IS NULL)
+					OR (kind = 'register' AND session_id IS NOT NULL))));
+
+CREATE TABLE auth_native_flows (
+	id bytea PRIMARY KEY,
+	provider text NOT NULL,
+	intent text NOT NULL CHECK (intent IN ('signin', 'link')),
+	nonce text NOT NULL,
+	client_id text NOT NULL,
+	origin text NOT NULL,
+	session_id uuid,
+	expires timestamptz NOT NULL,
+	CHECK ((intent = 'signin' AND session_id IS NULL)
+		OR (intent = 'link' AND session_id IS NOT NULL))
+);
+`).Error
+}
+
+func appsDown(_ context.Context, db *gorm.DB) error {
+	return db.Exec(`
+DROP TABLE auth_native_flows;
+DELETE FROM auth_ceremonies WHERE client_id IS NOT NULL;
+DELETE FROM auth_sessions WHERE client_id IS NOT NULL;
+ALTER TABLE auth_ceremonies
+	DROP CONSTRAINT auth_ceremonies_native_scope,
+	DROP COLUMN session_id,
+	DROP COLUMN origin,
+	DROP COLUMN client_id;
+ALTER TABLE auth_sessions DROP COLUMN label, DROP COLUMN client_id;
+`).Error
+}
+
 // sweep runs outside address locks; SKIP LOCKED avoids waiting on active rows.
 func sweep(db *gorm.DB, library string) error {
 	now := time.Now()
@@ -168,6 +211,7 @@ func sweep(db *gorm.DB, library string) error {
 		{"DELETE FROM auth_sessions WHERE id IN (SELECT id FROM auth_sessions WHERE expires <= ? OR seen <= ? FOR UPDATE SKIP LOCKED)", []any{now, now.Add(-idleLife)}},
 		{"DELETE FROM auth_ceremonies WHERE id IN (SELECT id FROM auth_ceremonies WHERE expires <= ? OR library <> ? FOR UPDATE SKIP LOCKED)", []any{now, library}},
 		{"DELETE FROM auth_flows WHERE id IN (SELECT id FROM auth_flows WHERE expires <= ? FOR UPDATE SKIP LOCKED)", []any{now}},
+		{"DELETE FROM auth_native_flows WHERE id IN (SELECT id FROM auth_native_flows WHERE expires <= ? FOR UPDATE SKIP LOCKED)", []any{now}},
 	} {
 		if err := db.Exec(q.sql, q.args...).Error; err != nil {
 			return err

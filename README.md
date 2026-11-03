@@ -80,6 +80,8 @@ a.Mount(mux)
 mux.Handle("GET /members", a.Require(auth.Anyone, members))
 ```
 
+`auth` also serves a versioned Connect-RPC API for SwiftUI and Compose apps; see [Serving an App API](CONVENTIONS.md#serving-an-app-api) for wiring.
+
 ## Packages
 
 - **`server`** composes the root handler, version reloads, recovery and graceful shutdown.
@@ -110,3 +112,11 @@ From this repository: `go build -o hgmx ./cmd/hgmx`.
 
 `hgmx.Version()` reports the main module's Go build-info version only when that module is hgmx itself, as in the CLI.
 It returns empty in a site; set the site's own version separately.
+
+## Regenerate RPC Code
+
+Regenerate committed RPC Go sources from `proto/`:
+
+```bash
+GOWORK=off CGO_ENABLED=0 go run github.com/bufbuild/buf/cmd/buf@v1.75.0 generate
+```

@@ -67,7 +67,7 @@ func addCode(t *testing.T, a *Auth, email, secret string) string {
 }
 
 func try(t *testing.T, a *Auth, email, guess string) verdict {
-	v, err := a.checkCode(t.Context(), httptest.NewRequest("POST", "/auth/code/verify", nil), at(a, apex), email, guess)
+	v, err := a.checkCode(t.Context(), browser(httptest.NewRequest("POST", "/auth/code/verify", nil), at(a, apex)), email, guess)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +151,7 @@ func TestCodeAndLinkPaired(t *testing.T) {
 	}
 	got := make(chan result, 2)
 	go func() {
-		v, err := a.checkCode(t.Context(), r, at(a, apex), email, "333333")
+		v, err := a.checkCode(t.Context(), browser(r, at(a, apex)), email, "333333")
 		got <- result{v, err}
 	}()
 	go func() {
@@ -180,17 +180,16 @@ func TestNextStaysOnSite(t *testing.T) {
 
 func TestCeremonySingleUse(t *testing.T) {
 	a := setup(t)
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest("POST", "/auth/passkey/begin", nil)
-	if err := a.saveCeremony(w, r, login, nil, &webauthn.SessionData{Challenge: "c", Origin: apex}); err != nil {
+	c := caller{host: at(a, apex)}
+	cookie, err := a.saveCeremony(t.Context(), c, login, nil, nil, &webauthn.SessionData{Challenge: "c", Origin: apex})
+	if err != nil {
 		t.Fatal(err)
 	}
-	cookie := w.Result().Cookies()[0].Value
 
-	if _, ok, err := takeCeremony(a.db, at(a, apex), cookie, login, a.library); err != nil || !ok {
+	if _, ok, err := takeCeremony(a.db, c, cookie, login, a.library); err != nil || !ok {
 		t.Fatalf("first take: ok %v, err %v", ok, err)
 	}
-	if _, ok, err := takeCeremony(a.db, at(a, apex), cookie, login, a.library); err != nil || ok {
+	if _, ok, err := takeCeremony(a.db, c, cookie, login, a.library); err != nil || ok {
 		t.Fatalf("second take: ok %v, err %v; want a consumed ceremony", ok, err)
 	}
 }
@@ -214,7 +213,7 @@ func TestFinishLoginRequiresOwner(t *testing.T) {
 	cred.Authenticator.SignCount = 7
 	finish := func(user pg.ID) error {
 		return a.db.Transaction(func(tx *gorm.DB) error {
-			_, err := finishLogin(tx, r, at(a, apex), user, &cred)
+			_, err := finishLogin(tx, browser(r, at(a, apex)), user, &cred)
 			return err
 		})
 	}
@@ -383,7 +382,7 @@ func TestLastMethodRace(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	token, err := startSession(a.db, httptest.NewRequest("POST", "/", nil), at(a, apex), u.ID)
+	token, err := startSession(a.db, caller{host: at(a, apex)}, u.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -433,11 +432,11 @@ func TestLastMethodRace(t *testing.T) {
 }
 
 func pending(t *testing.T, a *Auth, user pg.ID, to string) string {
-	token, err := startSession(a.db, httptest.NewRequest("POST", "/", nil), at(a, apex), user)
+	token, err := startSession(a.db, caller{host: at(a, apex)}, user)
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, _, err := lookup(a.db, apex, token)
+	s, _, err := lookup(a.db, caller{host: at(a, apex), token: token})
 	if err != nil {
 		t.Fatal(err)
 	}

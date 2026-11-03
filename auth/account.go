@@ -11,13 +11,17 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/cogikyo/hgmx/clientip"
 	"github.com/cogikyo/hgmx/pg"
+	authv1 "github.com/cogikyo/hgmx/proto/hgmx/auth/v1"
 )
 
 var (
 	errStale   = errors.New("auth: session or ceremony no longer valid")
 	errDenied  = errors.New("auth: the host's Allow refused the user")
 	errMissing = errors.New("auth: row not found")
+	errLast    = errors.New("auth: the last sign-in method stays")
+	errRecent  = errors.New("auth: the session is too old for this change")
 )
 
 func (a *Auth) account(w http.ResponseWriter, r *http.Request, h *host) {
@@ -39,7 +43,7 @@ func (a *Auth) methods(db *gorm.DB, h *host, u User) (int64, error) {
 			total++
 		}
 	}
-	if a.google != nil {
+	if a.googleOn(h) {
 		var n int64
 		if err := db.Raw("SELECT count(*) FROM auth_identities WHERE user_id = ? AND kind = ?", u.ID, googleKind).Scan(&n).Error; err != nil {
 			return 0, err
@@ -62,9 +66,7 @@ func (a *Auth) renderAccount(w http.ResponseWriter, r *http.Request, h *host, s 
 	if err := db.Select("id", "name", "credential", "created", "used").Where("user_id = ?", s.user.ID).Order("created").Find(&keys).Error; err != nil {
 		panic(err)
 	}
-	var others int64
-	now := time.Now()
-	err := db.Table("auth_sessions").Where("user_id = ? AND origin = ? AND id <> ? AND expires > ? AND seen > ?", s.user.ID, h.origin, s.id, now, now.Add(-idleLife)).Count(&others).Error
+	rows, err := a.sessions(db, h, s.user.ID)
 	if err != nil {
 		panic(err)
 	}
@@ -84,7 +86,6 @@ func (a *Auth) renderAccount(w http.ResponseWriter, r *http.Request, h *host, s 
 		Email:      s.user.Email,
 		Mail:       a.mail != nil,
 		Next:       next(r.URL.Query().Get("next")),
-		Others:     int(others),
 		Recent:     s.recent(),
 		Google:     a.google != nil,
 		Linked:     linked,
@@ -92,6 +93,9 @@ func (a *Auth) renderAccount(w http.ResponseWriter, r *http.Request, h *host, s 
 		Delete:     h.mode == Open,
 		Problem:    problem,
 		Notice:     notice,
+	}
+	for _, row := range rows {
+		v.Sessions = append(v.Sessions, SessionRow{ID: row.ID.String(), Device: a.device(row), Seen: row.Seen, Current: row.ID == s.id})
 	}
 	for _, k := range keys {
 		row := PasskeyRow{ID: encodeID(k.ID), Name: k.Name, Created: k.Created, Used: k.Used}
@@ -103,6 +107,35 @@ func (a *Auth) renderAccount(w http.ResponseWriter, r *http.Request, h *host, s 
 	}
 	v.KeepLast = len(v.Passkeys) == 1 && total == 1
 	a.page(w, r, h, status, "Account", root("account", a.script, h.views.Account(v)))
+}
+
+func (a *Auth) device(row sessionRow) string {
+	switch {
+	case row.Label != nil:
+		return *row.Label
+	case row.ClientID == nil:
+		return "Browser"
+	case a.apps[*row.ClientID].kind == authv1.ClientKind_CLIENT_KIND_IOS:
+		return "iPhone or iPad app"
+	}
+	return "Android app"
+}
+
+func (a *Auth) revokeSession(w http.ResponseWriter, r *http.Request, h *host) {
+	s, ok := a.signedIn(w, r, h)
+	if !ok {
+		return
+	}
+	id, err := pg.ParseID(r.PathValue("id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	err = a.revoke(r.Context(), browser(r, h), s.user.ID, &id)
+	if !errors.Is(err, errMissing) && a.refused(w, r, h, s, err) {
+		return
+	}
+	http.Redirect(w, r, accountPath, http.StatusSeeOther)
 }
 
 func (a *Auth) deleteAccount(w http.ResponseWriter, r *http.Request, h *host) {
@@ -123,27 +156,7 @@ func (a *Auth) deleteAccount(w http.ResponseWriter, r *http.Request, h *host) {
 		a.accountPage(w, r, h, s, http.StatusUnprocessableEntity, "Tick the box to confirm deleting your account.")
 		return
 	}
-	err := a.db.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error {
-		if err := lock(tx, s.user.Email); err != nil {
-			return err
-		}
-		u, err := hold(tx, s.user.ID)
-		if err != nil {
-			return err
-		}
-		// Recheck under the locks: reset may have revoked this session.
-		cur, err := live(tx, r, h, s.user.ID)
-		if err != nil {
-			return err
-		}
-		if !cur.recent() || u.Email != s.user.Email {
-			return errStale
-		}
-		if err := revokeCodes(tx, u); err != nil {
-			return err
-		}
-		return tx.Exec("DELETE FROM auth_users WHERE id = ?", s.user.ID).Error
-	})
+	err := a.erase(r.Context(), browser(r, h), s)
 	if errors.Is(err, pg.ErrForeignKey) {
 		a.accountPage(w, r, h, s, http.StatusConflict, "This account still owns data on this site, so it can't be deleted here.")
 		return
@@ -153,6 +166,40 @@ func (a *Auth) deleteAccount(w http.ResponseWriter, r *http.Request, h *host) {
 	}
 	setCookie(w, sessionCookie, "", -time.Second)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+const flowsOf = "DELETE FROM auth_native_flows WHERE session_id IN (SELECT id FROM auth_sessions WHERE user_id = ?)"
+
+func (a *Auth) erase(ctx context.Context, c caller, s session) error {
+	return a.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := lock(tx, s.user.Email); err != nil {
+			return err
+		}
+		u, err := hold(tx, s.user.ID)
+		if err != nil {
+			return err
+		}
+		// Recheck under the locks: reset may have revoked this session.
+		cur, err := live(tx, c, s.user.ID)
+		if err != nil {
+			return err
+		}
+		if !cur.recent() || u.Email != s.user.Email {
+			return errStale
+		}
+		if err := revokeCodes(tx, u); err != nil {
+			return err
+		}
+		if err := tx.Exec(flowsOf, u.ID).Error; err != nil {
+			return err
+		}
+		if a.erasure != nil {
+			if err := a.erasure(tx, u.ID); err != nil {
+				return err
+			}
+		}
+		return tx.Exec("DELETE FROM auth_users WHERE id = ?", u.ID).Error
+	})
 }
 
 func (a *Auth) setUsername(w http.ResponseWriter, r *http.Request, h *host) {
@@ -169,24 +216,7 @@ func (a *Auth) setUsername(w http.ResponseWriter, r *http.Request, h *host) {
 		a.accountPage(w, r, h, s, http.StatusUnprocessableEntity, msg)
 		return
 	}
-	err := a.db.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error {
-		if _, err := hold(tx, s.user.ID); err != nil {
-			return err
-		}
-		cur, err := live(tx, r, h, s.user.ID)
-		if err != nil {
-			return err
-		}
-		if cur.user.Email != s.user.Email {
-			return errMissing
-		}
-		u := cur.user
-		u.Username = name
-		if !h.admits(u) {
-			return errDenied
-		}
-		return tx.Exec("UPDATE auth_users SET username = ? WHERE id = ?", name, u.ID).Error
-	})
+	err := a.saveUsername(r.Context(), browser(r, h), s, name)
 	if errors.Is(err, pg.ErrDuplicate) {
 		a.accountPage(w, r, h, s, http.StatusConflict, "That username is taken.")
 		return
@@ -199,6 +229,27 @@ func (a *Auth) setUsername(w http.ResponseWriter, r *http.Request, h *host) {
 		return
 	}
 	http.Redirect(w, r, accountPath, http.StatusSeeOther)
+}
+
+func (a *Auth) saveUsername(ctx context.Context, c caller, s session, name string) error {
+	return a.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if _, err := hold(tx, s.user.ID); err != nil {
+			return err
+		}
+		cur, err := live(tx, c, s.user.ID)
+		if err != nil {
+			return err
+		}
+		if cur.user.Email != s.user.Email {
+			return errMissing
+		}
+		u := cur.user
+		u.Username = name
+		if !c.host.admits(u) {
+			return errDenied
+		}
+		return tx.Exec("UPDATE auth_users SET username = ? WHERE id = ?", name, u.ID).Error
+	})
 }
 
 func (a *Auth) changeEmail(w http.ResponseWriter, r *http.Request, h *host) {
@@ -220,11 +271,11 @@ func (a *Auth) changeEmail(w http.ResponseWriter, r *http.Request, h *host) {
 		a.accountPage(w, r, h, s, http.StatusUnprocessableEntity, "That's already your email.")
 		return
 	}
-	if !h.sends.allow(r) {
+	if !h.sends.allow(clientip.From(r)) {
 		a.accountPage(w, r, h, s, http.StatusTooManyRequests, "Too many emails from this network. Try again later.")
 		return
 	}
-	sent, err := a.issueVerify(r.Context(), r, h, s.user.ID, to)
+	sent, err := a.issueVerify(r.Context(), browser(r, h), s.user.ID, to)
 	if a.refused(w, r, h, s, err) {
 		return
 	}
@@ -238,7 +289,8 @@ func (a *Auth) changeEmail(w http.ResponseWriter, r *http.Request, h *host) {
 	a.renderAccount(w, r, h, s, http.StatusOK, "", "If no other account uses "+to+", we emailed it a link to confirm the change. It expires in 30 minutes.")
 }
 
-func (a *Auth) issueVerify(ctx context.Context, r *http.Request, h *host, user pg.ID, to string) (sent, error) {
+func (a *Auth) issueVerify(ctx context.Context, k caller, user pg.ID, to string) (sent, error) {
+	h := k.host
 	var s sent
 	db := a.db.WithContext(ctx)
 	if err := sweep(db, a.library); err != nil {
@@ -251,7 +303,7 @@ func (a *Auth) issueVerify(ctx context.Context, r *http.Request, h *host, user p
 		if _, err := hold(tx, user); err != nil {
 			return err
 		}
-		cur, err := live(tx, r, h, user)
+		cur, err := live(tx, k, user)
 		if err != nil {
 			return err
 		}

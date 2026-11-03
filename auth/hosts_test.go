@@ -13,7 +13,7 @@ import (
 )
 
 func signedIn(t *testing.T, a *Auth, origin string, user pg.ID) *http.Cookie {
-	token, err := startSession(a.db, httptest.NewRequest("POST", "/", nil), at(a, origin), user)
+	token, err := startSession(a.db, caller{host: at(a, origin)}, user)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +71,7 @@ func TestProofStaysOnHost(t *testing.T) {
 	if err != nil || v.verdict != stale {
 		t.Fatalf("apex link on admin: verdict %d, err %v; want stale", v.verdict, err)
 	}
-	g, err := a.checkCode(t.Context(), httptest.NewRequest("POST", "/", nil), at(a, admin), email, "123456")
+	g, err := a.checkCode(t.Context(), browser(httptest.NewRequest("POST", "/", nil), at(a, admin)), email, "123456")
 	if err != nil || g.verdict != stale {
 		t.Fatalf("apex code on admin: verdict %d, err %v; want stale", g.verdict, err)
 	}
@@ -138,7 +138,7 @@ func TestSendBudgetPerHost(t *testing.T) {
 			try(t, a, email, "000000")
 		}
 	}
-	v, err := a.checkCode(t.Context(), httptest.NewRequest("POST", "/", nil), at(a, admin), email, "000000")
+	v, err := a.checkCode(t.Context(), browser(httptest.NewRequest("POST", "/", nil), at(a, admin)), email, "000000")
 	if err != nil || v.verdict != exhausted {
 		t.Fatalf("admin guess after the apex spent the wrong-code budget: verdict %d, err %v; want exhausted", v.verdict, err)
 	}

@@ -26,6 +26,7 @@ type Host struct {
 	// Layout wraps auth's page root in a full document; required by New.
 	Layout func(r *http.Request, title string, body templ.Component) templ.Component
 	Views  Views
+	Apps   []App // Native clients bound to this host's API origin.
 }
 
 type host struct {

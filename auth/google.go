@@ -14,10 +14,11 @@ import (
 	"golang.org/x/oauth2"
 	"gorm.io/gorm"
 
+	"github.com/cogikyo/hgmx/clientip"
 	"github.com/cogikyo/hgmx/pg"
 )
 
-// Google configures sign-in with Google.
+// Google configures browser sign-in; native apps use [App.Google].
 type Google struct {
 	ClientID     string // OAuth 2.0 client ID for a Google web application.
 	ClientSecret string // Required; supplied by the site.
@@ -41,16 +42,22 @@ var googleIssuer = oidc.ProviderConfig{
 type provider struct {
 	kind     string
 	client   *http.Client
+	keys     *oidc.Provider
 	oauth    oauth2.Config
 	verifier *oidc.IDTokenVerifier
 }
 
-func newProvider(kind string, issuer oidc.ProviderConfig, id, secret string) *provider {
+func discover(issuer oidc.ProviderConfig) (*http.Client, *oidc.Provider) {
 	client := &http.Client{Timeout: 10 * time.Second}
-	p := issuer.NewProvider(oidc.ClientContext(context.Background(), client))
+	return client, issuer.NewProvider(oidc.ClientContext(context.Background(), client))
+}
+
+func newProvider(kind string, issuer oidc.ProviderConfig, id, secret string) *provider {
+	client, p := discover(issuer)
 	return &provider{
 		kind:   kind,
 		client: client,
+		keys:   p,
 		oauth: oauth2.Config{
 			ClientID:     id,
 			ClientSecret: secret,
@@ -190,7 +197,7 @@ func createNamed(tx *gorm.DB, base string) (User, error) {
 	return u, errors.New("auth: no free username")
 }
 
-func (a *Auth) enterGoogle(ctx context.Context, r *http.Request, h *host, id identity) (verified, error) {
+func (a *Auth) enterGoogle(ctx context.Context, c caller, id identity) (verified, error) {
 	v := verified{verdict: stale}
 	err := a.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		user, found, err := owner(tx, googleKind, id.subject)
@@ -205,7 +212,7 @@ func (a *Auth) enterGoogle(ctx context.Context, r *http.Request, h *host, id ide
 				return err
 			}
 		} else {
-			if h.mode != Open {
+			if c.host.mode != Open {
 				v.verdict = unknown
 				return nil
 			}
@@ -223,11 +230,11 @@ func (a *Auth) enterGoogle(ctx context.Context, r *http.Request, h *host, id ide
 				return err
 			}
 		}
-		if !h.admits(v.user) {
+		if !c.host.admits(v.user) {
 			v.verdict = denied
 			return errDenied
 		}
-		v.token, err = startSession(tx, r, h, v.user.ID)
+		v.token, err = startSession(tx, c, v.user.ID)
 		v.verdict = accepted
 		return err
 	})
@@ -237,11 +244,10 @@ func (a *Auth) enterGoogle(ctx context.Context, r *http.Request, h *host, id ide
 	return v, admitted(err)
 }
 
-func (a *Auth) linkGoogle(ctx context.Context, r *http.Request, h *host, f flow, id identity) (verdict, User, error) {
+func (a *Auth) linkGoogle(ctx context.Context, c caller, s session, from *pg.ID, id identity) (verdict, User, error) {
 	v := stale
 	var u User
-	s, ok := a.session(r, h)
-	if !ok || f.SessionID == nil || s.id != *f.SessionID {
+	if from == nil || s.id != *from {
 		return v, u, nil
 	}
 	err := a.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -249,7 +255,7 @@ func (a *Auth) linkGoogle(ctx context.Context, r *http.Request, h *host, f flow,
 		if u, err = hold(tx, s.user.ID); err != nil {
 			return err
 		}
-		cur, err := live(tx, r, h, u.ID)
+		cur, err := live(tx, c, u.ID)
 		if err != nil || cur.id != s.id || !cur.recent() {
 			return err
 		}
@@ -285,7 +291,7 @@ func (a *Auth) linkGoogle(ctx context.Context, r *http.Request, h *host, f flow,
 
 func (a *Auth) googleSignin(w http.ResponseWriter, r *http.Request, h *host) {
 	to := next(r.FormValue("next"))
-	if !h.begins.allow(r) {
+	if !h.begins.allow(clientip.From(r)) {
 		a.signinPage(w, r, h, http.StatusTooManyRequests, to, "", "Too many sign-in attempts. Try again in a few minutes.")
 		return
 	}
@@ -301,7 +307,7 @@ func (a *Auth) googleLink(w http.ResponseWriter, r *http.Request, h *host) {
 		a.accountPage(w, r, h, s, http.StatusForbidden, "Sign in again to link Google.")
 		return
 	}
-	if !h.begins.allow(r) {
+	if !h.begins.allow(clientip.From(r)) {
 		a.accountPage(w, r, h, s, http.StatusTooManyRequests, "Too many attempts. Try again in a few minutes.")
 		return
 	}
@@ -337,9 +343,11 @@ func (a *Auth) googleCallback(w http.ResponseWriter, r *http.Request, h *host) {
 		return
 	}
 	if f.Intent == link {
-		v, u, err := a.linkGoogle(r.Context(), r, h, f, id)
-		if err != nil {
-			panic(err)
+		v, u := stale, User{}
+		if s, ok := a.session(r, h); ok {
+			if v, u, err = a.linkGoogle(r.Context(), browser(r, h), s, f.SessionID, id); err != nil {
+				panic(err)
+			}
 		}
 		switch v {
 		case accepted:
@@ -356,7 +364,7 @@ func (a *Auth) googleCallback(w http.ResponseWriter, r *http.Request, h *host) {
 		}
 		return
 	}
-	v, err := a.enterGoogle(r.Context(), r, h, id)
+	v, err := a.enterGoogle(r.Context(), browser(r, h), id)
 	if err != nil {
 		panic(err)
 	}
@@ -384,30 +392,11 @@ func (a *Auth) googleUnlink(w http.ResponseWriter, r *http.Request, h *host) {
 		a.accountPage(w, r, h, s, http.StatusForbidden, "Sign in again to remove Google.")
 		return
 	}
-	var u User
-	last := false
-	err := a.db.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error {
-		var err error
-		if u, err = hold(tx, s.user.ID); err != nil {
-			return err
-		}
-		if _, err := live(tx, r, h, u.ID); err != nil {
-			return err
-		}
-		n, err := a.methods(tx, h, u)
-		if err != nil {
-			return err
-		}
-		if n <= 1 {
-			last = true
-			return nil
-		}
-		res := tx.Exec("DELETE FROM auth_identities WHERE user_id = ? AND kind = ?", u.ID, googleKind)
-		if res.Error == nil && res.RowsAffected == 0 {
-			return errMissing
-		}
-		return res.Error
-	})
+	u, err := a.unlinkGoogle(r.Context(), browser(r, h), s.user.ID)
+	last := errors.Is(err, errLast)
+	if last {
+		err = nil
+	}
 	if errors.Is(err, errMissing) {
 		http.Redirect(w, r, accountPath, http.StatusSeeOther)
 		return
@@ -421,4 +410,30 @@ func (a *Auth) googleUnlink(w http.ResponseWriter, r *http.Request, h *host) {
 	}
 	a.notify(a.googleMail(r.Context(), h, u.Email, false))
 	http.Redirect(w, r, accountPath, http.StatusSeeOther)
+}
+
+func (a *Auth) unlinkGoogle(ctx context.Context, c caller, user pg.ID) (User, error) {
+	var u User
+	err := a.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var err error
+		if u, err = hold(tx, user); err != nil {
+			return err
+		}
+		if _, err := live(tx, c, u.ID); err != nil {
+			return err
+		}
+		n, err := a.methods(tx, c.host, u)
+		if err != nil {
+			return err
+		}
+		if n <= 1 {
+			return errLast
+		}
+		res := tx.Exec("DELETE FROM auth_identities WHERE user_id = ? AND kind = ?", u.ID, googleKind)
+		if res.Error == nil && res.RowsAffected == 0 {
+			return errMissing
+		}
+		return res.Error
+	})
+	return u, err
 }

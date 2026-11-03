@@ -15,7 +15,7 @@ A rule holds unless its own text names an exception.
 - **Invalid input** re-renders the full page with the error and status 422, never bare text.
 - **The server renders UI state it knows**, such as the active nav link, selection and counts.
   - JS never reconciles it; the server writes `aria-current="page"` and the like.
-- **No JSON API** feeds client rendering, and no route negotiates between JSON and HTML.
+- **No JSON API** feeds browser rendering, and no route negotiates between JSON and HTML.
 
 **Search-as-you-type** filters the page in place.
 `GET /items?q=` renders the filtered full page, so reload and share keep the query.
@@ -105,7 +105,7 @@ This spelling was verified with htmx 4.0.0 in Chromium and Firefox; WebKit is un
   - A GET or HEAD carrying a different build version gets a full reload; requests without the header pass through.
   - `scripts.Navigation` re-sends the config headers on history restores.
   - Auth mounts `/auth/*` without `PageVersion`, so per-route wrappers leave those pages without version reloads.
-    Wrap the root handler returned by `Site.Handler` with `PageVersion` to cover them too.
+    On browser-only sites, wrap the root handler returned by `Site.Handler` with `PageVersion` to cover them too.
 - **Per-page regions outside `#main`**, such as a breadcrumb, are listed in `hx-select-oob` and morphed.
   - Morph only regions whose attributes only the server writes.
   - Morph strips classes and inline styles that JS set.
@@ -280,8 +280,8 @@ mux.Handle(scripts.Path, js)
 mux.Handle(webapp.Path, app)
 ```
 
-- **`server.Site{Version, CSP, Allow, InternalError, Telemetry}.Handler(mux)` owns composition.**
-  - Application routes run telemetry, recovery, `http.CrossOriginProtection`, then an unwrapped `*http.ServeMux`.
+- **`server.Site{Version, CSP, Allow, InternalError, Telemetry, RPC}.Handler(mux)` owns composition.**
+  - Application routes run telemetry, recovery and `http.CrossOriginProtection` before the mux.
   - `/healthz` and the `/_v/` beacon bypass that application chain; the beacon mounts only when telemetry is enabled.
   - Supply non-nil `Telemetry`; use `telemetry.Disabled` to opt out of telemetry.
 - **`InternalError` is fixed panic-page HTML, not the 404 page.**
@@ -305,6 +305,21 @@ mux.Handle(webapp.Path, app)
   - Pass `p.Shutdown`, then `func(ctx context.Context) error { return pg.Close(ctx, db) }` to `server.Run`.
   - `Shutdown` logs dropped telemetry and returns nil if the final export fails or times out.
 - **`server.Site` serves `/healthz` as `ok <version>`** with `no-store`; set the build version via `-X main.version`.
+
+### Serving an App API
+
+Register native clients in `Host.Apps` under their HTTPS API origin; never move an app ID to another host or platform.
+Build `api := accounts.API()`, register site services on `api.Server()`, and classify each procedure with `api.Allow` using generated procedure constants.
+Use `api.Mount(mux)`, which rejects missing or unmatched access policies; direct Connect mounting bypasses auth's checks.
+Mount browser auth with `accounts.Mount(mux)` and set `server.Site.RPC` to `api.Server()` before building `Site.Handler(mux)` for RPC-aware recovery and unknown-service faults.
+
+Authenticated site handlers read the user with `auth.Caller(ctx)`; `Public` and `Anonymous` calls do not resolve a user.
+RPC accepts native bearers, never browser cookies, and requires `HGMX-App-ID` and `HGMX-App-Build` even for bootstrap.
+Keep `PageVersion` and other HTML-only middleware on browser handlers.
+
+Set `Config.Erase` from `store/` when account deletion needs site-data cleanup, using the supplied transaction while auth holds its locks.
+An error rolls back cleanup and account deletion.
+This is the transaction-passing exception: both changes must commit together.
 
 ### CSP Literal
 
@@ -353,6 +368,7 @@ Each package may also import its own layer, subject to the page restriction belo
 | Package                | May import                                                  |
 | ---------------------- | ----------------------------------------------------------- |
 | `routes`               | `middleware`, `store`, domain packages, `views`, page views |
+| `api`                  | `store`, domain packages, generated `proto/...`             |
 | `middleware`           | `store`, domain packages                                    |
 | A domain package       | Its own domain and `store`                                  |
 | `store`                | `store/...`, excluding `store/migrations/...`               |
@@ -444,6 +460,10 @@ _A fresh database must replay each step against the schema of its own time._
 **Kiln runs migrations only during deploys**, using the new binary's `<site> migrate up` in a transient unit with the site's user and `PG*` environment.
 A non-zero exit, including a lock timeout, keeps the old binary version running.
 Production never runs `down`; rollback reverts binaries only.
+
+**While auth schema v5 is live, rollback to v0.3.0 or older weakens credential isolation.**
+Those binaries accept a copied native app token as a browser cookie on the same origin because they do not check `client_id`.
+Recover by deploying forward.
 
 **Expand, then contract:** add schema compatible with the old binary, deploy code that uses it, and remove obsolete schema in a later deploy after old binaries no longer need it.
 An applied migration can remain after a later step fails, so every intermediate schema must support the old binary.

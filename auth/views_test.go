@@ -49,7 +49,7 @@ func TestCustomViews(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	token, err := startSession(a.db, httptest.NewRequest("POST", "/", nil), at(a, apex), u.ID)
+	token, err := startSession(a.db, caller{host: at(a, apex)}, u.ID)
 	if err != nil {
 		t.Fatal(err)
 	}

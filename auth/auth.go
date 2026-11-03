@@ -44,7 +44,7 @@
 // [Invite] also accepts emailed codes and links, but only for existing users.
 // [Open] creates a user on their first verified code or link and allows account deletion.
 // Pass a non-nil mail queue in Invite and Open modes.
-// Config.Google adds Google sign-in in every mode.
+// Config.Google adds browser Google sign-in in every mode.
 // Register every Host.Origin + "/auth/google/callback" with Google.
 // Signed-in users can link Google; Open mode can create Google-only users.
 // Google's email never becomes the user's email.
@@ -72,7 +72,7 @@
 //   - .auth-field: field labels, including the delete confirmation.
 //   - .auth-primary, .auth-secondary and .auth-danger: action buttons.
 //   - .auth-note: supporting text; .auth-problem: error messages.
-//   - .auth-passkeys: the passkey list.
+//   - .auth-passkeys and .auth-sessions: passkey and session lists.
 //
 // Auth serves passkey.js and loads it on the pages that need it.
 // The site's CSP must allow script-src 'self' and connect-src 'self'.
@@ -107,6 +107,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 	"gorm.io/gorm"
@@ -116,7 +117,6 @@ import (
 	"github.com/cogikyo/hgmx/static"
 )
 
-// Mode decides how people sign in and who may create an account.
 type Mode int
 
 const (
@@ -130,17 +130,19 @@ const (
 
 func (m Mode) codes() bool { return m != Operator }
 
-// Config describes shared accounts and their host policies.
 type Config struct {
 	// Name is the site name shown by passkey managers and in mail.
 	Name string
 	// Key is the HMAC key for codes and links, at least 32 bytes.
 	Key []byte
-	// Google enables Google sign-in when non-nil.
+	// Google enables browser Google sign-in when non-nil.
 	Google *Google
 	// Hosts must share a registrable domain or use localhost names.
 	// A single loopback IP is also allowed; at least one host is required.
 	Hosts []Host
+	// Erase cleans up site data in auth's locked deletion transaction.
+	// A nil hook skips site cleanup; errors roll back cleanup and deletion.
+	Erase func(tx *gorm.DB, user pg.ID) error
 }
 
 // User is an account shared by all configured hosts.
@@ -151,7 +153,6 @@ type User struct {
 	Created  time.Time
 }
 
-// Auth serves sign-in, the account page and session lookups.
 type Auth struct {
 	db      *gorm.DB
 	mail    *mail.Queue
@@ -164,6 +165,10 @@ type Auth struct {
 	script  string
 	library string
 	google  *provider
+	tokens  *oidc.Provider
+	apps    map[string]*app
+	links   []association
+	erasure func(tx *gorm.DB, user pg.ID) error
 }
 
 const (
@@ -208,17 +213,11 @@ func New(db *gorm.DB, q *mail.Queue, c Config) (*Auth, error) {
 		origins = append(origins, h.origin)
 	}
 	slices.Sort(origins)
-	wa, err := webauthn.New(&webauthn.Config{
-		RPID:                  rp,
-		RPDisplayName:         c.Name,
-		RPOrigins:             origins,
-		AttestationPreference: protocol.PreferNoAttestation,
-		AuthenticatorSelection: protocol.AuthenticatorSelection{
-			ResidentKey:        protocol.ResidentKeyRequirementRequired,
-			RequireResidentKey: protocol.ResidentKeyRequired(),
-			UserVerification:   protocol.VerificationRequired,
-		},
-	})
+	wa, err := webauthn.New(webauthnConfig(rp, c.Name, origins))
+	if err != nil {
+		return nil, err
+	}
+	apps, err := parseApps(c.Hosts, hosts, rp)
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +227,16 @@ func New(db *gorm.DB, q *mail.Queue, c Config) (*Auth, error) {
 	if c.Google != nil {
 		google = newProvider(googleKind, googleIssuer, c.Google.ClientID, c.Google.ClientSecret)
 	}
-	return &Auth{
+	var tokens *oidc.Provider
+	switch {
+	case google != nil:
+		tokens = google.keys
+	case slices.ContainsFunc(c.Hosts, func(h Host) bool {
+		return slices.ContainsFunc(h.Apps, func(p App) bool { return len(p.Google) > 0 })
+	}):
+		_, tokens = discover(googleIssuer)
+	}
+	a := &Auth{
 		db:      db,
 		mail:    q,
 		name:    c.Name,
@@ -240,7 +248,29 @@ func New(db *gorm.DB, q *mail.Queue, c Config) (*Auth, error) {
 		script:  script,
 		library: library(),
 		google:  google,
-	}, nil
+		tokens:  tokens,
+		apps:    apps,
+		links:   associations(c.Hosts),
+		erasure: c.Erase,
+	}
+	if err := a.verifiers(c.Name); err != nil {
+		return nil, err
+	}
+	return a, nil
+}
+
+func webauthnConfig(rp, name string, origins []string) *webauthn.Config {
+	return &webauthn.Config{
+		RPID:                  rp,
+		RPDisplayName:         name,
+		RPOrigins:             origins,
+		AttestationPreference: protocol.PreferNoAttestation,
+		AuthenticatorSelection: protocol.AuthenticatorSelection{
+			ResidentKey:        protocol.ResidentKeyRequirementRequired,
+			RequireResidentKey: protocol.ResidentKeyRequired(),
+			UserVerification:   protocol.VerificationRequired,
+		},
+	}
 }
 
 func (c Config) check() (map[string]*host, string, error) {
@@ -281,6 +311,7 @@ func library() string {
 }
 
 // Mount registers the /auth/ pages and endpoints on mux.
+// With apps configured, it also serves associations on the RP host.
 func (a *Auth) Mount(mux *http.ServeMux) {
 	handle := func(pattern string, serve func(http.ResponseWriter, *http.Request, *host)) {
 		mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
@@ -307,12 +338,16 @@ func (a *Auth) Mount(mux *http.ServeMux) {
 	handle("POST /auth/account/passkeys/{id}/rename", a.rename)
 	handle("POST /auth/account/passkeys/{id}/remove", a.remove)
 	handle("POST /auth/account/signout-others", a.signoutOthers)
+	handle("POST /auth/account/sessions/{id}/revoke", a.revokeSession)
 	handle("POST /auth/account/username", a.setUsername)
 	handle("POST /auth/account/delete", a.deleteAccount)
 	if a.mail != nil {
 		handle("POST /auth/account/email", a.changeEmail)
 		handle("GET "+confirmPath, a.showConfirm)
 		handle("POST "+confirmPath, a.confirmEmail)
+	}
+	if len(a.apps) > 0 {
+		a.mountAssociations(mux)
 	}
 	if a.google != nil {
 		handle("POST /auth/google", a.googleSignin)

@@ -2,12 +2,9 @@ package auth
 
 import (
 	"container/list"
-	"net/http"
 	"net/netip"
 	"sync"
 	"time"
-
-	"github.com/cogikyo/hgmx/clientip"
 )
 
 const tracked = 10000
@@ -29,8 +26,8 @@ func newLimiter(max int, per time.Duration) *limiter {
 	return &limiter{max: max, per: per, keys: map[string]*list.Element{}, lru: list.New()}
 }
 
-func (l *limiter) allow(r *http.Request) bool {
-	key := client(clientip.From(r))
+func (l *limiter) allow(ip string) bool {
+	key := client(ip)
 	now := time.Now()
 	l.mu.Lock()
 	defer l.mu.Unlock()

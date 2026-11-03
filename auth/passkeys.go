@@ -2,11 +2,13 @@ package auth
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -35,37 +37,59 @@ type passkey struct {
 func (passkey) TableName() string { return "auth_passkeys" }
 
 type ceremony struct {
-	ID      []byte
-	Kind    string
-	Session pg.JSON[webauthn.SessionData]
-	UserID  *pg.ID
-	Library string
-	Expires time.Time
+	ID        []byte
+	Kind      string
+	Session   pg.JSON[webauthn.SessionData]
+	UserID    *pg.ID
+	Library   string
+	Expires   time.Time
+	ClientID  *string
+	Origin    *string
+	SessionID *pg.ID
 }
 
 func (ceremony) TableName() string { return "auth_ceremonies" }
 
-func (a *Auth) saveCeremony(w http.ResponseWriter, r *http.Request, kind string, user *pg.ID, s *webauthn.SessionData) error {
-	db := a.db.WithContext(r.Context())
-	if err := sweep(db, a.library); err != nil {
-		return err
+var (
+	errUnknown    = errors.New("auth: passkey not registered")
+	errOrigin     = errors.New("auth: passkey response from another origin")
+	errUnverified = errors.New("auth: passkey could not be verified")
+)
+
+func (a *Auth) verifier(c caller) *webauthn.WebAuthn {
+	if c.app == nil {
+		return a.wa
 	}
-	t := token()
-	err := db.Create(&ceremony{ID: hash(t), Kind: kind, Session: pg.JSON[webauthn.SessionData]{V: *s}, UserID: user, Library: a.library, Expires: time.Now().Add(ceremonyLife)}).Error
-	if err != nil {
-		return err
-	}
-	setCookie(w, ceremonyCookie, t, ceremonyLife)
-	return nil
+	return c.app.wa
 }
 
-func takeCeremony(db *gorm.DB, h *host, t, kind, library string) (ceremony, bool, error) {
-	var c ceremony
-	err := db.Raw("DELETE FROM auth_ceremonies WHERE id = ? AND session->>'origin' = ? RETURNING *", hash(t), h.origin).Scan(&c).Error
-	if err != nil {
-		return c, false, err
+func (c caller) proves(origin string) bool {
+	return c.app == nil || slices.Contains(c.app.origins, origin)
+}
+
+func (a *Auth) saveCeremony(ctx context.Context, c caller, kind string, user, from *pg.ID, s *webauthn.SessionData) (string, error) {
+	db := a.db.WithContext(ctx)
+	if err := sweep(db, a.library); err != nil {
+		return "", err
 	}
-	return c, c.ID != nil && c.Kind == kind && c.Library == library && time.Now().Before(c.Expires), nil
+	t := token()
+	row := ceremony{ID: hash(t), Kind: kind, Session: pg.JSON[webauthn.SessionData]{V: *s}, UserID: user, Library: a.library, Expires: time.Now().Add(ceremonyLife)}
+	if c.app != nil {
+		row.ClientID, row.Origin, row.SessionID = c.client(), &c.host.origin, from
+	}
+	return t, db.Create(&row).Error
+}
+
+func takeCeremony(db *gorm.DB, c caller, t, kind, library string) (ceremony, bool, error) {
+	var row ceremony
+	q, args := "DELETE FROM auth_ceremonies WHERE id = ? AND session->>'origin' = ? AND client_id IS NULL RETURNING *", []any{hash(t), c.host.origin}
+	if c.app != nil {
+		q, args = "DELETE FROM auth_ceremonies WHERE id = ? AND origin = ? AND client_id = ? RETURNING *", append(args, c.app.id)
+	}
+	if err := db.Raw(q, args...).Scan(&row).Error; err != nil {
+		return row, false, err
+	}
+	return row, row.ID != nil && row.Kind == kind && row.Library == library && time.Now().Before(row.Expires), nil
 }
 
 func (a *Auth) ceremony(w http.ResponseWriter, r *http.Request, h *host, kind string) (ceremony, bool) {
@@ -74,46 +98,49 @@ func (a *Auth) ceremony(w http.ResponseWriter, r *http.Request, h *host, kind st
 		return ceremony{}, false
 	}
 	setCookie(w, ceremonyCookie, "", -time.Second)
-	c, ok, err := takeCeremony(a.db.WithContext(r.Context()), h, cookie.Value, kind, a.library)
+	c, ok, err := takeCeremony(a.db.WithContext(r.Context()), browser(r, h), cookie.Value, kind, a.library)
 	if err != nil {
 		panic(err)
 	}
 	return c, ok
 }
 
+func (a *Auth) beginLogin(ctx context.Context, c caller) (*protocol.CredentialAssertion, string, error) {
+	var opts []webauthn.LoginOption
+	if c.app == nil {
+		opts = append(opts, webauthn.WithLoginOrigin(c.host.origin))
+	}
+	options, s, err := a.verifier(c).BeginDiscoverableLogin(opts...)
+	if err != nil {
+		return nil, "", err
+	}
+	t, err := a.saveCeremony(ctx, c, login, nil, nil, s)
+	return options, t, err
+}
+
 func (a *Auth) loginBegin(w http.ResponseWriter, r *http.Request, h *host) {
-	if !h.begins.allow(r) {
+	c := browser(r, h)
+	if !h.begins.allow(c.ip) {
 		problem(w, http.StatusTooManyRequests, "Too many sign-in attempts. Try again in a few minutes.")
 		return
 	}
-	options, s, err := a.wa.BeginDiscoverableLogin(webauthn.WithLoginOrigin(h.origin))
+	options, t, err := a.beginLogin(r.Context(), c)
 	if err != nil {
 		panic(err)
 	}
-	if err := a.saveCeremony(w, r, login, nil, s); err != nil {
-		panic(err)
-	}
+	setCookie(w, ceremonyCookie, t, ceremonyLife)
 	writeJSON(w, options)
 }
 
-var errUnknown = errors.New("auth: passkey not registered")
-
-func (a *Auth) loginFinish(w http.ResponseWriter, r *http.Request, h *host) {
-	c, ok := a.ceremony(w, r, h, login)
-	if !ok {
-		problem(w, http.StatusBadRequest, "Sign-in took too long. Try again.")
-		return
-	}
-	parsed, err := protocol.ParseCredentialRequestResponseBody(http.MaxBytesReader(w, r.Body, 64<<10))
-	if err != nil {
-		problem(w, http.StatusBadRequest, "That passkey response was not readable.")
-		return
+func (a *Auth) passkeyLogin(ctx context.Context, c caller, cer ceremony, parsed *protocol.ParsedCredentialAssertionData) (string, error) {
+	if !c.proves(parsed.Response.CollectedClientData.Origin) {
+		return "", errOrigin
 	}
 	var t string
-	err = a.db.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error {
+	err := a.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var u *holder
 		var load error
-		_, cred, err := a.wa.ValidatePasskeyLogin(func(id, handle []byte) (webauthn.User, error) {
+		_, cred, err := a.verifier(c).ValidatePasskeyLogin(func(id, handle []byte) (webauthn.User, error) {
 			// Lock user before credential to avoid a cycle with account deletion.
 			// KEY SHARE permits passkey removal's NO KEY UPDATE user lock.
 			// Fill the username before KEY SHARE to avoid concurrent lock upgrades.
@@ -128,7 +155,7 @@ func (a *Auth) loginFinish(w http.ResponseWriter, r *http.Request, h *host) {
 			}
 			u, load = loadHolder(tx, "handle", handle)
 			return u, load
-		}, c.Session.V, parsed)
+		}, cer.Session.V, parsed)
 		if load != nil && !errors.Is(load, pg.ErrNotFound) {
 			return load
 		}
@@ -136,18 +163,33 @@ func (a *Auth) loginFinish(w http.ResponseWriter, r *http.Request, h *host) {
 			return errUnknown
 		}
 		// Validation and row-lock waits can outlive the initial expiry check.
-		if !time.Now().Before(c.Expires) {
+		if !time.Now().Before(cer.Expires) {
 			return errStale
 		}
-		if !h.admits(u.User) {
+		if !c.host.admits(u.User) {
 			return errDenied
 		}
-		t, err = finishLogin(tx, r, h, u.ID, cred)
+		t, err = finishLogin(tx, c, u.ID, cred)
 		if errors.Is(err, pg.ErrNotFound) {
 			return errUnknown
 		}
 		return err
 	})
+	return t, err
+}
+
+func (a *Auth) loginFinish(w http.ResponseWriter, r *http.Request, h *host) {
+	c, ok := a.ceremony(w, r, h, login)
+	if !ok {
+		problem(w, http.StatusBadRequest, "Sign-in took too long. Try again.")
+		return
+	}
+	parsed, err := protocol.ParseCredentialRequestResponseBody(http.MaxBytesReader(w, r.Body, 64<<10))
+	if err != nil {
+		problem(w, http.StatusBadRequest, "That passkey response was not readable.")
+		return
+	}
+	t, err := a.passkeyLogin(r.Context(), browser(r, h), c, parsed)
 	if errors.Is(err, errUnknown) {
 		problem(w, http.StatusUnauthorized, "That passkey is not registered here.")
 		return
@@ -167,7 +209,7 @@ func (a *Auth) loginFinish(w http.ResponseWriter, r *http.Request, h *host) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func finishLogin(tx *gorm.DB, r *http.Request, h *host, user pg.ID, cred *webauthn.Credential) (string, error) {
+func finishLogin(tx *gorm.DB, c caller, user pg.ID, cred *webauthn.Credential) (string, error) {
 	res := tx.Model(&passkey{}).Where("id = ? AND user_id = ?", cred.ID, user).
 		Updates(map[string]any{"credential": pg.JSON[webauthn.Credential]{V: *cred}, "used": time.Now()})
 	if res.Error != nil {
@@ -176,7 +218,7 @@ func finishLogin(tx *gorm.DB, r *http.Request, h *host, user pg.ID, cred *webaut
 	if res.RowsAffected != 1 {
 		return "", pg.ErrNotFound
 	}
-	return startSession(tx, r, h, user)
+	return startSession(tx, c, user)
 }
 
 func (a *Auth) recentSession(w http.ResponseWriter, r *http.Request, h *host) (session, bool) {
@@ -196,33 +238,83 @@ func (a *Auth) recentSession(w http.ResponseWriter, r *http.Request, h *host) (s
 	return s, true
 }
 
+func (a *Auth) beginAdd(ctx context.Context, c caller, s session) (*protocol.CredentialCreation, string, error) {
+	u, err := loadHolder(a.db.WithContext(ctx), "id", s.user.ID)
+	if err != nil {
+		return nil, "", err
+	}
+	var exclude []protocol.CredentialDescriptor
+	for _, k := range u.creds {
+		if compatible(k, a.rp) {
+			exclude = append(exclude, k.Descriptor())
+		}
+	}
+	opts := []webauthn.RegistrationOption{webauthn.WithExclusions(exclude)}
+	if c.app == nil {
+		opts = append(opts, webauthn.WithRegistrationOrigin(c.host.origin))
+	}
+	options, sd, err := a.verifier(c).BeginRegistration(u, opts...)
+	if err != nil {
+		return nil, "", err
+	}
+	t, err := a.saveCeremony(ctx, c, register, &u.ID, &s.id, sd)
+	return options, t, err
+}
+
 func (a *Auth) addBegin(w http.ResponseWriter, r *http.Request, h *host) {
 	s, ok := a.recentSession(w, r, h)
 	if !ok {
 		return
 	}
-	if !h.begins.allow(r) {
+	c := browser(r, h)
+	if !h.begins.allow(c.ip) {
 		problem(w, http.StatusTooManyRequests, "Too many attempts. Try again in a few minutes.")
 		return
 	}
-	u, err := loadHolder(a.db.WithContext(r.Context()), "id", s.user.ID)
+	options, t, err := a.beginAdd(r.Context(), c, s)
 	if err != nil {
 		panic(err)
 	}
-	var exclude []protocol.CredentialDescriptor
-	for _, c := range u.creds {
-		if compatible(c, a.rp) {
-			exclude = append(exclude, c.Descriptor())
-		}
-	}
-	options, sd, err := a.wa.BeginRegistration(u, webauthn.WithExclusions(exclude), webauthn.WithRegistrationOrigin(h.origin))
-	if err != nil {
-		panic(err)
-	}
-	if err := a.saveCeremony(w, r, register, &u.ID, sd); err != nil {
-		panic(err)
-	}
+	setCookie(w, ceremonyCookie, t, ceremonyLife)
 	writeJSON(w, options)
+}
+
+func (a *Auth) finishAdd(ctx context.Context, c caller, s session, cer ceremony, parsed *protocol.ParsedCredentialCreationData) (string, User, error) {
+	if !c.proves(parsed.Response.CollectedClientData.Origin) {
+		return "", User{}, errOrigin
+	}
+	db := a.db.WithContext(ctx)
+	holder, err := loadHolder(db, "id", s.user.ID)
+	if err != nil {
+		return "", User{}, err
+	}
+	cred, err := a.verifier(c).CreateCredential(holder, cer.Session.V, parsed)
+	if err != nil {
+		return "", User{}, errUnverified
+	}
+	var name string
+	var u User
+	err = db.Transaction(func(tx *gorm.DB) error {
+		var err error
+		if u, err = hold(tx, s.user.ID); err != nil {
+			return err
+		}
+		// Reset may have revoked the session while the ceremony was in flight.
+		cur, err := live(tx, c, s.user.ID)
+		if err != nil {
+			return err
+		}
+		if !cur.recent() || !time.Now().Before(cer.Expires) || cer.SessionID != nil && cur.id != *cer.SessionID {
+			return errStale
+		}
+		var n int64
+		if err := tx.Model(&passkey{}).Where("user_id = ?", s.user.ID).Count(&n).Error; err != nil {
+			return err
+		}
+		name = fmt.Sprintf("Passkey %d", n+1)
+		return tx.Create(&passkey{ID: cred.ID, UserID: s.user.ID, Name: name, Credential: pg.JSON[webauthn.Credential]{V: *cred}, Created: time.Now()}).Error
+	})
+	return name, u, err
 }
 
 func (a *Auth) addFinish(w http.ResponseWriter, r *http.Request, h *host) {
@@ -240,38 +332,11 @@ func (a *Auth) addFinish(w http.ResponseWriter, r *http.Request, h *host) {
 		problem(w, http.StatusBadRequest, "That passkey response was not readable.")
 		return
 	}
-	db := a.db.WithContext(r.Context())
-	holder, err := loadHolder(db, "id", s.user.ID)
-	if err != nil {
-		panic(err)
-	}
-	cred, err := a.wa.CreateCredential(holder, c.Session.V, parsed)
-	if err != nil {
+	name, u, err := a.finishAdd(r.Context(), browser(r, h), s, c, parsed)
+	if errors.Is(err, errUnverified) {
 		problem(w, http.StatusBadRequest, "That passkey could not be verified.")
 		return
 	}
-	var name string
-	var u User
-	err = db.Transaction(func(tx *gorm.DB) error {
-		var err error
-		if u, err = hold(tx, s.user.ID); err != nil {
-			return err
-		}
-		// Reset may have revoked the session while the ceremony was in flight.
-		cur, err := live(tx, r, h, s.user.ID)
-		if err != nil {
-			return err
-		}
-		if !cur.recent() || !time.Now().Before(c.Expires) {
-			return errStale
-		}
-		var n int64
-		if err := tx.Model(&passkey{}).Where("user_id = ?", s.user.ID).Count(&n).Error; err != nil {
-			return err
-		}
-		name = fmt.Sprintf("Passkey %d", n+1)
-		return tx.Create(&passkey{ID: cred.ID, UserID: s.user.ID, Name: name, Credential: pg.JSON[webauthn.Credential]{V: *cred}, Created: time.Now()}).Error
-	})
 	if errors.Is(err, errDenied) {
 		problem(w, http.StatusForbidden, "This account can't change passkeys here.")
 		return
@@ -292,8 +357,30 @@ func (a *Auth) addFinish(w http.ResponseWriter, r *http.Request, h *host) {
 }
 
 func passkeyID(r *http.Request) ([]byte, bool) {
-	id, err := base64.RawURLEncoding.DecodeString(r.PathValue("id"))
+	return parsePasskeyID(r.PathValue("id"))
+}
+
+func parsePasskeyID(raw string) ([]byte, bool) {
+	id, err := base64.RawURLEncoding.DecodeString(raw)
 	return id, err == nil && len(id) > 0
+}
+
+func validPasskeyName(name string) bool { return name != "" && len([]rune(name)) <= 64 }
+
+func (a *Auth) renamePasskey(ctx context.Context, c caller, user pg.ID, id []byte, name string) error {
+	return a.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if _, err := hold(tx, user); err != nil {
+			return err
+		}
+		if _, err := live(tx, c, user); err != nil {
+			return err
+		}
+		res := tx.Model(&passkey{}).Where("id = ? AND user_id = ?", id, user).Update("name", name)
+		if res.Error == nil && res.RowsAffected == 0 {
+			return errMissing
+		}
+		return res.Error
+	})
 }
 
 func (a *Auth) rename(w http.ResponseWriter, r *http.Request, h *host) {
@@ -307,23 +394,11 @@ func (a *Auth) rename(w http.ResponseWriter, r *http.Request, h *host) {
 		http.NotFound(w, r)
 		return
 	}
-	if name == "" || len([]rune(name)) > 64 {
+	if !validPasskeyName(name) {
 		a.accountPage(w, r, h, s, http.StatusUnprocessableEntity, "Passkey names need 1 to 64 characters.")
 		return
 	}
-	err := a.db.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error {
-		if _, err := hold(tx, s.user.ID); err != nil {
-			return err
-		}
-		if _, err := live(tx, r, h, s.user.ID); err != nil {
-			return err
-		}
-		res := tx.Model(&passkey{}).Where("id = ? AND user_id = ?", id, s.user.ID).Update("name", name)
-		if res.Error == nil && res.RowsAffected == 0 {
-			return errMissing
-		}
-		return res.Error
-	})
+	err := a.renamePasskey(r.Context(), browser(r, h), s.user.ID, id, name)
 	if errors.Is(err, errMissing) {
 		http.NotFound(w, r)
 		return
@@ -332,6 +407,38 @@ func (a *Auth) rename(w http.ResponseWriter, r *http.Request, h *host) {
 		return
 	}
 	http.Redirect(w, r, accountPath, http.StatusSeeOther)
+}
+
+func (a *Auth) removePasskey(ctx context.Context, c caller, user pg.ID, id []byte) (string, User, error) {
+	var name string
+	var u User
+	err := a.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var err error
+		if u, err = hold(tx, user); err != nil {
+			return err
+		}
+		if _, err := live(tx, c, user); err != nil {
+			return err
+		}
+		var k passkey
+		err = tx.Where("id = ? AND user_id = ?", id, user).Take(&k).Error
+		if errors.Is(err, pg.ErrNotFound) {
+			return errMissing
+		}
+		if err != nil {
+			return err
+		}
+		n, err := a.methods(tx, c.host, u)
+		if err != nil {
+			return err
+		}
+		if compatible(k.Credential.V, a.rp) && n <= 1 {
+			return errLast
+		}
+		name = k.Name
+		return tx.Delete(&passkey{}, "id = ? AND user_id = ?", id, user).Error
+	})
+	return name, u, err
 }
 
 func (a *Auth) remove(w http.ResponseWriter, r *http.Request, h *host) {
@@ -348,45 +455,16 @@ func (a *Auth) remove(w http.ResponseWriter, r *http.Request, h *host) {
 		http.NotFound(w, r)
 		return
 	}
-	var name string
-	var u User
-	last := false
-	err := a.db.WithContext(r.Context()).Transaction(func(tx *gorm.DB) error {
-		var err error
-		if u, err = hold(tx, s.user.ID); err != nil {
-			return err
-		}
-		if _, err := live(tx, r, h, s.user.ID); err != nil {
-			return err
-		}
-		var k passkey
-		err = tx.Where("id = ? AND user_id = ?", id, s.user.ID).Take(&k).Error
-		if errors.Is(err, pg.ErrNotFound) {
-			return errMissing
-		}
-		if err != nil {
-			return err
-		}
-		n, err := a.methods(tx, h, u)
-		if err != nil {
-			return err
-		}
-		if compatible(k.Credential.V, a.rp) && n <= 1 {
-			last = true
-			return nil
-		}
-		name = k.Name
-		return tx.Delete(&passkey{}, "id = ? AND user_id = ?", id, s.user.ID).Error
-	})
+	name, u, err := a.removePasskey(r.Context(), browser(r, h), s.user.ID, id)
 	if errors.Is(err, errMissing) {
 		http.NotFound(w, r)
 		return
 	}
-	if a.refused(w, r, h, s, err) {
+	if errors.Is(err, errLast) {
+		a.accountPage(w, r, h, s, http.StatusConflict, "This is your only way to sign in. Add another passkey before removing it.")
 		return
 	}
-	if last {
-		a.accountPage(w, r, h, s, http.StatusConflict, "This is your only way to sign in. Add another passkey before removing it.")
+	if a.refused(w, r, h, s, err) {
 		return
 	}
 	a.notify(a.passkeyMail(r.Context(), h, u.Email, name, false))
