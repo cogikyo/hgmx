@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package fixture.api.v1;
+
+option go_package = "example.com/fixture/proto/fixture/api/v1;apiv1";
+
+service NoteService {
+  rpc ListNotes(ListNotesRequest) returns (ListNotesResponse);
+  rpc AddNote(AddNoteRequest) returns (AddNoteResponse);
+}
+
+message Note {
+  string id = 1;
+  string text = 2;
+}
+
+message Notes {
+  repeated Note notes = 1;
+  bool can_add = 2;
+}
+
+message ListNotesRequest {}
+
+message ListNotesResponse {
+  Notes notes = 1;
+}
+
+message AddNoteRequest {
+  string text = 1;
+}
+
+message AddNoteResponse {
+  Notes notes = 1;
+}
