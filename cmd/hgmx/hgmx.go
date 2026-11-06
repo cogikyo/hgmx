@@ -14,7 +14,10 @@ var rootCmd = &cobra.Command{
 }
 
 var logLevel string
-var paletteLua bool
+var (
+	paletteLua bool
+	skip       []string
+)
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
@@ -31,20 +34,24 @@ func init() {
 	rootCmd.AddCommand(fmtCobraCmd)
 	rootCmd.AddCommand(devCobraCmd)
 	rootCmd.AddCommand(checkCobraCmd)
+	rootCmd.AddCommand(bufCobraCmd)
 	rootCmd.AddCommand(updateCobraCmd)
 	rootCmd.AddCommand(skillsCobraCmd)
 	rootCmd.AddCommand(migrateCobraCmd)
 	rootCmd.AddCommand(credentialsCobraCmd)
 	credentialsCobraCmd.AddCommand(credentialsCheckCobraCmd)
+	for _, c := range []*cobra.Command{genCobraCmd, checkCobraCmd} {
+		c.Flags().StringSliceVar(&skip, "skip", nil, "Native platforms to leave unchecked and ungenerated: android, ios")
+	}
 	paletteCobraCmd.Flags().BoolVar(&paletteLua, "lua", false, "Write a Lua table of hex shades to stdout instead of CSS")
 }
 
 var genCobraCmd = &cobra.Command{
 	Use:   "gen",
-	Short: "Generates templ Go code and the minified Tailwind CSS",
+	Short: "Generates templ Go code, the minified Tailwind CSS and the protobuf contract code",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		os.Exit(genCmd())
+		os.Exit(genCmd(skip))
 	},
 }
 
@@ -67,10 +74,20 @@ var devCobraCmd = &cobra.Command{
 
 var checkCobraCmd = &cobra.Command{
 	Use:   "check",
-	Short: "Runs the generation and credentials checks, site rules, format check, vet, build and tests",
+	Short: "Runs the contract, generation, pin and credentials checks, site rules, format check, vet, build and tests",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		os.Exit(checkCmd())
+		os.Exit(checkCmd(skip))
+	},
+}
+
+var bufCobraCmd = &cobra.Command{
+	Use:                "buf [buf args...]",
+	Short:              "Runs hgmx's pinned buf in the current directory",
+	Hidden:             true,
+	DisableFlagParsing: true,
+	Run: func(cmd *cobra.Command, args []string) {
+		os.Exit(bufPassCmd(args))
 	},
 }
 

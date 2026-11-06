@@ -19,7 +19,7 @@ import (
 	"github.com/a-h/templ/cmd/templ/generatecmd"
 )
 
-func genCmd() (code int) {
+func genCmd(skip []string) (code int) {
 	log := newLogger(logLevel, os.Stderr)
 	s, err := loadSite(".")
 	if err != nil {
@@ -43,6 +43,17 @@ func genCmd() (code int) {
 			return 1
 		}
 	}
+	k, err := loadKit(s, skip, log)
+	if err != nil {
+		log.Error("Failed to plan generation", slog.String("error", err.Error()))
+		return 1
+	}
+	if k != nil {
+		if err := k.gen(ctx); err != nil {
+			log.Error("Contract generation failed", slog.String("error", err.Error()))
+			return 1
+		}
+	}
 	return 0
 }
 
@@ -52,7 +63,7 @@ func tailwind(s site, out string, args ...string) *exec.Cmd {
 	return cmd
 }
 
-func staleOutputs(ctx context.Context, s site) ([]string, error) {
+func staleOutputs(ctx context.Context, s site, k *kit) ([]string, error) {
 	var stale []string
 	if s.templ() != nil {
 		args, log, _, err := generatecmd.NewArguments(io.Discard, os.Stderr, []string{"-path", s.dir, "-keep-orphaned-files", "-log-level", "warn"})
@@ -108,6 +119,13 @@ func staleOutputs(ctx context.Context, s site) ([]string, error) {
 		if got, err := os.ReadFile(s.path(cssOutput)); err != nil || !bytes.Equal(got, want) {
 			stale = append(stale, cssOutput+": out of date")
 		}
+	}
+	if k != nil {
+		lines, err := k.stale(ctx)
+		if err != nil {
+			return nil, err
+		}
+		stale = append(stale, lines...)
 	}
 	return stale, nil
 }

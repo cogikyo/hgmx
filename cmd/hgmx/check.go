@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func checkCmd() (code int) {
+func checkCmd(skip []string) (code int) {
 	log := newLogger(logLevel, os.Stderr)
 	s, err := loadSite(".")
 	if err != nil {
@@ -21,24 +21,46 @@ func checkCmd() (code int) {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	k, err := loadKit(s, skip, log)
+	if err != nil {
+		log.Error("Failed to plan checks", slog.String("error", err.Error()))
+		return 1
+	}
 
-	stages := []struct {
+	type stage struct {
 		name string
 		run  func() error
-	}{
-		{"gen", func() error {
-			stale, err := staleOutputs(ctx, s)
-			if err != nil {
-				return err
+	}
+	var stages []stage
+	if k != nil {
+		stages = append(stages, stage{"contracts", func() error { return k.contracts(ctx) }})
+	}
+	stages = append(stages, stage{"gen", func() error {
+		stale, err := staleOutputs(ctx, s, k)
+		if err != nil {
+			return err
+		}
+		for _, line := range stale {
+			fmt.Fprintf(os.Stdout, "%s; run go tool hgmx gen\n", line)
+		}
+		if len(stale) > 0 {
+			return fmt.Errorf("stale files: %d", len(stale))
+		}
+		return nil
+	}})
+	if k != nil {
+		stages = append(stages, stage{"pins", func() error {
+			bad := k.pins()
+			for _, line := range bad {
+				fmt.Fprintln(os.Stdout, line)
 			}
-			for _, line := range stale {
-				fmt.Fprintf(os.Stdout, "%s; run go tool hgmx gen\n", line)
-			}
-			if len(stale) > 0 {
-				return fmt.Errorf("stale files: %d", len(stale))
+			if len(bad) > 0 {
+				return fmt.Errorf("runtime pins: %d", len(bad))
 			}
 			return nil
-		}},
+		}})
+	}
+	stages = append(stages, []stage{
 		{"credentials", func() error { return s.checkCredentials(ctx) }},
 		{"rules", func() error {
 			findings, err := runRules(s)
@@ -69,14 +91,18 @@ func checkCmd() (code int) {
 		{"vet", s.gocmd("vet", "./...").Run},
 		{"build", s.gocmd("build", "./...").Run},
 		{"test", s.gocmd("test", "./...").Run},
-	}
+	}...)
 	for _, st := range stages {
 		start := time.Now()
 		if err := st.run(); err != nil {
 			log.Error("Check failed", slog.String("stage", st.name), slog.String("error", err.Error()))
+			k.incomplete()
 			return 1
 		}
 		log.Info("Check passed", slog.String("stage", st.name), slog.Duration("took", time.Since(start).Round(time.Millisecond)))
+	}
+	if k.incomplete() {
+		return 1
 	}
 	return 0
 }

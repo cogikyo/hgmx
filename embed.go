@@ -21,5 +21,8 @@ func Version() string {
 //go:embed go.mod
 var GoMod []byte
 
+//go:embed buf.yaml
+var BufYAML []byte
+
 //go:embed library/**
 var LibraryFS embed.FS

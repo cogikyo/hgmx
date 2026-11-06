@@ -116,8 +116,8 @@ It returns empty in a site; set the site's own version separately.
 
 ## Regenerate RPC Code
 
-Regenerate committed RPC Go sources from `proto/`:
+From this repository's root, regenerate committed RPC Go sources from `proto/`:
 
 ```bash
-GOWORK=off CGO_ENABLED=0 go run github.com/bufbuild/buf/cmd/buf@v1.75.0 generate
+go run ./cmd/hgmx gen
 ```

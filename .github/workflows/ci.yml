@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v6
@@ -39,6 +41,18 @@ jobs:
 
       - name: Check Generated Templates
         run: go tool templ generate -path . -check
+
+      - name: Check Generated Contracts
+        run: |
+          go run ./cmd/hgmx gen
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
+
+      - name: Check Contract Compatibility
+        run: |
+          tag=$(git describe --tags --abbrev=0 --match 'v*')
+          echo "Against $tag"
+          go run ./cmd/hgmx buf breaking --against ".git#tag=$tag,subdir=proto"
 
       - name: Verify Vendored Scripts
         run: go run ./scripts/fetch -check scripts

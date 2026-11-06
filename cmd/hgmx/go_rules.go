@@ -26,6 +26,8 @@ var layers = []struct {
 	may []string
 }{
 	{"routes", []string{"routes", "middleware", "store", "views", "views/pages", domain}},
+	{"api", []string{"api", "proto", "store", domain}},
+	{"proto", []string{"proto"}},
 	{"middleware", []string{"middleware", "store", domain}},
 	{"store/migrations", []string{"store/migrations"}},
 	{"store", []string{"store"}},
@@ -139,6 +141,9 @@ func (a *audit) goReport(pos token.Position, r *rule, msg, fix string) {
 func (a *audit) imports(sp sitePkg, site map[string]sitePkg) {
 	p := sp.pkg
 	for _, f := range p.Syntax {
+		if generated(p, f) {
+			continue
+		}
 		for _, spec := range f.Imports {
 			path, err := strconv.Unquote(spec.Path.Value)
 			if err != nil {
@@ -170,6 +175,10 @@ func (a *audit) imports(sp sitePkg, site map[string]sitePkg) {
 	}
 }
 
+func generated(p *packages.Package, f *ast.File) bool {
+	return ast.IsGenerated(f) && !strings.HasSuffix(p.Fset.File(f.Pos()).Name(), "_templ.go")
+}
+
 func storeChain(p sitePkg, site map[string]sitePkg, seen map[string]bool) []string {
 	if p.layer == "store" {
 		return []string{p.rel}
@@ -192,6 +201,9 @@ func (a *audit) typeRules(p *packages.Package) {
 		a.goReport(p.Fset.Position(pos), r, msg, fix)
 	}
 	for _, f := range p.Syntax {
+		if generated(p, f) {
+			continue
+		}
 		test := strings.HasSuffix(p.Fset.File(f.Pos()).Name(), "_test.go")
 		for _, decl := range f.Decls {
 			switch d := decl.(type) {

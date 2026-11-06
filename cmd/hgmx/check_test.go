@@ -59,7 +59,7 @@ func TestCheckNoVendor(t *testing.T) {
 			if missing {
 				want = 1
 			}
-			if got := checkCmd(); got != want {
+			if got := checkCmd(nil); got != want {
 				t.Fatalf("check exit: %d; want %d", got, want)
 			}
 			for name, want := range map[string]string{"go.mod": mod, "go.sum": ""} {
