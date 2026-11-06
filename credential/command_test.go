@@ -38,3 +38,30 @@ func TestCheckNeverPrintsValue(t *testing.T) {
 		}
 	}
 }
+
+func TestCheckSkipsOffFeatures(t *testing.T) {
+	t.Setenv("CREDENTIALS_DIRECTORY", "")
+	t.Setenv("TEST_GOOGLE_SECRET", "")
+
+	var r Registry
+	on := r.Feature("google", Flag("-google-client-id").Set())
+	google := r.Declare(Definition{Name: "google-client-secret", Env: "TEST_GOOGLE_SECRET", Purpose: "p", Source: Issued{}, Check: "google"}, on, "site")
+	checks := Checks{google.Name(): func(context.Context, string) error { return nil }}
+
+	for _, tc := range []struct {
+		flags []string
+		code  int
+		out   string
+	}{
+		{nil, 0, "google-client-secret: skipped; feature google is off\n"},
+		{[]string{"-google-client-id", "x"}, 1, "google-client-secret: missing from $CREDENTIALS_DIRECTORY and env TEST_GOOGLE_SECRET\n"},
+	} {
+		fs := flag.NewFlagSet("site", flag.ContinueOnError)
+		fs.String("google-client-id", "", "")
+		var out bytes.Buffer
+		code := Command(context.Background(), &r, fs, append([]string{"check", "--"}, tc.flags...), checks, &out)
+		if code != tc.code || out.String() != tc.out {
+			t.Errorf("flags %q: exit %d, output %q; want %d, %q", tc.flags, code, out.String(), tc.code, tc.out)
+		}
+	}
+}

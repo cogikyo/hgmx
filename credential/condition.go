@@ -3,7 +3,9 @@ package credential
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -42,7 +44,7 @@ func (s Selector) Fallback(env Selector) Selector {
 // Set requires a supplied, nonempty value.
 func (s Selector) Set() Condition { return s.leaf("set", nil) }
 
-// Present includes explicitly supplied empty values.
+// Present includes explicitly supplied empty flags; an empty env value is unset.
 func (s Selector) Present() Condition { return s.leaf("present", nil) }
 
 func (s Selector) Eq(v string) Condition { return s.leaf("eq", v) }
@@ -67,7 +69,7 @@ func (s Selector) leaf(test string, arg any) Condition {
 	return Any(c, All(Not(Flag(s.name).Present()), env))
 }
 
-// Condition describes deployment policy for Nix, not a Go runtime test.
+// Condition describes deployment policy, not site runtime behavior.
 // Absent inputs fail leaf tests; flag defaults are not used.
 type Condition struct {
 	op   string
@@ -105,6 +107,47 @@ func (c Condition) walk(fn func(Condition) error) error {
 		}
 	}
 	return nil
+}
+
+func (c Condition) holds(flags map[string]string) (bool, error) {
+	switch c.op {
+	case "all", "any":
+		decisive := c.op == "any"
+		var first error
+		for _, sub := range c.subs {
+			ok, err := sub.holds(flags)
+			if err == nil && ok == decisive {
+				return decisive, nil
+			}
+			if first == nil {
+				first = err
+			}
+		}
+		return !decisive, first
+	case "not":
+		ok, err := c.subs[0].holds(flags)
+		return !ok, err
+	}
+	value, ok := flags[c.sel.name]
+	if c.sel.kind == "env" {
+		value = os.Getenv(c.sel.name)
+		ok = value != ""
+	}
+	switch {
+	case !ok || c.op == "gte" && value == "":
+		return false, nil
+	case c.op == "present":
+		return true, nil
+	case c.op == "set":
+		return value != "", nil
+	case c.op == "eq":
+		return value == c.arg, nil
+	}
+	n, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || strings.Trim(value, "0123456789") != "" {
+		return false, fmt.Errorf("%s is not a nonnegative int64 for gte", c.sel.name)
+	}
+	return n >= c.arg.(int64), nil
 }
 
 func (c Condition) MarshalJSON() ([]byte, error) {

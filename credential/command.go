@@ -77,7 +77,7 @@ func (r *Registry) wired(checks Checks) error {
 	return errors.Join(errs...)
 }
 
-func (r *Registry) manifest(fs *flag.FlagSet) ([]byte, error) {
+func (r *Registry) kinds(fs *flag.FlagSet) (map[string]string, error) {
 	kinds := map[string]string{}
 	var errs []error
 	fs.VisitAll(func(f *flag.Flag) {
@@ -93,7 +93,29 @@ func (r *Registry) manifest(fs *flag.FlagSet) ([]byte, error) {
 			errs = append(errs, fmt.Errorf("feature %s: %w", name, err))
 		}
 	}
-	if err := errors.Join(errs...); err != nil {
+	return kinds, errors.Join(errs...)
+}
+
+func (r *Registry) on(fs *flag.FlagSet) (map[string]bool, error) {
+	if _, err := r.kinds(fs); err != nil {
+		return nil, err
+	}
+	flags := map[string]string{}
+	fs.Visit(func(f *flag.Flag) { flags["-"+f.Name] = f.Value.String() })
+	on := map[string]bool{Always.name: true}
+	for _, name := range slices.Sorted(maps.Keys(r.features)) {
+		ok, err := r.features[name].holds(flags)
+		if err != nil {
+			return nil, fmt.Errorf("feature %s: %w", name, err)
+		}
+		on[name] = ok
+	}
+	return on, nil
+}
+
+func (r *Registry) manifest(fs *flag.FlagSet) ([]byte, error) {
+	kinds, err := r.kinds(fs)
+	if err != nil {
 		return nil, err
 	}
 
@@ -174,10 +196,26 @@ func (r *Registry) check(ctx context.Context, fs *flag.FlagSet, args []string, c
 		return 2
 	}
 
-	var selected []Handle
+	var on map[string]bool
+	if len(names) == 0 {
+		var err error
+		if on, err = r.on(fs); err != nil {
+			fmt.Fprintf(out, "credentials: %v\n", err)
+			return 2
+		}
+	}
+	var selected, skipped []Handle
 	for _, h := range r.handles {
-		if len(names) == 0 && checkIDs[h.def.Check] != "" || slices.Contains(names, h.def.Name) {
+		switch {
+		case len(names) > 0:
+			if slices.Contains(names, h.def.Name) {
+				selected = append(selected, h)
+			}
+		case checkIDs[h.def.Check] == "":
+		case on[h.required]:
 			selected = append(selected, h)
+		default:
+			skipped = append(skipped, h)
 		}
 	}
 	code := 0
@@ -195,7 +233,7 @@ func (r *Registry) check(ctx context.Context, fs *flag.FlagSet, args []string, c
 			code = 2
 		}
 	}
-	if len(selected) == 0 {
+	if len(selected)+len(skipped) == 0 {
 		fmt.Fprintln(out, "credentials: no credential declares an hgmx check")
 		code = 2
 	}
@@ -203,6 +241,9 @@ func (r *Registry) check(ctx context.Context, fs *flag.FlagSet, args []string, c
 		return code
 	}
 
+	for _, h := range skipped {
+		fmt.Fprintf(out, "%s: skipped; feature %s is off\n", h.def.Name, h.required)
+	}
 	for _, h := range selected {
 		if !h.probe(ctx, checks[h.def.Name], out) {
 			code = 1

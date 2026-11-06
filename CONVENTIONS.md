@@ -542,7 +542,8 @@ For package loading and Go commands, `check` sets `GOWORK=off` and passes `-mod=
 
 **Declare credentials unconditionally in a site-owned `credential.Registry`.**
 Use `Feature(name, condition)` for requirements that follow runtime flags or env, or `credential.Always` for unconditional requirements.
-Keep those conditions consistent with the site's runtime branches; Go serializes them for Nix without evaluating them.
+Keep those conditions consistent with the site's runtime branches.
+The manifest serializes them for Nix; unnamed live checks evaluate them against flags and env.
 `Declare(definition, requirement, shared)` copies the metadata and returns a handle; read values through `handle.Read()`.
 Use `"site"` for site-local secrets or a shared label such as `"smtp"`.
 
@@ -556,7 +557,8 @@ The `credentials` stage of `go tool hgmx check` compares that output byte-for-by
 Invalid declarations, unknown referenced flags and site build failures also fail the stage.
 
 Use `go tool hgmx credentials check [name...] [-- site flags...]` for live SMTP/Google client checks with a current manifest.
-With no names, it checks all declared SMTP/Google targets; missing values or settings fail instead of skipping them.
+With no names, it checks targets whose features are on for the given flags and env; the rest print `skipped; feature X is off`.
+Named checks run regardless of feature state; missing values or settings fail for checked targets.
 It never prints secrets; SMTP sends no mail, and Google success verifies token-endpoint client authentication, not browser sign-in.
 Ordinary `go tool hgmx check` does not run live provider checks.
 

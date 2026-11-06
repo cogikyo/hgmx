@@ -50,7 +50,8 @@ Its `credentials` stage fails if the site-root `credentials.json` is missing or 
 Declare secrets in a site-owned `credential.Registry`, read through its handles, then run `go tool hgmx credentials` and commit the file with the code, even for sites with no secrets.
 See [credential wiring](CONVENTIONS.md#hgmx-credentials) for the early command dispatch.
 
-`go tool hgmx credentials check [name...] [-- site flags...]` requires a current manifest and checks the named SMTP/Google credentials, or all declared SMTP/Google targets when no names are given.
+`go tool hgmx credentials check [name...] [-- site flags...]` requires a current manifest and checks the named SMTP/Google credentials regardless of feature state.
+With no names, it checks targets whose features are on for the given flags and env; the rest print `skipped; feature X is off`.
 It never prints secrets; SMTP sends no mail, and the Google probe does not test browser sign-in.
 Ordinary `check` does not run these live provider checks.
 
