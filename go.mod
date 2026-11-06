@@ -5,6 +5,7 @@ go 1.27.0
 require (
 	connectrpc.com/connect/v2 v2.0.2
 	github.com/a-h/templ v0.3.1100
+	github.com/alltom/oklab v1.0.0
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/fatih/color v1.19.0
 	github.com/go-webauthn/webauthn v0.18.2

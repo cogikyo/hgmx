@@ -91,20 +91,20 @@ mux.Handle("GET /members", a.Require(auth.Anyone, members))
 - **`migrate`** runs Go-defined schema steps with transactions and a session lock.
 - **`static`** serves file sets at hashed URLs or fixed root URLs, with a disk-backed dev mode.
 - **`scripts`** serves selected htmx, hx-preload, navigation support, hyperscript and Motion scripts in dependency order.
-- **`palette`** generates contrast-tier scales and semantic tokens from base, primary and optional accent colours.
-- **`theme`** serves palette stylesheets, the theme switcher and explorer.
+- **`palette`** generates OKLCH shades and semantic colour tokens from one seed.
 - **`icons`** provides 441 Lucide templ components with Motion 14.7.1 hover animations; see the [motion grammar](icons/GRAMMAR.md) when adding one.
 - **`webapp`** builds an install manifest and icons from a PNG, without offline support.
 
 ## Generate a Palette
 
+From this repository's root, overwrite `library/views/static/css/colors.css`:
+
 ```bash
-go tool hgmx palette 'night=#222536,#0184fe' -f tailwind -o views/static/css/colors.css
+go run ./cmd/hgmx palette '#222536'
 ```
 
-The input is `<name>=<base>,<primary>[,<accent>]`; repeat it for multiple themes.
-Formats are `tailwind` (default), `css` and `lua`; Lua takes one theme.
-Without `-o`, output goes to stdout.
+Add `--lua` to write a Lua palette to stdout instead.
+Live theme switching is not available.
 
 ## Build the CLI
 

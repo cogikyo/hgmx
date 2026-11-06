@@ -229,11 +229,10 @@ The `htmx/boost` check rejects literal boost values, including string expression
 
 - **Standalone CLI 4.3.3** with one input, `main.css`.
   - It starts with `@import "tailwindcss" source(none);` plus explicit `@source` for `**/*.templ` and `**/*.go`.
-- **Palette sites** map `palette` output to `:root` variables, then to `@theme inline` semantic tokens.
-  - Generate from a base and primary colour, with an optional accent, and inspect `Palette.Clashes()`.
-  - Tier labels express contrast targets, not fixed lightness; unreachable tiers stay in the output.
+- **Palette sites** import `palette` CSS output, which defines `:root` shades and `@theme` tokens.
+  - Generate from one hex seed.
   - Shared components use semantic utilities only.
-- **Single-brand sites** without palette swapping use brand-named `@theme` tokens.
+- **Single-brand sites** without generated palettes use brand-named `@theme` tokens.
   - Semantic names would only add indirection there.
 - **Each colour has one definition.** JS reads tokens with `getComputedStyle` instead of repeating hex values.
 - **Classes built in Go are complete literals** chosen by map or branch, so Tailwind's scan finds them.
@@ -254,7 +253,6 @@ templ Button(size Size, active bool, attrs templ.Attributes) {
 
 - **No safelist:** data-driven colours render from the value itself, as an SVG `fill` or a `style`.
   - A `style` attribute needs a `Site.CSP` override: `"style-src-attr": {"'unsafe-inline'"}`.
-  - `theme.Explorer` emits no `style` attributes; its bundled JS sets the chrome colours, so it needs no override.
 - **No tailwind-merge.** Components expose typed variants instead of accepting override classes.
   - A caller's extra classes must not conflict with the component's own.
 - **`@layer components`** is only for single-element patterns or HTML you don't author.
@@ -645,8 +643,7 @@ The infrastructure packages are:
 - **`static`** serves the site's files at set-hash URLs or fixed root URLs.
 - **`scripts`** serves selected scripts and navigation support with ordered head tags.
 - **`webapp`** serves the install manifest and icons.
-- **`palette`** generates contrast-tier scales and semantic colour tokens.
-- **`theme`** serves palette stylesheets, switching and the explorer.
+- **`palette`** generates OKLCH shades and semantic colour tokens from one seed.
 - **`icons`** provides SVG templ components and hover-animation assets.
 
 Put the selected handlers' `Head()` output in the document head.

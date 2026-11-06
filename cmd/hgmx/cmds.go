@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"strings"
 
 	"github.com/a-h/templ"
@@ -136,91 +135,37 @@ func initCmd() (code int) {
 func paletteCmd(args []string) (code int) {
 	log := newLogger(logLevel, os.Stderr)
 
-	themes := make([]theme, 0, len(args))
-	seen := map[string]bool{}
-	for _, arg := range args {
-		t, err := parseTheme(arg)
-		if err == nil && seen[t.name] {
-			err = errors.New("theme name used twice")
-		}
-		if err != nil {
-			log.Error("Invalid theme", slog.String("theme", arg), slog.String("error", err.Error()))
-			return 64
-		}
-		seen[t.name] = true
-		themes = append(themes, t)
-		for _, c := range t.palette.Clashes() {
-			log.Warn(c.String(), slog.String("theme", t.name))
-		}
-	}
-
-	var buf bytes.Buffer
-	switch paletteFormat {
-	case "tailwind", "css":
-		for i, t := range themes {
-			sel := t.selector
-			if i == 0 {
-				sel = ":root, " + sel
-			} else {
-				buf.WriteByte('\n')
-			}
-			t.palette.CSS(&buf, sel)
-		}
-		if paletteFormat == "tailwind" {
-			buf.WriteByte('\n')
-			themes[0].palette.Theme(&buf)
-		}
-	case "lua":
-		if len(themes) != 1 {
-			log.Error("Lua output takes exactly one theme")
-			return 64
-		}
-		themes[0].palette.Lua(&buf)
-	default:
-		log.Error("Unknown format", slog.String("format", paletteFormat))
+	if len(args) != 1 {
+		log.Error("Missing or too many arguments: expected exactly one (hex) color argument.")
 		return 64
 	}
 
-	if paletteOut == "" {
-		if _, err := os.Stdout.Write(buf.Bytes()); err != nil {
-			log.Error("Failed to write palette", slog.String("error", err.Error()))
-			return 1
-		}
-		return 0
-	}
-	if err := writeAtomic(paletteOut, buf.Bytes()); err != nil {
-		log.Error("Failed to write palette", slog.String("file", paletteOut), slog.String("error", err.Error()))
+	hexColor := args[0]
+
+	log.Info("Generating palette for color:", slog.String("hex", hexColor))
+
+	generatedPalette, err := palette.Generate(hexColor)
+	if err != nil {
+		log.Error("Invalid color", slog.String("error", err.Error()))
 		return 1
 	}
-	log.Info("Palette written", slog.String("file", paletteOut), slog.Int("themes", len(themes)))
+
+	if paletteLua {
+		generatedPalette.ToLua(os.Stdout)
+		return 0
+	}
+
+	outputFile := "library/views/static/css/colors.css"
+	f, err := os.Create(outputFile)
+	if err != nil {
+		log.Error("Failed to open output file for writing", slog.String("file", outputFile), slog.String("error", err.Error()))
+		return 1
+	}
+	defer f.Close()
+	generatedPalette.ToCSS(f)
+
+	log.Info("Palette successfully generated and written", slog.String("file", outputFile))
 	return 0
-}
-
-type theme struct {
-	name     string
-	selector string
-	palette  palette.Palette
-}
-
-func parseTheme(arg string) (theme, error) {
-	name, spec, ok := strings.Cut(arg, "=")
-	if !ok {
-		return theme{}, errors.New("expected <name>=<base>,<primary>[,<accent>]")
-	}
-	sel, err := palette.Selector(name)
-	if err != nil {
-		return theme{}, err
-	}
-	hexes := strings.Split(spec, ",")
-	if len(hexes) < 2 || len(hexes) > 3 || slices.Contains(hexes, "") {
-		return theme{}, errors.New("expected <name>=<base>,<primary>[,<accent>]")
-	}
-	hexes = append(hexes, "")
-	seed, err := palette.ParseSeed(hexes[0], hexes[1], hexes[2])
-	if err != nil {
-		return theme{}, err
-	}
-	return theme{name, sel, palette.Generate(seed)}, nil
 }
 
 func writeAtomic(path string, data []byte) error {

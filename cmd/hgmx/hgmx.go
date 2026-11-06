@@ -14,10 +14,7 @@ var rootCmd = &cobra.Command{
 }
 
 var logLevel string
-var (
-	paletteFormat string
-	paletteOut    string
-)
+var paletteLua bool
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
@@ -39,8 +36,7 @@ func init() {
 	rootCmd.AddCommand(migrateCobraCmd)
 	rootCmd.AddCommand(credentialsCobraCmd)
 	credentialsCobraCmd.AddCommand(credentialsCheckCobraCmd)
-	paletteCobraCmd.Flags().StringVarP(&paletteFormat, "format", "f", "tailwind", "Output format [tailwind, css, lua]")
-	paletteCobraCmd.Flags().StringVarP(&paletteOut, "out", "o", "", "Write to this file instead of stdout")
+	paletteCobraCmd.Flags().BoolVar(&paletteLua, "lua", false, "Write a Lua table of hex shades to stdout instead of CSS")
 }
 
 var genCobraCmd = &cobra.Command{
@@ -144,10 +140,12 @@ var initCobraCmd = &cobra.Command{
 }
 
 var paletteCobraCmd = &cobra.Command{
-	Use:   "palette <name>=<base>,<primary>[,<accent>]...",
-	Short: "Generates semantic palette themes from a base and a primary colour",
-	Args:  cobra.MinimumNArgs(1),
+	Use:   "palette <hex_color>",
+	Short: "Generates a color palette based on the input hex color",
+	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		os.Exit(paletteCmd(args))
+		if code := paletteCmd(args); code != 0 {
+			os.Exit(code)
+		}
 	},
 }
