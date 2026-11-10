@@ -1,11 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-	<path d="m9 5 3-3 3 3"></path>
-	<path d="m9 10 3-3 3 3"></path>
-	<path d="M12 12V2"></path>
-	<path d="m2 15 3-3 3 3"></path>
-	<path d="m2 20 3-3 3 3"></path>
-	<path d="M5 22V12"></path>
-	<path d="m16 15 3-3 3 3"></path>
-	<path d="m16 20 3-3 3 3"></path>
-	<path d="M19 22V12"></path>
+	<g transform-origin="12px 12px">
+		<path d="m9 5 3-3 3 3"></path>
+		<path d="m9 10 3-3 3 3"></path>
+		<path d="M12 12V2"></path>
+	</g>
+	<g transform-origin="5px 22px">
+		<path d="m2 15 3-3 3 3"></path>
+		<path d="m2 20 3-3 3 3"></path>
+		<path d="M5 22V12"></path>
+	</g>
+	<g transform-origin="19px 22px">
+		<path d="m16 15 3-3 3 3"></path>
+		<path d="m16 20 3-3 3 3"></path>
+		<path d="M19 22V12"></path>
+	</g>
 </svg>
