@@ -319,6 +319,48 @@ Set `Config.Erase` from `store/` when account deletion needs site-data cleanup, 
 An error rolls back cleanup and account deletion.
 This is the transaction-passing exception: both changes must commit together.
 
+### Native App Ownership
+
+**Go owns permissions and business state; native code owns presentation.**
+Keep site contracts in `proto/<site>/api/v1/` and Connect adapters in `api/`, calling domain and store code shared with browser handlers.
+Give the site its own protobuf namespace; do not add site services under `proto/hgmx/`.
+Within a supported API major, keep changes additive and preserve input meanings and accepted values.
+Schema checks alone cannot detect stricter server validation.
+
+**Use the generated client through the starter's session owner.**
+Construct feature clients from `session.api.client` and make their calls through `Session.call` so metadata, auth changes and typed faults follow one path.
+Use `Session.signIn` for grants and `Session.update` for auth account snapshots.
+View models expose loading, data and problems; views render server capabilities and own drafts and navigation.
+Do not copy generated messages into parallel handwritten DTOs or put permission decisions in a view.
+
+Keep tokens inside the session and its platform `TokenStore`, never in view state, logs or URLs.
+The configured transport refuses redirects; do not add cookie authentication or a second bearer client.
+After mutations, apply the returned snapshot or reload it, and cancel screen work when its lifetime ends.
+Preserve the session generation guard so a late response cannot restore an old sign-in.
+Sign-out clears the local token, then attempts server revocation.
+If revocation is unconfirmed and the session has not changed, both starters show a notice directing the user to sign in at `<origin>/auth/account` and end that device's session under **Devices**.
+
+### App Launch Requirements
+
+**Each business that owns an iPhone app's content enrolls in the Apple Developer Program and submits under its own account.**
+[App Review guideline 4.2.6](https://developer.apple.com/app-store/review/guidelines/#minimum-functionality) rejects apps made from commercial templates or app-generation services unless the content provider submits them directly.
+The business invites a developer such as cogikyo into its team as Admin or App Manager to help; the developer does not publish client apps under a shared account.
+See Apple's [contract-developer enrollment guidance](https://developer.apple.com/support/enrollment/#contract-developers).
+Account ownership does not replace Apple's requirements for a customized, useful app or guarantee approval.
+
+**Apple sign-in is not built yet.**
+Buyer launch still requires Apple sign-in/linking, durable Apple token revocation during deletion, declared server credentials, working in-app account deletion with site-data cleanup, and App Store review.
+Prove cleanup and any legally required retention against the site's real data; a website link or local identity removal is insufficient.
+
+Passkeys on iOS need a real Apple team, provisioning with Associated Domains, and `webcredentials` for the site's RP domain.
+Register the actual provisioning app ID prefix and bundle in `auth.IOS`; that prefix need not equal the Team ID.
+For Android, register the package and SHA-256 certificates of supported installed builds, not an upload key or shared debug certificate by habit.
+Serve AASA and assetlinks publicly from the RP host without redirects or challenges, then prove passkeys on physical devices.
+
+Report generation, native compilation, live calls, physical-device checks and store readiness separately.
+Both starters check configuration at launch and handle update faults on calls; neither currently refreshes configuration on foreground.
+Add and verify foreground refresh before treating that requirement as complete.
+
 ### CSP Literal
 
 **Set site overrides in `server.Site.CSP`, a `map[string][]string`.**
@@ -522,7 +564,7 @@ The `hgmx-skills` rule in `go tool hgmx check` fails on missing, stale, edited o
 | Command                             | Task                                                                        |
 | ----------------------------------- | --------------------------------------------------------------------------- |
 | `go tool hgmx init`                 | Write `main.go`, `routes/`, `store/` and `views/` in a module with `go.mod` |
-| `go tool hgmx gen`                  | Generate templ and minified CSS                                             |
+| `go tool hgmx gen`                  | Generate templ, minified CSS and app contract code                          |
 | `go tool hgmx dev [-- site flags…]` | Watch templ and CSS, restarting `go run . -static views/static`             |
 | `go tool hgmx fmt`                  | Format Go and templ files                                                   |
 | `go tool hgmx migrate …`            | Run `go run . migrate …` for development                                    |
@@ -537,6 +579,68 @@ Tailwind generation uses `tailwindcss` from PATH when `views/static/css/main.css
 It stops at the first failed stage and never writes formatted files.
 For package loading and Go commands, `check` sets `GOWORK=off` and passes `-mod=vendor` when `vendor/` exists or `-mod=readonly` otherwise, overriding `GOFLAGS`.
 `dev` and `migrate` keep the caller's workspace settings.
+
+### App Generation and Checks
+
+**Adopt each native starter once with `go tool hgmx init apps android` or `ios`.**
+Both require `--name`, `--origin` and `--app-id`; Android also needs `--package`, and iOS needs `--bundle-id`.
+`--app-id` matches the site's `auth.App.ID`.
+`--origin` requires HTTPS on a domain name, without user information, a non-root path, query or fragment; both platforms refuse IP origins.
+The server and adoption share canonicalization through `internal/webhost`: hosts become lowercase ASCII, IDNs use punycode, and a root slash and default HTTPS port are removed.
+The RP ID comes from that canonical host's registrable domain; iOS also refuses `localhost` RP IDs.
+`--name` must be nonempty, without surrounding whitespace, double quotes, backslashes, control characters or Unicode line/paragraph separators, and must not start with `@` or `?`.
+iOS also refuses `$`, `//` and a trailing `;` in the name.
+Android's optional `--google-client-id` is the public Google web/server client ID, never a secret; iOS rejects it.
+Adoption copies the whole platform project, substitutes identity and refuses an existing destination before writing.
+It does not configure Apple signing, server registrations or provider consoles.
+
+The presence of `proto/` or a native platform directory enables contract generation alongside templ/CSS.
+`gen` materializes hgmx's exact `buf.yaml` and `proto/hgmx/` contracts and refuses edited or unowned managed inputs.
+Sites import hgmx's generated Go types instead of generating duplicate hgmx descriptors.
+
+| Target  | Generated output                                                                  |
+| ------- | --------------------------------------------------------------------------------- |
+| Go      | `.pb.go` and `.connect.go` beside site protos in `proto/<site>/`                  |
+| Android | Java lite messages and Kotlin Connect in `apps/android/app/src/main/generated/`   |
+| iOS     | Swift messages and async Connect clients in `apps/ios/API/Sources/API/Generated/` |
+
+Mobile output includes both hgmx and site contracts for each platform present.
+Keep handwritten files out of the mobile output directories: `gen` removes files without generated counterparts.
+Commit generated sources and platform lockfiles; Xcode and Gradle compile them without regenerating.
+Contract generators run into temporary trees before replacing generated outputs; a plugin failure leaves those outputs intact, though managed inputs may already have been written.
+
+**Use hgmx's pinned generator chain.**
+Buf and Go plugins run through hgmx, outside the site's tool dependencies; add no site Buf tool or remote plugins.
+Android generation needs JDK 21 on PATH; hgmx downloads its pinned protoc and Kotlin plugin.
+On a Mac, Swift generation runs locally; elsewhere it uses batch-mode SSH to `HGMX_MAC`, defaulting to `neumann`.
+Set `HGMX_MAC` to your SSH host or alias for a Mac with Swift 6.2+ and command-line build tools available.
+hgmx builds and caches its pinned Swift plugins there; this does not run an Xcode app build remotely.
+Missing tools or an unavailable Mac fail generation and check.
+
+`check` compares managed inputs and fully regenerated file sets without writing the site.
+Its `contracts` stage runs Buf format-diff and STANDARD lint, plus the release checks below.
+Its `pins` stage checks Go runtime floors, Android's protobuf/Connect dependency lock, and **iOS pins** in the Xcode workspace's `Package.resolved`.
+The iOS check requires both version and commit to match hgmx's SwiftProtobuf and Connect pins.
+Generation and pin checks do not compile either native app; run platform builds separately.
+
+**`--skip android,ios` is partial work, never a passing check.**
+Use either platform or a comma-separated list on `gen` and `check`.
+`gen` leaves the skipped platform's generated output alone while generating the rest.
+For platforms present in the site, `check` omits their generation and pins, runs remaining stages until a failure, then exits nonzero naming the skipped stages.
+Sites without app or proto directories keep the ordinary web-only generation path.
+
+### App Release Baselines
+
+**`apps/compatibility.json` records installed-client baselines, not the hgmx module version.**
+Adoption creates it only if missing, with `base` set to `origin/master` and `releases` set to an empty list.
+Keep the list empty only while no store build has shipped; an empty list explicitly skips release and merge-base breaking checks.
+Each released build records `platform` (`android` or `ios`), positive integer `build`, immutable full 40-character schema `commit`, and supported API `majors`.
+`base` selects the ref used for the merge-base comparison.
+
+With recorded releases, `check` uses Buf FILE breaking checks against each release commit and the merge-base with `base`.
+Missing commits or the base ref fail; fetch the required history rather than removing a release record.
+**Retained-client behavior checks are not implemented yet:** recording any release currently makes `check` fail even if schema checks pass.
+Implement those checks before the first release is recorded; do not leave a shipped app marked unreleased to get a green check.
 
 ### hgmx: Credentials
 

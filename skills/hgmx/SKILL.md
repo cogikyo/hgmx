@@ -1,12 +1,14 @@
 ---
 name: hgmx
-description: Build, change, or review a Go site that uses github.com/cogikyo/hgmx, including site conventions, shared packages, generation, checks, updates, and managed agent skills.
+description: Build, change, or review a Go site that uses github.com/cogikyo/hgmx, including site conventions, shared packages, native app routing, generation, checks, updates, and managed agent skills.
 ---
 
 # Build a site on hgmx
 
 hgmx is a shared Go toolkit for server-rendered sites using templ, htmx, and Tailwind.
 Each site imports the infrastructure it needs and owns its pages and copied components.
+Use **hgmx-connect** for native API contracts and service wiring, **hgmx-ios** for SwiftUI, and **hgmx-android** for Compose.
+Browser pages remain server-rendered HTML and do not consume the native API.
 
 ## Read the source of truth
 
@@ -26,7 +28,7 @@ Run commands from the site's module root through `go tool hgmx`.
 The site's `go.mod` must declare `tool github.com/cogikyo/hgmx/cmd/hgmx` so the CLI and library share one version.
 
 1. Run **`go tool hgmx check`** to find the current failures.
-   It checks generation, site rules, formatting, vet, build, and tests without writing fixes.
+   It checks contracts and runtime pins when present, generation, credentials, site rules, formatting, vet, build, and tests without writing fixes.
 2. Keep the site on **latest hgmx master** while hgmx is being built out.
    Run `go tool hgmx update` when behind; it updates the library and tool, tidies modules, re-vendors an existing `vendor/`, and re-syncs skills.
    A failed remote lookup makes the latest-version check warn and skip, so an offline pass does not prove currency.
@@ -34,6 +36,7 @@ The site's `go.mod` must declare `tool github.com/cogikyo/hgmx/cmd/hgmx` so the 
    Run `go tool hgmx gen` and `go tool hgmx fmt` to write generated and formatted files.
 4. Run **`go tool hgmx check`** again before handing off.
    Report any failed or skipped check, including database tests skipped for missing local prerequisites.
+   Native `--skip` makes check exit nonzero; it is not a substitute for platform generation or builds.
 
 ## Managed skills
 
