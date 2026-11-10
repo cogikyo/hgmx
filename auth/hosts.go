@@ -5,14 +5,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/netip"
-	"net/url"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/a-h/templ"
-	"golang.org/x/net/idna"
-	"golang.org/x/net/publicsuffix"
+	"github.com/cogikyo/hgmx/internal/webhost"
 )
 
 // Host shares accounts and passkeys, but binds sessions to its origin.
@@ -49,7 +45,7 @@ func parseHosts(hs []Host) (map[string]*host, string, error) {
 	hosts := make(map[string]*host, len(hs))
 	var rp string
 	for _, h := range hs {
-		origin, name, err := parseOrigin(h.Origin)
+		origin, name, err := webhost.Parse(h.Origin)
 		if err != nil {
 			return nil, "", err
 		}
@@ -62,7 +58,7 @@ func parseHosts(hs []Host) (map[string]*host, string, error) {
 		if _, err := netip.ParseAddr(name); err == nil && len(hs) > 1 {
 			return nil, "", fmt.Errorf("auth: IP host %s must be the only host", origin)
 		}
-		site, err := registrable(name, len(hs) == 1)
+		site, err := webhost.Registrable(name, len(hs) == 1)
 		if err != nil {
 			return nil, "", fmt.Errorf("auth: host %s: %w", origin, err)
 		}
@@ -84,66 +80,9 @@ func parseHosts(hs []Host) (map[string]*host, string, error) {
 	return hosts, rp, nil
 }
 
-func registrable(name string, alone bool) (string, error) {
-	switch {
-	case loopback(name) && alone:
-		return name, nil
-	case name == "localhost" || strings.HasSuffix(name, ".localhost"):
-		return "localhost", nil
-	}
-	return publicsuffix.EffectiveTLDPlusOne(name)
-}
-
-func parseOrigin(raw string) (origin, name string, err error) {
-	bad := fmt.Errorf("auth: host origin %q must be https://host, or http:// on localhost", raw)
-	u, err := url.Parse(raw)
-	if err != nil || u.User != nil || strings.TrimSuffix(u.Path, "/") != "" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" {
-		return "", "", bad
-	}
-	key, name, ok := authority(u.Scheme, u.Host)
-	_, err = netip.ParseAddr(name)
-	domain := err != nil
-	if !ok || !(u.Scheme == "https" && (domain || loopback(name)) || u.Scheme == "http" && loopback(name)) {
-		return "", "", bad
-	}
-	return u.Scheme + "://" + key, name, nil
-}
-
-func authority(scheme, hostport string) (key, name string, ok bool) {
-	u, err := url.Parse(scheme + "://" + hostport)
-	if err != nil || hostport == "" || u.Host != hostport || strings.HasSuffix(hostport, ":") {
-		return "", "", false
-	}
-	name, port := u.Hostname(), u.Port()
-	if ip, err := netip.ParseAddr(name); err == nil {
-		if ip.Zone() != "" {
-			return "", "", false
-		}
-		name = ip.String()
-	} else if name, err = idna.Lookup.ToASCII(name); err != nil || name == "" || strings.HasSuffix(name, ".") {
-		return "", "", false
-	}
-	key = name
-	if strings.Contains(name, ":") {
-		key = "[" + name + "]"
-	}
-	if port != "" {
-		n, err := strconv.ParseUint(port, 10, 16)
-		if err != nil || n == 0 {
-			return "", "", false
-		}
-		if p := strconv.FormatUint(n, 10); p != defaultPort[scheme] {
-			key += ":" + p
-		}
-	}
-	return key, name, true
-}
-
-var defaultPort = map[string]string{"https": "443", "http": "80"}
-
 func (a *Auth) host(r *http.Request) (*host, bool) {
 	for _, scheme := range [...]string{"https", "http"} {
-		if key, _, ok := authority(scheme, r.Host); ok {
+		if key, _, ok := webhost.Authority(scheme, r.Host); ok {
 			if h, ok := a.hosts[scheme+"://"+key]; ok {
 				return h, true
 			}

@@ -99,12 +99,10 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"net/url"
 	"runtime/debug"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -284,14 +282,6 @@ func (c Config) check() (map[string]*host, string, error) {
 		return nil, "", errors.New("auth: Config.Google needs a ClientID and ClientSecret")
 	}
 	return parseHosts(c.Hosts)
-}
-
-func loopback(host string) bool {
-	if host == "localhost" || strings.HasSuffix(host, ".localhost") {
-		return true
-	}
-	ip := net.ParseIP(host)
-	return ip != nil && ip.IsLoopback()
 }
 
 func library() string {

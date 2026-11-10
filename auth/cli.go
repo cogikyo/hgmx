@@ -12,6 +12,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/cogikyo/hgmx/internal/webhost"
 	"github.com/cogikyo/hgmx/pg"
 )
 
@@ -77,7 +78,7 @@ func target(hosts map[string]*host, raw string) (*host, error) {
 		}
 		return nil, fmt.Errorf("auth: --origin is required; one of %s", strings.Join(slices.Sorted(maps.Keys(hosts)), ", "))
 	}
-	origin, _, err := parseOrigin(raw)
+	origin, _, err := webhost.Parse(raw)
 	if err != nil {
 		return nil, err
 	}

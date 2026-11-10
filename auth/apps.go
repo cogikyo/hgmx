@@ -16,6 +16,8 @@ import (
 
 	"github.com/go-webauthn/webauthn/webauthn"
 
+	"github.com/cogikyo/hgmx/internal/appid"
+	"github.com/cogikyo/hgmx/internal/webhost"
 	authv1 "github.com/cogikyo/hgmx/proto/hgmx/auth/v1"
 )
 
@@ -56,7 +58,6 @@ type app struct {
 }
 
 var (
-	appID          = regexp.MustCompile(`^[a-z0-9]+([.-][a-z0-9]+)*$`)
 	iosPrefix      = regexp.MustCompile(`^[A-Z0-9]{10}$`)
 	iosBundle      = regexp.MustCompile(`^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$`)
 	androidPkg     = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$`)
@@ -69,7 +70,7 @@ func parseApps(hs []Host, hosts map[string]*host, rp string) (map[string]*app, e
 	apps := map[string]*app{}
 	platforms := map[string]string{}
 	for _, h := range hs {
-		origin, _, _ := parseOrigin(h.Origin)
+		origin, _, _ := webhost.Parse(h.Origin)
 		for _, c := range h.Apps {
 			a, ids, err := parseApp(c, hosts[origin], rp)
 			if err != nil {
@@ -97,7 +98,7 @@ func parseApp(c App, h *host, rp string) (*app, []string, error) {
 	switch {
 	case !strings.HasPrefix(h.origin, "https://"):
 		return nil, nil, fmt.Errorf("apps need an https origin")
-	case len(c.ID) > 64 || !appID.MatchString(c.ID):
+	case !appid.Valid(c.ID):
 		return nil, nil, fmt.Errorf("ID must be lowercase letters, digits, dots and dashes")
 	case (c.IOS == nil) == (c.Android == nil):
 		return nil, nil, fmt.Errorf("set exactly one of IOS and Android")
