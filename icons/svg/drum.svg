@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-	<path d="m2 2 8 8"></path>
-	<path d="m22 2-8 8"></path>
+	<path transform-origin="2px 2px" d="m2 2 8 8"></path>
+	<path transform-origin="22px 2px" d="m22 2-8 8"></path>
 	<ellipse cx="12" cy="9" rx="10" ry="5"></ellipse>
 	<path d="M7 13.4v7.9"></path>
 	<path d="M12 14v8"></path>

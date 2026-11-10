@@ -1,0 +1,9 @@
+import { animate, τmid, τmin } from "../motion.js";
+
+export default function (el) {
+  const bars = el.querySelector("g");
+  animate(bars, { scaleY: [1, 0.8, 1] }, { duration: τmid });
+
+  const slash = el.querySelector('path[d="m2 2 20 20"]');
+  animate(slash, { pathLength: [0, 1], opacity: [0, 1] }, { duration: τmid, delay: τmin });
+}
