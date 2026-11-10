@@ -752,16 +752,28 @@ The infrastructure packages are:
 - **`palette`** generates OKLCH shades and semantic colour tokens from one seed.
 - **`icons/glyph`** renders icon sets and serves hover-animation assets.
 
-Icons use both models: import `icons/glyph` for the runtime and copy selected icons with `go tool hgmx icons add <names>`.
-Import the `icons` catalog only to preview the whole set.
+Import `icons/glyph` for the runtime and copy selected icons with `go tool hgmx icons add <names>`.
 
 Put the selected handlers' `Head()` output in the document head.
 It returns `template.HTML`, which html/template renders as-is and templ takes as `@templ.Raw(...)`.
 The glyph handler's `Head()` belongs after the `scripts.Motion` tag; `glyph.Hover` also needs hyperscript.
 
+### hgmx: Icons Source
+
+**Use either the full `github.com/cogikyo/hgmx/icons` catalog or a local set in `views/icons/`, never both.**
+One glyph handler serves one icon set; `hgmx/icons-source` enforces this.
+A set made by `icons add`, or any Go or templ files in `views/icons/`, counts; an empty directory does not.
+Preview sites delete `views/icons/` and use catalog names; other sites drop the catalog import.
+
 ### hgmx: Icons
 
 Run icon commands from the site's module root.
+Icon commands and `check`'s icon rules read the catalog from hgmx's module source selected by the site's effective module file (`go.mod` or the `GOFLAGS` `-modfile` alternate), including `replace`.
+They use [check's module policy](#layout-no-justfile), so `go.work` does not select the catalog.
+If the source is not cached, hgmx downloads it using temporary copies of that module file and its paired `.sum` file for checksum verification.
+These commands never write the original module or sum files.
+If the download fails offline, run `go mod download github.com/cogikyo/hgmx` with network access.
+
 `go tool hgmx icons add <names>` lists and copies catalog icons into `views/icons/`.
 `views/icons/icons.json` is the site's list of icon names; `svg/` and `anim/` hold editable copies.
 `icons.go`, `tags.json` and the per-file SHA-256 lock `icons.sum` are generated.
@@ -771,6 +783,15 @@ Run `go tool hgmx icons sync` after editing the list; it preserves local edits a
 Run `go tool hgmx icons update` after bumping hgmx to refresh unedited copies and report conflicts.
 Use `update --rename` to follow catalog renames in the list and filenames, then change Go references to the new constants.
 Use `update --keep <name>` to keep an icon's local edits after a conflict and record the new catalog version in the lock.
-Run `go tool hgmx icons --check` in CI to report pending sync or update changes without writing.
+Use `go tool hgmx icons --check` to run only the icon comparison without writing.
+It passes when `views/icons/` has no set made by `icons add`.
 
 See the [motion grammar](icons/GRAMMAR.md) when editing animations.
+
+### hgmx: Icons Drift
+
+**`go tool hgmx check` runs the `icons --check` comparison as `hgmx/icons-drift`.**
+This catches missing copies and stale generated files without writing.
+It recognizes generated sets by `icons.json` or an `icons.go` with the generator header in `views/icons/`.
+Run `go tool hgmx icons update` and follow each finding's fix.
+If `icons.json` is missing, restore it from version control or recreate the list with `go tool hgmx icons add <names>`.
