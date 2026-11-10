@@ -4,8 +4,10 @@
 	<path d="M12 18h.01"></path>
 	<path d="M2 9h2V7"></path>
 	<path d="M7 12 4 9"></path>
-	<path d="M17.8 11.1 20 9"></path>
-	<path d="M20 7v2h2"></path>
+	<g transform-origin="17.8px 11.1px">
+		<path d="M17.8 11.1 20 9"></path>
+		<path d="M20 7v2h2"></path>
+	</g>
 	<path d="M9 8.7a7 7 0 1 0 6 0"></path>
 	<path d="M5 22h14"></path>
 </svg>
