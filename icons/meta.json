@@ -101,10 +101,6 @@
 			"title": "Mathematics"
 		},
 		{
-			"name": "maths",
-			"title": "Maths"
-		},
-		{
 			"name": "medical",
 			"title": "Medical"
 		},
@@ -7544,7 +7540,7 @@
 				"layout",
 				"design",
 				"tools",
-				"maths",
+				"math",
 				"gaming"
 			]
 		},

@@ -12,6 +12,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"slices"
+	"strings"
 
 	"github.com/cogikyo/hgmx/icons/glyph"
 )
@@ -90,10 +92,33 @@ func All() []Name {
 	return names(Set.Names())
 }
 
-// Match finds case-insensitive substrings in names and tags.
+// Match finds icons by case-insensitive substring in names, tags, or categories.
+// Categories match by name or title.
 // An empty or whitespace-only query returns all icons.
 func Match(q string) []Name {
-	return names(Set.Match(q))
+	hits := map[string]bool{}
+	for _, n := range Set.Match(q) {
+		hits[n] = true
+	}
+	cats := meta.match(q)
+	out := []Name{}
+	for _, n := range All() {
+		if hits[string(n)] || slices.ContainsFunc(meta.Icons[n].Categories, func(c string) bool { return cats[c] }) {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+func (m catalogMeta) match(q string) map[string]bool {
+	q = strings.ToLower(strings.TrimSpace(q))
+	cats := map[string]bool{}
+	for _, c := range m.Categories {
+		if strings.Contains(c.Name, q) || strings.Contains(strings.ToLower(c.Title), q) {
+			cats[c.Name] = true
+		}
+	}
+	return cats
 }
 
 // Categories returns the catalog's categories in display order, each with its icons.

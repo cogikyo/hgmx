@@ -92,6 +92,8 @@ var originals = map[string][]string{
 	"user-contact": {"account", "communication", "social"},
 }
 
+var labCategories = map[string]string{"maths": "math"}
+
 func main() {
 	check := flag.Bool("check", false, "verify icon and generated files against lock.json without downloading")
 	update := flag.Bool("update", false, "lock every icon in the pinned sources and refresh their metadata")
@@ -170,6 +172,7 @@ func run(dir string, check, update bool) error {
 	for _, f := range files {
 		names = append(names, strings.TrimSuffix(filepath.Base(f), ".svg"))
 	}
+	slices.Sort(names)
 	_, licenseErr := os.Stat(filepath.Join(dir, "LICENSE"))
 	unlisted := slices.ContainsFunc(names, func(name string) bool {
 		_, ok := m.Icons[name]
@@ -468,6 +471,9 @@ func fetch(l lock) (*upstream, error) {
 			canonical[icon] = true
 			raw[icon] = rec.Categories
 		case "lab/":
+			for i, c := range rec.Categories {
+				rec.Categories[i] = cmp.Or(labCategories[c], c)
+			}
 			raw[icon] = rec.Categories
 			u.tags[icon] = rec.Tags
 		case "categories/":

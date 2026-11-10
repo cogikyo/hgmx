@@ -85,6 +85,7 @@ func Load(fsys fs.FS) (*Set, error) {
 		s.glyphs[name] = glyph{markup: markup, tags: tags[name]}
 		s.names = append(s.names, name)
 	}
+	slices.Sort(s.names)
 	return s, nil
 }
 
