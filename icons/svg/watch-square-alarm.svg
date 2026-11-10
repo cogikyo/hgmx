@@ -2,7 +2,7 @@
 	<path d="m15.8 6-.5-2.4c-.2-1-1-1.6-2-1.6h-2.7a2 2 0 0 0-2 1.6L8.2 6"></path>
 	<rect width="12" height="12" x="6" y="6" rx="2"></rect>
 	<path d="m8.2 18 .5 2.4c.2 1 1 1.6 2 1.6h2.7a2 2 0 0 0 2-1.6l.5-2.4"></path>
-	<path d="M12 10v2l1 1"></path>
+	<path transform-origin="12px 12px" d="M12 10v2l1 1"></path>
 	<path d="M2 16c0 2.1 1.1 4 2.7 5"></path>
 	<path d="M22 8c0-2.1-1.1-4-2.7-5"></path>
 </svg>

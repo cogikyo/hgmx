@@ -2,7 +2,7 @@
 	<path d="M2.5 9a9.93 9.93 0 0 0 0 6"></path>
 	<path d="M21.5 15a9.93 9.93 0 0 0 0-6"></path>
 	<circle cx="12" cy="12" r="6"></circle>
-	<path d="M12 10v2l1 1"></path>
+	<path transform-origin="12px 12px" d="M12 10v2l1 1"></path>
 	<path d="m16.13 7.66-.81-4.05a2 2 0 0 0-2-1.61h-2.68a2 2 0 0 0-2 1.61l-.78 4.05"></path>
 	<path d="m7.88 16.36.8 4a2 2 0 0 0 2 1.61h2.72a2 2 0 0 0 2-1.61l.81-4.05"></path>
 </svg>
