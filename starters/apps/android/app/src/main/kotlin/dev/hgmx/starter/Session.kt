@@ -89,7 +89,7 @@ class Session(
             generation++
             _gate.value = Gate.SignedIn(g.account)
         }
-        previous?.let(::revoke)
+        previous?.let { scope.launch { revoke(it) } }
     }
 
     suspend fun <T> update(rpc: suspend (Headers) -> ResponseMessage<T>, account: (T) -> Account): Account =
@@ -103,18 +103,28 @@ class Session(
 
     fun signOut() {
         scope.launch {
-            val old = lock.withLock {
-                token.also { end(null) }
+            val (old, sent) = lock.withLock {
+                val old = token
+                end(null)
+                old to generation
             }
-            old?.let(::revoke)
+            if (old == null || revoke(old)) return@launch
+            lock.withLock {
+                if (sent == generation) {
+                    _gate.value = Gate.SignedOut(
+                        "You're signed out on this device, but the server didn't confirm it. " +
+                            "To end that session, sign in at ${api.origin}/auth/account and sign out $label under Devices.",
+                    )
+                }
+            }
         }
     }
 
-    private fun revoke(old: String) {
-        scope.launch {
-            api.auth.signOut(SignOutRequest.getDefaultInstance(), api.headers(old))
+    private suspend fun revoke(old: String): Boolean =
+        when (val response = api.auth.signOut(SignOutRequest.getDefaultInstance(), api.headers(old))) {
+            is ResponseMessage.Success -> true
+            is ResponseMessage.Failure -> response.cause.code == Code.UNAUTHENTICATED
         }
-    }
 
     private suspend fun end(notice: String?) {
         withContext(Dispatchers.IO) { tokens.clear() }
