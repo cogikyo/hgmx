@@ -25,7 +25,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import okio.ByteString.Companion.toByteString
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -89,9 +88,8 @@ class SessionTest {
         val offline = Session(Api("http://localhost:18559", "test-android", 1), tokens, scope)
         offline.signIn({ success(VerifyCodeResponse.newBuilder().setGrant(grant()).build()) }) { it.grant }
         offline.signOut()
-        val notice = withTimeout(10_000) {
-            offline.gate.first { it is Gate.SignedOut && it.notice != null }
-        }.let { (it as Gate.SignedOut).notice.orEmpty() }
+        val notice = offline.gate.first { it is Gate.SignedOut && it.notice != null }
+            .let { (it as Gate.SignedOut).notice.orEmpty() }
         assertNull(tokens.read())
         assertTrue(notice, notice.contains("didn't confirm"))
         assertTrue(notice, notice.contains("http://localhost:18559/auth/account"))

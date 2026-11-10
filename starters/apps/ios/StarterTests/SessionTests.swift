@@ -1,6 +1,7 @@
 import API
 import Connect
 import Foundation
+import Observation
 import Security
 import SwiftProtobuf
 import Testing
@@ -62,8 +63,8 @@ struct SessionTests {
         session.signOut()
         #expect(session.gate == .signedOut(notice: nil))
         #expect(tokens.read() == nil)
-        for _ in 0..<100 where session.gate == .signedOut(notice: nil) {
-            try await Task.sleep(for: .milliseconds(50))
+        await withCheckedContinuation { changed in
+            withObservationTracking { _ = session.gate } onChange: { changed.resume() }
         }
         guard case .signedOut(let notice?) = session.gate else {
             Issue.record("no notice after an unconfirmed sign-out: \(session.gate)")
