@@ -30,6 +30,7 @@ func init() {
 	rootCmd.AddCommand(infoCobraCmd)
 	rootCmd.AddCommand(initCobraCmd)
 	rootCmd.AddCommand(paletteCobraCmd)
+	rootCmd.AddCommand(iconsCobraCmd)
 	rootCmd.AddCommand(genCobraCmd)
 	rootCmd.AddCommand(fmtCobraCmd)
 	rootCmd.AddCommand(devCobraCmd)

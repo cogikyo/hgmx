@@ -750,8 +750,27 @@ The infrastructure packages are:
 - **`scripts`** serves selected scripts and navigation support with ordered head tags.
 - **`webapp`** serves the install manifest and icons.
 - **`palette`** generates OKLCH shades and semantic colour tokens from one seed.
-- **`icons`** provides SVG templ components and hover-animation assets.
+- **`icons/glyph`** renders icon sets and serves hover-animation assets.
+
+Icons use both models: import `icons/glyph` for the runtime and copy selected icons with `go tool hgmx icons add <names>`.
+Import the `icons` catalog only to preview the whole set.
 
 Put the selected handlers' `Head()` output in the document head.
 It returns `template.HTML`, which html/template renders as-is and templ takes as `@templ.Raw(...)`.
-The icons handler's `Head()` belongs after the `scripts.Motion` tag; the icon hover helper also needs hyperscript.
+The glyph handler's `Head()` belongs after the `scripts.Motion` tag; `glyph.Hover` also needs hyperscript.
+
+### hgmx: Icons
+
+Run icon commands from the site's module root.
+`go tool hgmx icons add <names>` lists and copies catalog icons into `views/icons/`.
+`views/icons/icons.json` is the site's list of icon names; `svg/` and `anim/` hold editable copies.
+`icons.go`, `tags.json` and the per-file SHA-256 lock `icons.sum` are generated.
+Import the site's `views/icons` package for templ components and pass its `Set` to `glyph.New`.
+
+Run `go tool hgmx icons sync` after editing the list; it preserves local edits and keeps existing copies at their locked catalog version.
+Run `go tool hgmx icons update` after bumping hgmx to refresh unedited copies and report conflicts.
+Use `update --rename` to follow catalog renames in the list and filenames, then change Go references to the new constants.
+Use `update --keep <name>` to keep an icon's local edits after a conflict and record the new catalog version in the lock.
+Run `go tool hgmx icons --check` in CI to report pending sync or update changes without writing.
+
+See the [motion grammar](icons/GRAMMAR.md) when editing animations.

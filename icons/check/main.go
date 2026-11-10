@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/cogikyo/hgmx/icons"
+	"github.com/cogikyo/hgmx/icons/glyph"
 	"github.com/cogikyo/hgmx/scripts"
 )
 
@@ -29,12 +30,12 @@ func main() {
 	flag.Parse()
 
 	js := scripts.New(scripts.HTMX, scripts.Hyperscript, scripts.Motion)
-	ic := icons.New()
+	ic := glyph.New(icons.Set)
 	head := js.Head() + "\n" + ic.Head()
 
 	mux := http.NewServeMux()
 	mux.Handle(scripts.Path, js)
-	mux.Handle(icons.Path, ic)
+	mux.Handle(glyph.Path, ic)
 	mux.HandleFunc("GET /check.css", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/css; charset=utf-8")
 		fmt.Fprint(w, css)

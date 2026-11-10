@@ -7,7 +7,7 @@ Animations use Motion 14.7.1 through the shared runtime.
 ## 1. Mechanics
 
 **One module per icon.**
-`assets/anim/<name>.js` animates `svg/<name>.svg`; the file's existence registers the animation.
+`anim/<name>.js` animates `svg/<name>.svg`; the file's existence registers the animation.
 Paths in this page are relative to `icons/` unless a command says otherwise.
 
 ```js
@@ -42,7 +42,7 @@ The importer reports changed SVGs as `edited` and does not overwrite them.
 Use classes only as group selectors, such as `g.gear` in `user-cog` and `g.search` in `user-search`; they carry no CSS.
 
 **Pivots.**
-`assets/icons.css` centres rotation and scaling for elements without `transform` or `transform-origin` attributes.
+`glyph/icons.css` centres rotation and scaling for elements without `transform` or `transform-origin` attributes.
 For a different pivot, set `transform-origin="Xpx Ypx"` in view-box units; the CSS switches that element to the view-box.
 
 - `palette` uses `12px 12px`, the icon centre.
@@ -53,7 +53,7 @@ For a different pivot, set `transform-origin="Xpx Ypx"` in view-box units; the C
 
 ## 2. Time
 
-The shared `assets/motion.js` exports the timing tokens:
+The shared `glyph/motion.js` exports the timing tokens:
 
 | Token | Seconds | Role                                   |
 | ----- | ------- | -------------------------------------- |
@@ -116,7 +116,7 @@ Each verb has keyframes, timing and reference icons.
 - Use it for a subject, at τmax alone or τmid before an accent (`user`, `user-check`).
 - Use `opacity: [0.5, 1]` for frames that must stay readable (`palette`, `user-contact`, `house`).
 - **Ring draw:** add `rotate: [270, 90]` to start a full circle at the top (`question`, `info`, `circle-check`).
-  - New rings end at 90; `user-circle` ends at 115, and any angle is at rest for a centred circle.
+  - New rings end at 90; `circle-user` ends at 115, and any angle is at rest for a centred circle.
 - **Direction:** drawing follows Lucide's path direction; do not use `pathOffset`.
   - If that reads backwards, grow the part from flat or slide it.
   - `chart-line` grows its line; `trending-*` arrows slide; `ruler` ticks grow from the edge.
@@ -225,7 +225,7 @@ The checker compares screenshots in Chromium and Firefox and requires **0 differ
   - End rotation at a multiple of 360°, or a turn that maps the part onto itself.
   - Two-fold symmetry permits 180°: a line, plus, x, `snowflake` or `atom` orbit.
   - Four-fold symmetry permits 90° (`sparkles`' main spark).
-  - A circle pivoting at its centre permits any angle (`user-circle` ends at 115°).
+  - A circle pivoting at its centre permits any angle (`circle-user` ends at 115°).
 - Runtime cleanup removes final symmetric turns because rotation changes antialiasing.
   - An unsafe 90° or 180° turn would visibly snap back; do not write one.
   - `orbit` keeps its carry because its final turn is not a multiple of 90°.
@@ -251,8 +251,8 @@ The checker compares screenshots in Chromium and Firefox and requires **0 differ
   - Examples include `chevron-down`, `rss`, `heart`, `send`, `pause` and `hammer`.
 - **A shared accent keeps one gesture across families.**
   - Badge and shield alert marks swing like `bell`, and their dots pop at τmid.
-  - Their frames differ: `badge-alert` breathes and `shield-alert` draws.
-  - `triangle-alert` is the exception: the whole sign sways, its bar draws and its dot pops at τmid.
+  - Their frames differ: `badge-exclamation-point` breathes and `shield-exclamation-point` draws.
+  - `triangle-exclamation-point` is the exception: the whole sign sways, its bar draws and its dot pops at τmid.
 - **Look-alikes from different families differ in at least one part's verb.**
   - Change the one whose gesture is not its family's base.
   - `text-align-center` grows its lines from the centre; `menu` squeezes its outer bars toward the middle and back.
@@ -279,10 +279,10 @@ Judge the film, not the property list.
 
 ## 9. Exemplars
 
-The 19 reference icons are `github`, `orbit`, `palette`, `question`, `rss`, `scroll`, `settings`, `user`, `users`, `user-check`, `user-circle`, `user-cog`, `user-contact`, `user-minus`, `user-pen`, `user-plus`, `user-search`, `user-star` and `user-x`.
+The 19 reference icons are `github`, `orbit`, `palette`, `question`, `rss`, `scroll`, `settings`, `user`, `users`, `user-check`, `circle-user`, `user-cog`, `user-contact`, `user-minus`, `user-pen`, `user-plus`, `user-search`, `user-star` and `user-x`.
 Keep these references intact when extending the set.
 
-Read these modules in `assets/anim/` for each verb:
+Read these modules in `anim/` for each verb:
 
 - **Draw:** `house`, `file-text`, `calendar`, `external-link`'s frame.
 - **Ring draw:** `circle-check`, `info`.

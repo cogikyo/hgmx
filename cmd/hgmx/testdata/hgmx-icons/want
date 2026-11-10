@@ -1,0 +1,9 @@
+.agents/skills/ [hgmx-skills] hgmx skills not installed
+go.mod [hgmx-tool] missing tool github.com/cogikyo/hgmx/cmd/hgmx
+go.mod:7:1 [hgmx-latest] replace github.com/cogikyo/hgmx overrides the pinned hgmx version
+views/page.go:10:6 [hgmx/icons] catalog.New moved to glyph.New(icons.Set), which serves only the site's icons
+views/page.go:11:6 [hgmx/icons] catalog.Path moved to glyph.Path, which serves only the site's icons
+views/page.go:12:12 [hgmx/icons] catalog.UserCircle was renamed to catalog.CircleUser, following Lucide
+views/page.go:12:32 [hgmx/icons] catalog.TriangleAlert was renamed to catalog.TriangleExclamationPoint, following Lucide
+views/page.go:12:69 [hgmx/icons] catalog.Hover moved to glyph.Hover, which serves only the site's icons
+views/page.go:13:6 [hgmx/icons] icons.UserCircle was renamed to icons.CircleUser, following Lucide

@@ -64,11 +64,11 @@ func checkCmd(skip []string) (code int) {
 		{"credentials", func() error { return s.checkCredentials(ctx) }},
 		{"rules", func() error {
 			findings, err := runRules(s)
-			if err != nil {
-				return err
-			}
 			for _, f := range findings {
 				f.print(os.Stdout)
+			}
+			if err != nil {
+				return err
 			}
 			if len(findings) > 0 {
 				return fmt.Errorf("findings: %d", len(findings))

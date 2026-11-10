@@ -119,7 +119,7 @@ Before planning a store release, read [App Launch Requirements](CONVENTIONS.md#a
 - **`static`** serves file sets at hashed URLs or fixed root URLs, with a disk-backed dev mode.
 - **`scripts`** serves selected htmx, hx-preload, navigation support, hyperscript and Motion scripts in dependency order.
 - **`palette`** generates OKLCH shades and semantic colour tokens from one seed.
-- **`icons`** provides 441 Lucide templ components with Motion 14.7.1 hover animations; see the [motion grammar](icons/GRAMMAR.md) when adding one.
+- **`icons`** holds the full catalog for previews; sites [copy selected icons](CONVENTIONS.md#hgmx-icons) with `go tool hgmx icons add <names>` and import `icons/glyph` for rendering and hover animations.
 - **`webapp`** builds an install manifest and icons from a PNG, without offline support.
 
 ## Generate a Palette

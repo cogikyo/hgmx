@@ -111,6 +111,11 @@ var (
 		"hgmx's navigation script expects one hx-boost value, and copied literals drift from it",
 		"write hx-boost:inherited={ scripts.Boost }",
 	}
+	ruleIcons = &rule{
+		"hgmx/icons",
+		"sites serve only the icons they copy into views/icons, and catalog names follow Lucide's renames",
+		"use the replacement the finding names",
+	}
 	ruleIgnore = &rule{
 		"hgmx/ignore",
 		"every ignore names the rule it silences and why, and goes away with its finding",
@@ -123,7 +128,7 @@ var rules = []*rule{
 	ruleJustfile, ruleInternal, ruleGoVersion, ruleTemplVersion,
 	ruleDirection, ruleStoreOnly, ruleLiveModels,
 	ruleAutoMigrate, ruleGlobal, ruleSlogContext, ruleExit,
-	ruleCSP, ruleInlineJS, ruleBoost, ruleIgnore,
+	ruleCSP, ruleInlineJS, ruleBoost, ruleIcons, ruleIgnore,
 }
 
 type finding struct {
@@ -187,8 +192,17 @@ func runRules(s site) ([]finding, error) {
 	if err := a.templRules(); err != nil {
 		return nil, err
 	}
-	if err := a.goRules(); err != nil {
+	if err := a.iconRules(); err != nil {
 		return nil, err
+	}
+	if err := a.goRules(); err != nil {
+		var moved []finding
+		for _, f := range a.findings {
+			if f.rule == ruleIcons {
+				moved = append(moved, f)
+			}
+		}
+		return moved, err
 	}
 	return a.resolve(), nil
 }
