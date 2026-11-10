@@ -46,7 +46,12 @@ func (n Name) Source() string {
 
 // Aliases returns the names the icon had before upstream renamed it.
 func (n Name) Aliases() []string {
-	return meta.Icons[n].Aliases
+	return slices.Clone(meta.Icons[n].Aliases)
+}
+
+// Categories returns the icon's categories in listed order; the first is its primary category.
+func (n Name) Categories() []string {
+	return slices.Clone(meta.Icons[n].Categories)
 }
 
 type Category struct {
