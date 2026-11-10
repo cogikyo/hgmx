@@ -116,6 +116,16 @@ var (
 		"sites serve only the icons they copy into views/icons, and catalog names follow Lucide's renames",
 		"use the replacement the finding names",
 	}
+	ruleIconsSource = &rule{
+		"hgmx/icons-source",
+		"one glyph handler serves one icon set, so a site serves either hgmx's whole catalog or its copied-in " + iconsDir + ", never both",
+		"keep one: a preview site deletes " + iconsDir + " and uses catalog names; any other site drops the " + catalogPath + " import",
+	}
+	ruleIconsDrift = &rule{
+		"hgmx/icons-drift",
+		"the site's copied-in icons match the catalog of its pinned hgmx version",
+		"run go tool hgmx icons update",
+	}
 	ruleIgnore = &rule{
 		"hgmx/ignore",
 		"every ignore names the rule it silences and why, and goes away with its finding",
@@ -128,7 +138,7 @@ var rules = []*rule{
 	ruleJustfile, ruleInternal, ruleGoVersion, ruleTemplVersion,
 	ruleDirection, ruleStoreOnly, ruleLiveModels,
 	ruleAutoMigrate, ruleGlobal, ruleSlogContext, ruleExit,
-	ruleCSP, ruleInlineJS, ruleBoost, ruleIcons, ruleIgnore,
+	ruleCSP, ruleInlineJS, ruleBoost, ruleIcons, ruleIconsSource, ruleIconsDrift, ruleIgnore,
 }
 
 type finding struct {
@@ -198,7 +208,7 @@ func runRules(s site) ([]finding, error) {
 	if err := a.goRules(); err != nil {
 		var moved []finding
 		for _, f := range a.findings {
-			if f.rule == ruleIcons {
+			if slices.Contains([]*rule{ruleIcons, ruleIconsSource, ruleIconsDrift}, f.rule) {
 				moved = append(moved, f)
 			}
 		}

@@ -1,0 +1,73 @@
+{
+	"categories": [
+		{
+			"name": "account",
+			"title": "Accounts & access"
+		},
+		{
+			"name": "cursors",
+			"title": "Cursors"
+		},
+		{
+			"name": "development",
+			"title": "Coding & development"
+		},
+		{
+			"name": "math",
+			"title": "Mathematics"
+		},
+		{
+			"name": "notifications",
+			"title": "Notifications"
+		},
+		{
+			"name": "shapes",
+			"title": "Shapes"
+		},
+		{
+			"name": "social",
+			"title": "Social"
+		}
+	],
+	"icons": {
+		"badge-exclamation-point": {
+			"source": "lucide",
+			"categories": [
+				"account",
+				"social"
+			],
+			"aliases": [
+				"badge-alert"
+			]
+		},
+		"circle-user": {
+			"source": "hgmx",
+			"categories": [
+				"account"
+			],
+			"aliases": [
+				"user-circle"
+			]
+		},
+		"plus": {
+			"source": "lucide",
+			"categories": [
+				"math",
+				"development",
+				"cursors"
+			]
+		},
+		"triangle-exclamation-point": {
+			"source": "lucide",
+			"categories": [
+				"shapes",
+				"notifications",
+				"development"
+			],
+			"aliases": [
+				"alert-triangle",
+				"triangle-alert"
+			]
+		}
+	}
+}

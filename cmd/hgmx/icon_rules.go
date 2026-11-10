@@ -8,11 +8,11 @@ import (
 	"go/token"
 	"go/types"
 	"io/fs"
-	"slices"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
-	"github.com/cogikyo/hgmx/icons"
 	"github.com/cogikyo/hgmx/icons/glyph"
 )
 
@@ -26,23 +26,14 @@ var glyphMoves = map[string]string{
 }
 
 func (a *audit) iconRules() error {
-	cat, err := readCatalog(icons.FS)
+	own := a.site.mod.Module.Mod.Path + "/" + iconsDir
+	local, managed, err := iconSet(a.site.path(iconsDir))
 	if err != nil {
 		return err
 	}
-	current := map[string]bool{}
-	for _, n := range icons.All() {
-		current[glyph.Ident(string(n))] = true
-	}
-	renamed := map[string]string{}
-	for alias, name := range cat.renamed {
-		if id := glyph.Ident(alias); !current[id] {
-			renamed[id] = glyph.Ident(name)
-		}
-	}
-	own := a.site.mod.Module.Mod.Path + "/" + iconsDir
 	fset := token.NewFileSet()
-	return a.site.walk(func(rel string, d fs.DirEntry) error {
+	var files []*ast.File
+	err = a.site.walk(func(rel string, d fs.DirEntry) error {
 		if d.IsDir() || !strings.HasSuffix(rel, ".go") {
 			return nil
 		}
@@ -57,12 +48,43 @@ func (a *audit) iconRules() error {
 		if ast.IsGenerated(f) && !strings.HasSuffix(rel, "_templ.go") {
 			return nil
 		}
-		if !slices.ContainsFunc(f.Imports, func(spec *ast.ImportSpec) bool {
+		uses := false
+		for _, spec := range f.Imports {
 			p, _ := strconv.Unquote(spec.Path.Value)
-			return p == catalogPath || p == own
-		}) {
-			return nil
+			uses = uses || p == catalogPath || p == own
+			if p == catalogPath && local {
+				a.goReport(fset.Position(spec.Path.Pos()), ruleIconsSource,
+					fmt.Sprintf("imports hgmx's full catalog while %s holds a local icon set; one glyph handler serves only one", iconsDir), "")
+			}
 		}
+		if uses {
+			files = append(files, f)
+		}
+		return nil
+	})
+	if err != nil || len(files) == 0 && !managed {
+		return err
+	}
+	cat, err := a.site.catalog()
+	if err != nil {
+		return err
+	}
+	svgs, err := fs.Glob(cat.fsys, "svg/*.svg")
+	if err != nil {
+		return err
+	}
+	current := map[string]bool{}
+	for _, rel := range svgs {
+		name, _ := relIcon(rel)
+		current[glyph.Ident(name)] = true
+	}
+	renamed := map[string]string{}
+	for alias, name := range cat.renamed {
+		if id := glyph.Ident(alias); !current[id] {
+			renamed[id] = glyph.Ident(name)
+		}
+	}
+	for _, f := range files {
 		info := &types.Info{Uses: map[*ast.Ident]types.Object{}}
 		conf := types.Config{Importer: unloaded{}, Error: func(error) {}}
 		conf.Check(f.Name.Name, fset, []*ast.File{f}, info)
@@ -98,8 +120,68 @@ func (a *audit) iconRules() error {
 			}
 			return true
 		})
+	}
+	if managed {
+		return a.iconDrift(cat)
+	}
+	return nil
+}
+
+func iconSet(dir string) (local, managed bool, err error) {
+	entries, err := os.ReadDir(dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return false, false, nil
+	}
+	for _, e := range entries {
+		name := e.Name()
+		switch {
+		case e.IsDir():
+		case name == iconsList:
+			managed = true
+		case name == iconsGo:
+			data, err := os.ReadFile(filepath.Join(dir, name))
+			if err != nil {
+				return false, false, err
+			}
+			managed = managed || strings.HasPrefix(string(data), iconsHeader)
+			local = true
+		case strings.HasSuffix(name, ".go") || strings.HasSuffix(name, ".templ"):
+			local = true
+		}
+	}
+	return local || managed, managed, err
+}
+
+func (a *audit) iconDrift(cat iconCatalog) error {
+	root, err := os.OpenRoot(a.site.path(iconsDir))
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	if _, err := root.Stat(iconsList); errors.Is(err, fs.ErrNotExist) {
+		a.report(finding{
+			file: iconsDir + "/" + iconsList,
+			rule: ruleIconsDrift,
+			msg:  iconsList + " is missing from a generated icon set",
+			fix:  "restore it from version control, or recreate the list with go tool hgmx icons add <names>",
+		})
 		return nil
-	})
+	}
+	res, err := syncIcons(root, cat, iconsCheck, nil)
+	if err != nil {
+		return fmt.Errorf("%s: %w", iconsDir, err)
+	}
+	for _, it := range res.items {
+		if !it.verdict.drift() {
+			continue
+		}
+		msg, fix := it.text(true)
+		a.report(finding{file: iconsDir + "/" + iconRel(it.name, "svg"), rule: ruleIconsDrift, msg: it.name + " " + msg, fix: fix})
+	}
+	for _, rel := range res.stale {
+		a.report(finding{file: iconsDir + "/" + rel, rule: ruleIconsDrift, msg: rel + " out of date"})
+	}
+	return nil
 }
 
 type unloaded struct{}

@@ -46,20 +46,13 @@ func iconsRoot(t *testing.T) (*os.Root, string) {
 
 func runIcons(t *testing.T, root *os.Root, cat iconCatalog, mode iconMode, add ...string) (iconResult, map[string]iconVerdict) {
 	t.Helper()
-	var out strings.Builder
-	res, err := syncIcons(root, cat, mode, add, &out)
+	res, err := syncIcons(root, cat, mode, add)
 	if err != nil {
 		t.Fatalf("sync: %v", err)
 	}
 	verdicts := map[string]iconVerdict{}
-	for line := range strings.Lines(out.String()) {
-		verb, rest, _ := strings.Cut(line, " ")
-		name, _, _ := strings.Cut(strings.TrimSpace(rest), ":")
-		for v, d := range iconVerdicts {
-			if d.verb == verb {
-				verdicts[name] = iconVerdict(v)
-			}
-		}
+	for _, it := range res.items {
+		verdicts[it.name] = it.verdict
 	}
 	return res, verdicts
 }
@@ -86,7 +79,7 @@ func idle(t *testing.T, root *os.Root, cat iconCatalog, mode iconMode) {
 	if res.wrote+res.removed > 0 {
 		t.Fatalf("rerun wrote %d and removed %d; want nothing", res.wrote, res.removed)
 	}
-	check, _ := runIcons(t, root, cat, iconMode{refresh: true, check: true})
+	check, _ := runIcons(t, root, cat, iconsCheck)
 	if check.drift || check.blocked > 0 {
 		t.Fatalf("check after rerun: %+v", check)
 	}
@@ -116,9 +109,8 @@ func TestIconsAdd(t *testing.T) {
 	}
 	idle(t, root, cat, iconMode{})
 
-	var out strings.Builder
 	for _, name := range []string{"nope", "user-circle", "../x"} {
-		if _, err := syncIcons(root, cat, iconMode{}, []string{name}, &out); err == nil {
+		if _, err := syncIcons(root, cat, iconMode{}, []string{name}); err == nil {
 			t.Errorf("add %s accepted", name)
 		}
 	}
@@ -231,7 +223,7 @@ func TestIconsRename(t *testing.T) {
 	if v["user-circle"] != iconRenamed || res.wrote > 0 || res.blocked > 0 {
 		t.Fatalf("renamed without --rename: %v %+v", v, res)
 	}
-	if check, _ := runIcons(t, root, cat, iconMode{refresh: true, check: true}); !check.drift {
+	if check, _ := runIcons(t, root, cat, iconsCheck); !check.drift {
 		t.Error("check passed with a pending rename")
 	}
 
@@ -312,9 +304,8 @@ func TestIconsKeep(t *testing.T) {
 	}
 	idle(t, root, cat, iconMode{refresh: true})
 
-	var out strings.Builder
 	for _, name := range []string{"plus", "nope"} {
-		if _, err := syncIcons(root, cat, iconMode{refresh: true, keep: []string{name}}, nil, &out); err == nil {
+		if _, err := syncIcons(root, cat, iconMode{refresh: true, keep: []string{name}}, nil); err == nil {
 			t.Errorf("--keep %s accepted", name)
 		}
 	}
@@ -371,5 +362,67 @@ func TestIconsRenameCrash(t *testing.T) {
 				t.Errorf("state after resume differs from an uninterrupted rename:\n%v\nwant:\n%v", got, want)
 			}
 		})
+	}
+}
+
+func TestIconsDrift(t *testing.T) {
+	dir := t.TempDir()
+	icons := filepath.Join(dir, filepath.FromSlash(iconsDir))
+	if err := os.MkdirAll(icons, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	root, err := os.OpenRoot(icons)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { root.Close() })
+	old := testCatalog(t, map[string]string{"svg/plus.svg": svg("M5 12h14"), "svg/x.svg": svg("M18 6 6 18")})
+	runIcons(t, root, old, iconMode{}, "plus", "x")
+	a := &audit{site: site{dir: dir}}
+	if err := a.iconDrift(old); err != nil || len(a.findings) > 0 {
+		t.Fatalf("in sync: %v %v", err, a.findings)
+	}
+
+	write(t, icons, "svg/x.svg", svg("M18 6 6 18 Z"))
+	cat := testCatalog(t, map[string]string{"svg/plus.svg": svg("M5 12h14M12 5v14"), "svg/x.svg": svg("M18 6 6 18M6 6l12 12")})
+	if err := a.iconDrift(cat); err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]finding{}
+	for _, f := range a.findings {
+		if f.rule != ruleIconsDrift {
+			t.Errorf("rule %s", f.rule.name)
+		}
+		got[f.file] = f
+	}
+	if len(got) != 3 || got["views/icons/svg/plus.svg"].msg != "plus unedited and changed in the catalog" || got["views/icons/icons.sum"].msg != "icons.sum out of date" {
+		t.Fatalf("findings: %v", a.findings)
+	}
+	if x := got["views/icons/svg/x.svg"]; !strings.HasPrefix(x.msg, "x edited here") || !strings.Contains(x.fix, "--keep x,") {
+		t.Errorf("conflict finding: %+v", x)
+	}
+	if read(t, icons, "svg/plus.svg") != svg("M5 12h14") {
+		t.Error("check wrote a refresh")
+	}
+
+	if err := os.Remove(filepath.Join(icons, iconsList)); err != nil {
+		t.Fatal(err)
+	}
+	if _, managed, err := iconSet(icons); err != nil || !managed {
+		t.Fatalf("set without %s: managed %v, %v", iconsList, managed, err)
+	}
+	a.findings = nil
+	if err := a.iconDrift(cat); err != nil || len(a.findings) != 1 || a.findings[0].file != iconsDir+"/"+iconsList {
+		t.Fatalf("missing list: %v %v", err, a.findings)
+	}
+
+	hand := t.TempDir()
+	if local, _, _ := iconSet(hand); local {
+		t.Error("empty dir counted as a local set")
+	}
+	write(t, hand, "icons.go", "package icons\n")
+	write(t, hand, iconsSum, "unrelated\n")
+	if local, managed, _ := iconSet(hand); !local || managed {
+		t.Errorf("hand-written package: local %v, managed %v", local, managed)
 	}
 }
