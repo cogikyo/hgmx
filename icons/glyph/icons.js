@@ -28,14 +28,23 @@ function restore(svg) {
   }
 }
 
+const ahead = new IntersectionObserver(
+  (entries) => {
+    for (const { isIntersecting, target } of entries) {
+      if (!isIntersecting) continue;
+      ahead.unobserve(target);
+      const { icon } = target.dataset;
+      if (!plays.has(icon)) load(icon).catch(() => {});
+    }
+  },
+  { rootMargin: "200px" },
+);
+
 function preload(root) {
   if (reduce.matches || document.readyState !== "complete") return;
   const svgs = [...root.querySelectorAll("svg[data-icon]")];
   if (root.matches?.("svg[data-icon]")) svgs.push(root);
-  for (const svg of svgs) {
-    const { icon } = svg.dataset;
-    if (!plays.has(icon)) load(icon).catch(() => {});
-  }
+  for (const svg of svgs) ahead.observe(svg);
 }
 
 addEventListener("load", () => preload(document));
