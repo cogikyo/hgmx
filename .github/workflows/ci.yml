@@ -57,6 +57,15 @@ jobs:
       - name: Verify Vendored Scripts
         run: go run ./scripts/fetch -check scripts
 
+      - name: Verify Icons
+        run: go run ./icons/fetch -check icons
+
+      - name: Check Icon Modules
+        run: find icons/anim icons/glyph -name '*.js' -print0 | xargs -0 -n1 node --check
+
+      - name: Lint Icon Animations
+        run: node icons/check/lint.mjs
+
       - name: Put Postgres on PATH
         run: |
           bin=$(ls -d /usr/lib/postgresql/*/bin | sort -V | tail -n 1)
