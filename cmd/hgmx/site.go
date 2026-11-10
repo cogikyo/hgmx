@@ -16,12 +16,12 @@ const (
 	cssInput  = "views/static/css/main.css"
 	cssOutput = "views/static/css/main.min.css"
 	templPath = "github.com/a-h/templ"
+	readonly  = "-mod=readonly"
 )
 
 type site struct {
-	dir   string
-	mod   *modfile.File
-	flags []string
+	dir string
+	mod *modfile.File
 }
 
 func loadSite(dir string) (site, error) {
@@ -40,11 +40,7 @@ func loadSite(dir string) (site, error) {
 	if mod.Module == nil {
 		return site{}, errors.New("go.mod declares no module path")
 	}
-	s := site{dir: dir, mod: mod, flags: []string{"-mod=readonly"}}
-	if _, err := os.Stat(filepath.Join(dir, "vendor")); err == nil {
-		s.flags = []string{"-mod=vendor"}
-	}
-	return s, nil
+	return site{dir: dir, mod: mod}, nil
 }
 
 func (s site) path(rel string) string {
@@ -70,7 +66,7 @@ func (s site) env() []string {
 }
 
 func (s site) gocmd(sub string, args ...string) *exec.Cmd {
-	cmd := exec.Command("go", slices.Concat([]string{sub}, s.flags, args)...)
+	cmd := exec.Command("go", slices.Concat([]string{sub, readonly}, args)...)
 	cmd.Dir = s.dir
 	cmd.Env = s.env()
 	cmd.Stdout = os.Stdout

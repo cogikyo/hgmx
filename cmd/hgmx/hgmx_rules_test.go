@@ -58,20 +58,16 @@ func TestHgmxLatest(t *testing.T) {
 	for _, tt := range []struct {
 		name    string
 		version string
-		vendor  string
 		want    string
 	}{
-		{"current", current, "# " + hgmxPath + " " + current + "\n## explicit; go 1.27.0\n" + hgmxTool + "\n", ""},
-		{"same-commit", "v0.0.0-20261101201201-" + latest, "", ""},
-		{"annotated-tag", "v0.1.0", "# " + hgmxPath + " v0.1.0\n", ""},
-		{"lightweight-tag", "v0.1.1", "# " + hgmxPath + " v0.1.1\n", ""},
-		{"old-annotated-tag", "v0.2.0", "", "go.mod [hgmx-latest] site requires hgmx v0.2.0; master resolves to " + latest + "\n"},
-		{"unknown-tag", "v0.3.0", "", "go.mod [hgmx-latest] site requires hgmx v0.3.0; master resolves to " + latest + "\n"},
-		{"no-vendor", current, "", ""},
-		{"old-module", "v0.0.33", "", "go.mod [hgmx-latest] site requires hgmx v0.0.33; master resolves to " + latest + "\n"},
-		{"old-commit", "v0.0.36-0.20261101193023-edcd391fa47d", "", "go.mod [hgmx-latest] site requires hgmx v0.0.36-0.20261101193023-edcd391fa47d; master resolves to " + latest + "\n"},
-		{"old-vendor", current, "# " + hgmxPath + " v0.0.33\n", "vendor/modules.txt [hgmx-latest] vendor contains hgmx v0.0.33; master resolves to " + latest + "\n"},
-		{"replacement-footer", current, "# " + hgmxPath + " " + current + "\n# " + hgmxPath + " => ../hgmx\n", ""},
+		{"current", current, ""},
+		{"same-commit", "v0.0.0-20261101201201-" + latest, ""},
+		{"annotated-tag", "v0.1.0", ""},
+		{"lightweight-tag", "v0.1.1", ""},
+		{"old-annotated-tag", "v0.2.0", "go.mod [hgmx-latest] site requires hgmx v0.2.0; master resolves to " + latest + "\n"},
+		{"unknown-tag", "v0.3.0", "go.mod [hgmx-latest] site requires hgmx v0.3.0; master resolves to " + latest + "\n"},
+		{"old-module", "v0.0.33", "go.mod [hgmx-latest] site requires hgmx v0.0.33; master resolves to " + latest + "\n"},
+		{"old-commit", "v0.0.36-0.20261101193023-edcd391fa47d", "go.mod [hgmx-latest] site requires hgmx v0.0.36-0.20261101193023-edcd391fa47d; master resolves to " + latest + "\n"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -79,22 +75,12 @@ func TestHgmxLatest(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte(mod), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			if tt.vendor != "" {
-				if err := os.Mkdir(filepath.Join(dir, "vendor"), 0o755); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.WriteFile(filepath.Join(dir, "vendor/modules.txt"), []byte(tt.vendor), 0o644); err != nil {
-					t.Fatal(err)
-				}
-			}
 			s, err := loadSite(dir)
 			if err != nil {
 				t.Fatal(err)
 			}
 			a := &audit{site: s}
-			if err := a.hgmxLatest(refs); err != nil {
-				t.Fatal(err)
-			}
+			a.hgmxLatest(refs)
 			var got strings.Builder
 			for _, f := range a.findings {
 				got.WriteString(f.String() + "\n")

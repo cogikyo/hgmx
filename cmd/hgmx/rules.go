@@ -51,6 +51,11 @@ var (
 		"a site is a main module nobody imports, so internal/ only adds a path segment",
 		"move its packages to routes/, middleware/, store/, views/ or a domain package at the root",
 	}
+	ruleVendor = &rule{
+		"layout/no-vendor",
+		"builds and deploys fetch modules from go.mod and go.sum, so a vendor/ copy only adds files that drift from them",
+		"run git rm -r vendor/, then go mod tidy",
+	}
 	ruleGoVersion = &rule{
 		"layout/go-version",
 		"sites stay on at least the Go release hgmx requires",
@@ -135,7 +140,7 @@ var (
 
 var rules = []*rule{
 	ruleHgmxLatest, ruleHgmxTool, ruleHgmxSkills,
-	ruleJustfile, ruleInternal, ruleGoVersion, ruleTemplVersion,
+	ruleJustfile, ruleInternal, ruleVendor, ruleGoVersion, ruleTemplVersion,
 	ruleDirection, ruleStoreOnly, ruleLiveModels,
 	ruleAutoMigrate, ruleGlobal, ruleSlogContext, ruleExit,
 	ruleCSP, ruleInlineJS, ruleBoost, ruleIcons, ruleIconsSource, ruleIconsDrift, ruleIgnore,
@@ -220,6 +225,9 @@ func runRules(s site) ([]finding, error) {
 func (a *audit) tree() error {
 	if err := a.directives("go.mod"); err != nil {
 		return err
+	}
+	if _, err := os.Stat(a.site.path("vendor")); err == nil {
+		a.report(finding{file: "vendor/", rule: ruleVendor, msg: "vendor/ directory"})
 	}
 	return a.site.walk(func(rel string, d fs.DirEntry) error {
 		name := d.Name()

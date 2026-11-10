@@ -2,16 +2,13 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"slices"
-	"strings"
 
 	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/module"
-	"golang.org/x/mod/semver"
 )
 
 func (a *audit) hgmx() error {
@@ -38,7 +35,8 @@ func (a *audit) hgmx() error {
 		newLogger(logLevel, os.Stderr).Warn("Could not resolve hgmx master; skipping hgmx-latest", slog.String("error", err.Error()))
 		return nil
 	}
-	return a.hgmxLatest(latest)
+	a.hgmxLatest(latest)
+	return nil
 }
 
 func (r hgmxRefs) current(version string) bool {
@@ -48,30 +46,10 @@ func (r hgmxRefs) current(version string) bool {
 	return r.tags[version] == r.master
 }
 
-func (a *audit) hgmxLatest(latest hgmxRefs) error {
+func (a *audit) hgmxLatest(latest hgmxRefs) {
 	v := a.site.version(hgmxPath)
 	if !latest.current(v) {
 		a.report(finding{file: "go.mod", rule: ruleHgmxLatest,
 			msg: fmt.Sprintf("site requires hgmx %s; master resolves to %s", v, latest.master[:12])})
 	}
-	data, err := os.ReadFile(a.site.path("vendor/modules.txt"))
-	if errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	for line := range strings.Lines(string(data)) {
-		fields := strings.Fields(line)
-		if len(fields) < 3 || fields[0] != "#" || fields[1] != hgmxPath || !semver.IsValid(fields[2]) {
-			continue
-		}
-		v := fields[2]
-		if !latest.current(v) {
-			a.report(finding{file: "vendor/modules.txt", rule: ruleHgmxLatest,
-				msg: fmt.Sprintf("vendor contains hgmx %s; master resolves to %s", v, latest.master[:12])})
-		}
-		break
-	}
-	return nil
 }

@@ -88,7 +88,7 @@ func (a *audit) goRules() error {
 			packages.NeedSyntax | packages.NeedTypesInfo,
 		Dir:        a.site.dir,
 		Env:        a.site.env(),
-		BuildFlags: a.site.flags,
+		BuildFlags: []string{readonly},
 		Overlay:    a.overlay,
 		Tests:      true,
 	}
