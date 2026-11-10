@@ -7,19 +7,24 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
-	"net/url"
+	"maps"
 	"os"
 	"path"
 	"regexp"
+	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/cogikyo/hgmx"
+	"github.com/cogikyo/hgmx/internal/appid"
+	"github.com/cogikyo/hgmx/internal/webhost"
 	"github.com/cogikyo/hgmx/starters"
 )
 
 type identity struct {
 	name, origin, appID, google string
-	pkg                         string
+	pkg, bundle                 string
+	rp                          string
 }
 
 type starter struct {
@@ -48,11 +53,38 @@ var appStarters = map[string]starter{
 		},
 		markers: []string{"dev.hgmx.starter", "dev/hgmx/starter", "starter-android", "starter.hgmx.dev", "hgmx.starter=dev"},
 	},
+	"ios": {
+		dir: "apps/ios",
+		identity: func(id identity) (texts, paths []string, err error) {
+			if !bundleID.MatchString(id.bundle) {
+				return nil, nil, fmt.Errorf("--bundle-id %q: want a reverse-DNS bundle ID such as com.example.notes", id.bundle)
+			}
+			if id.google != "" {
+				return nil, nil, errors.New("--google-client-id: the iOS starter has no Google sign-in yet")
+			}
+			if strings.Contains(id.name, "$") || strings.Contains(id.name, "//") || strings.HasSuffix(id.name, ";") {
+				return nil, nil, fmt.Errorf("--name %q: an Xcode config value can't hold $ or //, or end in ;", id.name)
+			}
+			if id.rp == "localhost" {
+				return nil, nil, fmt.Errorf("--origin %q: iOS passkeys need a public domain; point the app at localhost through Info.plist instead", id.origin)
+			}
+			texts = []string{
+				"PRODUCT_BUNDLE_IDENTIFIER = dev.hgmx.starter", "PRODUCT_BUNDLE_IDENTIFIER = " + id.bundle,
+				"INFOPLIST_KEY_CFBundleDisplayName = Starter", "INFOPLIST_KEY_CFBundleDisplayName = " + id.name,
+				"HGMX_API_HOST = starter.hgmx.dev", "HGMX_API_HOST = " + strings.TrimPrefix(id.origin, "https://"),
+				"HGMX_RP_ID = hgmx.dev", "HGMX_RP_ID = " + id.rp,
+				"HGMX_APP_ID = starter-ios", "HGMX_APP_ID = " + id.appID,
+				"HGMX_STARTER = dev", "HGMX_STARTER = " + revision(),
+			}
+			return texts, nil, nil
+		},
+		markers: []string{"dev.hgmx.starter", "starter-ios", "starter.hgmx.dev", "HGMX_RP_ID = hgmx.dev", "HGMX_STARTER = dev"},
+	},
 }
 
 var (
 	javaPackage = regexp.MustCompile(`^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$`)
-	publicID    = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]{0,62}$`)
+	bundleID    = regexp.MustCompile(`^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$`)
 )
 
 const compatInitial = `{
@@ -116,17 +148,19 @@ type starterFile struct {
 func adopt(s site, platform string, id identity) ([]starterFile, error) {
 	st, ok := appStarters[platform]
 	if !ok {
-		return nil, fmt.Errorf("no %s starter; want one of: android", platform)
+		return nil, fmt.Errorf("no %s starter; want one of: %s", platform, strings.Join(slices.Sorted(maps.Keys(appStarters)), ", "))
 	}
-	u, err := url.Parse(id.origin)
-	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" {
-		return nil, fmt.Errorf("--origin %q: want the exact https API origin, such as https://example.com", id.origin)
+	origin, rp, err := webhost.RelyingParty(id.origin)
+	if err != nil || !strings.HasPrefix(origin, "https://") {
+		return nil, fmt.Errorf("--origin %q: want the exact https API origin on a domain name, such as https://example.com", id.origin)
 	}
-	if !publicID.MatchString(id.appID) {
+	id.origin, id.rp = origin, rp
+	if !appid.Valid(id.appID) {
 		return nil, fmt.Errorf("--app-id %q: want the public app ID from the site's auth.App, such as notes-android", id.appID)
 	}
-	if strings.TrimSpace(id.name) == "" || strings.ContainsAny(id.name, "\"\\\n") || strings.ContainsAny(id.name[:1], "@?") {
-		return nil, fmt.Errorf("--name %q: want a display name without double quotes or backslashes, not starting with @ or ?", id.name)
+	if id.name == "" || strings.TrimSpace(id.name) != id.name || strings.IndexFunc(id.name, func(r rune) bool { return unicode.IsControl(r) || unicode.In(r, unicode.Zl, unicode.Zp) }) >= 0 ||
+		strings.ContainsAny(id.name, "\"\\") || strings.ContainsAny(id.name[:1], "@?") {
+		return nil, fmt.Errorf("--name %q: want a one-line display name without double quotes, backslashes or surrounding spaces, not starting with @ or ?", id.name)
 	}
 	if strings.ContainsAny(id.google, "\"\\ \n") {
 		return nil, fmt.Errorf("--google-client-id %q: want the Google web client ID", id.google)

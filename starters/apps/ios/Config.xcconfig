@@ -1,0 +1,8 @@
+PRODUCT_BUNDLE_IDENTIFIER = dev.hgmx.starter
+INFOPLIST_KEY_CFBundleDisplayName = Starter
+HGMX_API_HOST = starter.hgmx.dev
+HGMX_RP_ID = hgmx.dev
+HGMX_APP_ID = starter-ios
+HGMX_STARTER = dev
+MARKETING_VERSION = 1.0
+CURRENT_PROJECT_VERSION = 1

@@ -27,6 +27,7 @@ const (
 	managedDir  = "proto/hgmx"
 	compatFile  = "apps/compatibility.json"
 	androidLock = "apps/android/app/gradle.lockfile"
+	iosLock     = "apps/ios/Starter.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
 )
 
 var managedHistory = map[string][]string{}
@@ -100,9 +101,7 @@ func (k *kit) incomplete() bool {
 	var stages []string
 	for _, name := range k.skipped {
 		stages = append(stages, name+" generation")
-		if name == "android" {
-			stages = append(stages, "android pins")
-		}
+		stages = append(stages, name+" pins")
 	}
 	k.log.Error("Check incomplete; --skip never passes", slog.String("not run", strings.Join(stages, ", ")))
 	return true
@@ -553,13 +552,23 @@ func (k *kit) pins() []string {
 			bad = append(bad, fmt.Sprintf("go.mod: %s %s is older than the generator's %s", pin.path, v, pin.min))
 		}
 	}
-	if !slices.ContainsFunc(k.platforms, func(p platform) bool { return p.name == "android" }) {
-		return bad
+	for _, p := range k.platforms {
+		switch p.name {
+		case "android":
+			bad = append(bad, k.androidPins()...)
+		case "ios":
+			bad = append(bad, k.iosPins()...)
+		}
 	}
+	return bad
+}
+
+func (k *kit) androidPins() []string {
 	data, err := os.ReadFile(k.path(androidLock))
 	if err != nil {
-		return append(bad, androidLock+": missing; run ./gradlew :app:dependencies --write-locks in apps/android")
+		return []string{androidLock + ": missing; run ./gradlew :app:dependencies --write-locks in apps/android"}
 	}
+	var bad []string
 	seen := map[string]bool{}
 	for line := range strings.Lines(string(data)) {
 		coord, _, _ := strings.Cut(line, "=")
@@ -580,6 +589,37 @@ func (k *kit) pins() []string {
 	for _, prefix := range slices.Sorted(maps.Keys(mobileRuntimes)) {
 		if !seen[prefix] {
 			bad = append(bad, fmt.Sprintf("%s: no %s; generated code needs %s", androidLock, prefix, mobileRuntimes[prefix]))
+		}
+	}
+	return bad
+}
+
+func (k *kit) iosPins() []string {
+	data, err := os.ReadFile(k.path(iosLock))
+	if err != nil {
+		return []string{iosLock + ": missing; resolve the Swift packages in apps/ios with xcodebuild -resolvePackageDependencies"}
+	}
+	var resolved struct {
+		Pins []struct {
+			Identity string
+			State    struct{ Revision, Version string }
+		}
+	}
+	if err := json.Unmarshal(data, &resolved); err != nil {
+		return []string{fmt.Sprintf("%s: %v", iosLock, err)}
+	}
+	got := map[string]struct{ Revision, Version string }{}
+	for _, p := range resolved.Pins {
+		got[p.Identity] = p.State
+	}
+	var bad []string
+	for _, t := range swiftTools {
+		pin, ok := got[t.name]
+		switch {
+		case !ok:
+			bad = append(bad, fmt.Sprintf("%s: no %s; generated code needs %s", iosLock, t.name, t.version))
+		case pin.Version != t.version || pin.Revision != t.commit:
+			bad = append(bad, fmt.Sprintf("%s: %s %s; generated code needs %s at %s", iosLock, t.name, pin.Version, t.version, t.commit))
 		}
 	}
 	return bad

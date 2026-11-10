@@ -78,6 +78,11 @@ func run(p *telemetry.Pipeline, addr, origin, signer string) error {
 			Android: &auth.Android{Package: "com.example.fixture.notes", Signers: [][]byte{cert}},
 			Build:   1,
 			Store:   "https://play.google.com/store/apps/details?id=com.example.fixture.notes",
+		}, {
+			ID:    "fixture-ios",
+			IOS:   &auth.IOS{Prefix: "FIXTURE000", Bundle: "com.example.fixture.notes"},
+			Build: 1,
+			Store: "https://apps.apple.com/app/id0000000000",
 		}},
 	}}
 	if u, err := url.Parse(origin); err == nil && u.Port() != "" {

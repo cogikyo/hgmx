@@ -46,6 +46,7 @@ func init() {
 	f.StringVar(&appIdentity.origin, "origin", "", "Exact https API origin, such as https://example.com")
 	f.StringVar(&appIdentity.appID, "app-id", "", "Public app ID registered in the site's auth.App")
 	f.StringVar(&appIdentity.pkg, "package", "", "Android application ID and Kotlin package, such as com.example.notes")
+	f.StringVar(&appIdentity.bundle, "bundle-id", "", "iOS bundle ID, such as com.example.notes")
 	f.StringVar(&appIdentity.google, "google-client-id", "", "Google web client ID for Sign in with Google; leave empty without Google")
 	for _, c := range []*cobra.Command{genCobraCmd, checkCobraCmd} {
 		c.Flags().StringSliceVar(&skip, "skip", nil, "Native platforms to leave unchecked and ungenerated: android, ios")
@@ -167,7 +168,7 @@ var appIdentity identity
 
 var initAppsCobraCmd = &cobra.Command{
 	Use:   "apps <platform>",
-	Short: "Copies the native app starter for android into apps/, with the site's identity",
+	Short: "Copies the native app starter for android or ios into apps/, with the site's identity",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		os.Exit(initAppsCmd(args[0], appIdentity))

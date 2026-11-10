@@ -100,7 +100,7 @@ jobs:
           "$sdkmanager" --list_installed
 
       - name: Adopt Fixture
-        run: starters/fixture/adopt.sh "$RUNNER_TEMP/fixture"
+        run: starters/fixture/adopt.sh "$RUNNER_TEMP/fixture" android
 
       - name: Commit Fixture
         working-directory: ${{ runner.temp }}/fixture
@@ -116,6 +116,59 @@ jobs:
       - name: Build Fixture App
         working-directory: ${{ runner.temp }}/fixture/apps/android
         run: ./gradlew --no-daemon :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
+
+      - name: Seeded Failures
+        run: starters/fixture/seeded.sh "$RUNNER_TEMP/fixture"
+
+  ios:
+    runs-on: xcode-27
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Check Xcode
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks
+          xcrun simctl list runtimes
+          test "$(xcrun --sdk iphonesimulator --show-sdk-version)" = 27.2
+
+      - name: Adopt Starter
+        run: starters/fixture/bare.sh "$RUNNER_TEMP/starter" ios
+
+      - name: Build Starter App
+        working-directory: ${{ runner.temp }}/starter/apps/ios
+        run: xcodebuild -project Starter.xcodeproj -scheme Starter -destination "generic/platform=iOS Simulator" -onlyUsePackageVersionsFromResolvedFile CODE_SIGNING_ALLOWED=NO build
+
+      - name: Adopt Fixture
+        run: starters/fixture/adopt.sh "$RUNNER_TEMP/fixture" ios
+
+      - name: Commit Fixture
+        working-directory: ${{ runner.temp }}/fixture
+        run: |
+          git init -q
+          git add -A
+          git -c user.name=ci -c user.email=ci@localhost commit -qm fixture
+
+      - name: Check Fixture
+        working-directory: ${{ runner.temp }}/fixture
+        run: go tool hgmx check
+
+      - name: Build Fixture App
+        working-directory: ${{ runner.temp }}/fixture/apps/ios
+        run: xcodebuild -project Starter.xcodeproj -scheme Starter -destination "generic/platform=iOS Simulator" -onlyUsePackageVersionsFromResolvedFile CODE_SIGNING_ALLOWED=NO build
+
+      - name: Test Fixture App
+        working-directory: ${{ runner.temp }}/fixture/apps/ios
+        run: xcodebuild -project Starter.xcodeproj -scheme Starter -destination "platform=iOS Simulator,name=iPhone 17,OS=27.2" -onlyUsePackageVersionsFromResolvedFile test
 
       - name: Seeded Failures
         run: starters/fixture/seeded.sh "$RUNNER_TEMP/fixture"

@@ -4,8 +4,10 @@ set -uo pipefail
 site=${1:?usage: seeded.sh <adopted fixture> [seed...]}
 site=$(cd "$site" && pwd)
 shift
-seeds=("$@")
-[ ${#seeds[@]} -gt 0 ] || seeds=(drift managed pins breaking retained baseline lock verification contract)
+seeds=()
+[ ! -d "$site/apps/android" ] || seeds+=(drift managed pins breaking retained baseline lock verification contract)
+[ ! -d "$site/apps/ios" ] || seeds+=(ios-drift ios-pins ios-lock ios-contract)
+[ $# -eq 0 ] || seeds=("$@")
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 failed=0
@@ -34,6 +36,11 @@ fresh() {
 
 gradle() {
 	(cd apps/android && ./gradlew --no-daemon --quiet :app:assembleDebug)
+}
+
+xcode() {
+	(cd apps/ios && xcodebuild -project Starter.xcodeproj -scheme Starter -destination "generic/platform=iOS Simulator" \
+		-derivedDataPath "$work/DerivedData" -onlyUsePackageVersionsFromResolvedFile CODE_SIGNING_ALLOWED=NO -quiet build)
 }
 
 for seed in "${seeds[@]}"; do
@@ -76,6 +83,23 @@ for seed in "${seeds[@]}"; do
 		sed -i 's/string text = 2;/string body = 2;/' proto/fixture/api/v1/notes.proto
 		go tool hgmx gen >/dev/null
 		expect contract "Unresolved reference" gradle
+		;;
+	ios-drift)
+		echo "// drift" >>apps/ios/API/Sources/API/Generated/fixture_api_v1_notes.connect.swift
+		expect ios-drift "fixture_api_v1_notes.connect.swift: out of date" go tool hgmx check
+		;;
+	ios-pins)
+		perl -0pi -e 's/("identity" : "swift-protobuf".*?"version" : ")1\.39\.0/${1}1.38.0/s' apps/ios/Starter.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
+		expect ios-pins "swift-protobuf 1.38.0; generated code needs 1.39.0" go tool hgmx check
+		;;
+	ios-lock)
+		perl -pi -e 's/exact: "1\.2\.3"/exact: "1.2.2"/' apps/ios/API/Package.swift
+		expect ios-lock "out-of-date resolved file" xcode
+		;;
+	ios-contract)
+		perl -pi -e 's/string text = 2;/string body = 2;/' proto/fixture/api/v1/notes.proto
+		go tool hgmx gen >/dev/null
+		expect ios-contract "has no member 'text'" xcode
 		;;
 	*)
 		echo "unknown seed $seed"
