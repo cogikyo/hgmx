@@ -4,6 +4,6 @@
 	<path d="M4 4a1 1 0 0 1 1-1 1 1 0 0 0 1-1"></path>
 	<path d="M10 4a1 1 0 0 1 1-1 1 1 0 0 0 1-1"></path>
 	<path d="M16 4a1 1 0 0 1 1-1 1 1 0 0 0 1-1"></path>
-	<path d="M9 8v3"></path>
+	<path transform-origin="9px 8px" d="M9 8v3"></path>
 	<path d="M11 16v-3.5L9 11l-2 1.5V16Z"></path>
 </svg>
