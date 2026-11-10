@@ -397,8 +397,6 @@ The `csp-literal` check rejects direct header values that are not calls to `serv
 - **Add `middleware/`** when application routes need shared request handling.
   - Add a root domain package when business rules need a home outside handlers and queries.
   - Don't scaffold empty packages or add a DI framework.
-- **Don't commit `vendor/`**, except on existing sites until the deploy system confirms removal is safe.
-  - Nix deploys will fetch modules using a pinned per-site `vendorHash` maintained by kiln.
 
 ### Imports: Direction
 
@@ -423,6 +421,11 @@ The table governs site-internal edges; standard-library and external imports rem
 
 **No `internal/` directories.** A site is a main module nobody imports; `internal/` adds no useful boundary.
 Put packages at the root under the names above.
+
+### Layout: No Vendor
+
+**No `vendor/` at the site root.** Builds and deploys fetch modules from `go.mod` and `go.sum`.
+Run `git rm -r vendor/`, then `go mod tidy`.
 
 ### Layout: Go Version
 
@@ -528,11 +531,10 @@ Recover by deploying forward, not by staying rolled back; sessions created durin
 ### hgmx: Latest
 
 **Every site stays on the latest hgmx master while hgmx is being built out.**
-`go tool hgmx check` compares the commits in `go.mod` and existing `vendor/modules.txt` with master from one `git ls-remote` lookup of master and tags, using peeled commits for annotated tags.
+`go tool hgmx check` compares the commit in `go.mod` with master from one `git ls-remote` lookup of master and tags, using peeled commits for annotated tags.
 If resolution fails, including offline, missing git or after a 10-second timeout, it warns with the cause and skips this rule.
 
 Run `go tool hgmx update` to resolve master with git and run `go get -tool github.com/cogikyo/hgmx/cmd/hgmx@<12-char commit>`, then `go mod tidy`.
-It runs `go mod vendor` only when `vendor/` already exists.
 Update fails if master cannot be resolved or its module version is older than the site's current requirement.
 It prints the old → new hgmx version and suggests `go tool hgmx gen` before `go tool hgmx check` if templ changed.
 
@@ -577,7 +579,7 @@ It rewrites site imports and regenerates templ Go files for the site's module pa
 Tailwind generation uses `tailwindcss` from PATH when `views/static/css/main.css` exists.
 `check` compares generated output to the tree in its gen stage without writing.
 It stops at the first failed stage and never writes formatted files.
-For package loading and Go commands, `check` sets `GOWORK=off` and passes `-mod=vendor` when `vendor/` exists or `-mod=readonly` otherwise, overriding `GOFLAGS`.
+For package loading and Go commands, `check` sets `GOWORK=off` and always passes `-mod=readonly`, overriding `GOFLAGS`.
 `dev` and `migrate` keep the caller's workspace settings.
 
 ### App Generation and Checks

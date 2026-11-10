@@ -39,7 +39,7 @@ Run these from the site's module root; there is no justfile.
 | `go tool hgmx dev [-- site flags…]` | Watch templ and CSS; restart the site with disk-backed static files |
 | `go tool hgmx fmt`                  | Format Go and templ                                                 |
 | `go tool hgmx migrate …`            | Run the site's migration command through `go run .`                 |
-| `go tool hgmx update`               | Update hgmx to master and tidy; re-vendor if present                |
+| `go tool hgmx update`               | Update hgmx to master and tidy                                      |
 | `go tool hgmx credentials`          | Build the site and write `credentials.json`                         |
 | `go tool hgmx credentials check …`  | Test SMTP and Google client authentication                          |
 | `go tool hgmx check`                | Check generated files, credentials, rules, format, vet, build, test |

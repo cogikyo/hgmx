@@ -18,7 +18,7 @@ The upstream skill's SDK table lists Go 87.0.0; the inspected site's v87.1.0 pin
 
 The November 2026 lessons were supplied from sandbox work on **alrodriguez.studio**.
 The example files `shop/settle.go` and `store/refunds.go` were inspected read-only at **`c762bbe`** to check fresh-session settlement, per-refund storage, payment locking, and observation windows.
-The site's stripe-go dependency and vendored `api_version.go` confirm v87.1.0 and `2026-10-28.endive`.
+The site's stripe-go pin and module-cache `api_version.go` confirm v87.1.0 and `2026-10-28.endive`.
 No Stripe account was connected and no payment tests were run for this documentation update.
 The reported restricted-key permissions and Dashboard-only limits were not independently exercised; the inline `price_data` permission additions remain unverified.
 

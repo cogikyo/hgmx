@@ -30,7 +30,7 @@ The site's `go.mod` must declare `tool github.com/cogikyo/hgmx/cmd/hgmx` so the 
 1. Run **`go tool hgmx check`** to find the current failures.
    It checks contracts and runtime pins when present, generation, credentials, site rules, formatting, vet, build, and tests without writing fixes.
 2. Keep the site on **latest hgmx master** while hgmx is being built out.
-   Run `go tool hgmx update` when behind; it updates the library and tool, tidies modules, re-vendors an existing `vendor/`, and re-syncs skills.
+   Run `go tool hgmx update` when behind; it updates the library and tool, tidies modules, and re-syncs skills.
    A failed remote lookup makes the latest-version check warn and skip, so an offline pass does not prove currency.
 3. Use **`go tool hgmx dev`** while editing.
    Run `go tool hgmx gen` and `go tool hgmx fmt` to write generated and formatted files.
