@@ -1,9 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-	<path d="M8 2h8"></path>
-	<path d="M10 2v5"></path>
-	<path d="M14 2v5"></path>
-	<rect width="12" height="14" x="6" y="7" rx="2"></rect>
-	<path d="M14 21v-8a2 2 0 1 0-4 0v8"></path>
-	<path d="M8 21v1"></path>
-	<path d="M16 21v1"></path>
+	<g transform-origin="8px 22px">
+		<path d="M8 2h8"></path>
+		<g transform-origin="12px 7px">
+			<path d="M10 2v5"></path>
+			<path d="M14 2v5"></path>
+		</g>
+		<rect width="12" height="14" x="6" y="7" rx="2"></rect>
+		<path d="M14 21v-8a2 2 0 1 0-4 0v8"></path>
+		<path d="M8 21v1"></path>
+		<path d="M16 21v1"></path>
+	</g>
 </svg>
