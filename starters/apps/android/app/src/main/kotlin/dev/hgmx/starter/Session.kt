@@ -6,6 +6,7 @@ import com.connectrpc.ConnectException
 import com.connectrpc.Headers
 import com.connectrpc.ResponseMessage
 import hgmx.app.v1.GetConfigurationRequest
+import hgmx.app.v1.GetConfigurationResponse
 import hgmx.app.v1.UpdateRequired
 import hgmx.auth.v1.Account
 import hgmx.auth.v1.DeleteAccountRequest
@@ -43,6 +44,7 @@ class Session(
     val gate: StateFlow<Gate> = _gate.asStateFlow()
 
     private val lock = Mutex()
+    private val checking = Mutex()
     private var token: String? = null
     private var generation = 0L
     private var methods = emptySet<String>()
@@ -54,11 +56,8 @@ class Session(
     suspend fun start() {
         _gate.value = Gate.Starting
         try {
-            val config = exchange({ api.app.getConfiguration(GetConfigurationRequest.getDefaultInstance(), it) })
-            if (config.updateRequired) {
-                _gate.value = Gate.Update(config.storeUrl, "Update the app to keep going.")
-                return
-            }
+            val config = configure()
+            if (config.updateRequired) return
             methods = config.methodsList.toSet()
             val stored = withContext(Dispatchers.IO) { tokens.read() }
             lock.withLock {
@@ -74,6 +73,17 @@ class Session(
             }
         } catch (p: Problem) {
             if (_gate.value == Gate.Starting) _gate.value = Gate.Unreachable(p)
+        }
+    }
+
+    suspend fun recheck() {
+        val gate = _gate.value
+        if (gate == Gate.Starting || gate is Gate.Update || !checking.tryLock()) return
+        try {
+            configure()
+        } catch (_: Problem) {
+        } finally {
+            checking.unlock()
         }
     }
 
@@ -132,6 +142,11 @@ class Session(
         generation++
         _gate.value = Gate.SignedOut(notice)
     }
+
+    private suspend fun configure(): GetConfigurationResponse =
+        exchange({ api.app.getConfiguration(GetConfigurationRequest.getDefaultInstance(), it) }) {
+            if (it.updateRequired) _gate.value = Gate.Update(it.storeUrl, "Update the app to keep going.")
+        }
 
     private suspend fun <T> exchange(
         rpc: suspend (Headers) -> ResponseMessage<T>,

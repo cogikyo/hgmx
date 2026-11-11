@@ -74,6 +74,15 @@ struct SessionTests {
         #expect(notice.contains("http://localhost:18559/auth/account"))
     }
 
+    @Test func offlineRecheckKeepsTheGate() async throws {
+        let offline = Api(origin: "http://localhost:18559", appID: "test", build: "1")
+        let session = Session(api: offline, tokens: tokens)
+        try await session.signIn({ _ in ResponseMessage(result: .success(Self.grant("first"))) }) { $0.grant }
+        let gate = session.gate
+        await session.recheck()
+        #expect(session.gate == gate)
+    }
+
     @Test func unauthenticatedEndsSession() async throws {
         let session = try await signedIn()
         let error = ConnectError(code: .unauthenticated, message: "Your session ended.")

@@ -96,6 +96,15 @@ class SessionTest {
     }
 
     @Test
+    fun offlineRecheckKeepsTheGate() = runBlocking {
+        val offline = Session(Api("http://localhost:18559", "test-android", 1), tokens, scope)
+        offline.signIn({ success(VerifyCodeResponse.newBuilder().setGrant(grant()).build()) }) { it.grant }
+        val gate = offline.gate.value
+        offline.recheck()
+        assertEquals(gate, offline.gate.value)
+    }
+
+    @Test
     fun unauthenticatedEndsTheSession() = runBlocking {
         session.signIn({ success(VerifyCodeResponse.newBuilder().setGrant(grant()).build()) }) { it.grant }
         val failure = ConnectException(Code.UNAUTHENTICATED, "Your session ended. Sign in again.")

@@ -2,7 +2,9 @@ import SwiftUI
 
 @main
 struct StarterApp: App {
+    @Environment(\.scenePhase) private var phase
     @State private var session: Session
+    @State private var away = false
 
     init() {
         let info = Bundle.main
@@ -18,6 +20,17 @@ struct StarterApp: App {
         WindowGroup {
             Root(session: session)
                 .task { await session.start() }
+        }
+        .onChange(of: phase) { _, phase in
+            switch phase {
+            case .background:
+                away = true
+            case .active where away:
+                away = false
+                Task { await session.recheck() }
+            default:
+                break
+            }
         }
     }
 }

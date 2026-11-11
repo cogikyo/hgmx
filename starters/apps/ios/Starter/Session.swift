@@ -34,6 +34,7 @@ final class Session {
     @ObservationIgnored private var token: String?
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var methods: Set<String> = []
+    @ObservationIgnored private var checking = false
 
     init(api: Api, tokens: TokenStore) {
         self.api = api
@@ -51,11 +52,8 @@ final class Session {
     func start() async {
         gate = .starting
         do {
-            let config = try await exchange { await self.api.app.getConfiguration(request: .init(), headers: $0) }
-            if config.updateRequired {
-                gate = .update(store: config.storeURL, message: "Update the app to keep going.")
-                return
-            }
+            let config = try await configure()
+            if config.updateRequired { return }
             methods = Set(config.methods)
             token = tokens.read()
             generation += 1
@@ -71,6 +69,17 @@ final class Session {
                 gate = .unreachable(problem)
             }
         } catch {}
+    }
+
+    func recheck() async {
+        switch gate {
+        case .starting, .update: return
+        default: break
+        }
+        guard !checking else { return }
+        checking = true
+        defer { checking = false }
+        _ = try? await configure()
     }
 
     func call<T>(_ rpc: (Headers) async -> ResponseMessage<T>) async throws -> T {
@@ -128,6 +137,14 @@ final class Session {
         token = nil
         generation += 1
         gate = .signedOut(notice: notice)
+    }
+
+    private func configure() async throws -> Hgmx_App_V1_GetConfigurationResponse {
+        try await exchange({ await self.api.app.getConfiguration(request: .init(), headers: $0) }) {
+            if $0.updateRequired {
+                self.gate = .update(store: $0.storeURL, message: "Update the app to keep going.")
+            }
+        }
     }
 
     @discardableResult
