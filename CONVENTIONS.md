@@ -600,7 +600,8 @@ It rewrites site imports and regenerates templ Go files for the site's module pa
 Tailwind generation uses `tailwindcss` from PATH when `views/static/css/main.css` exists.
 `check` compares generated output to the tree in its gen stage without writing.
 It stops at the first failed stage and never writes formatted files.
-For package loading and Go commands, `check` sets `GOWORK=off` and always passes `-mod=readonly`, overriding `GOFLAGS`.
+Package loading in `check`, its vet/build/test commands and credentials builds use `GOWORK=off` and `-mod=readonly`, overriding `GOFLAGS`.
+`update` runs `go get` and `go mod tidy` with `GOWORK=off` and `GOFLAGS=-mod=mod`.
 `dev` and `migrate` keep the caller's workspace settings.
 
 ### App Generation and Checks
