@@ -4,8 +4,10 @@ export const τmid = τmax - τmin;
 
 let started = null;
 
-export function animate(...args) {
-  const controls = Motion.animate(...args);
+export function animate(targets, keyframes, options) {
+  // Motion's default gap repeats the dash at the path end, leaving a round-cap dot.
+  if (keyframes.pathLength) keyframes = { pathSpacing: 1, ...keyframes };
+  const controls = Motion.animate(targets, keyframes, options);
   started?.push(controls);
   return controls;
 }

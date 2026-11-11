@@ -9,3 +9,8 @@ svg[data-icon] :not([transform], [transform-origin]) {
 svg[data-icon] [transform-origin] {
   transform-box: view-box !important;
 }
+
+/* Motion's zero-length dash still paints a round-cap dot. */
+svg[data-icon] [stroke-dasharray^="0 "] {
+  stroke: none;
+}
