@@ -64,14 +64,24 @@ struct SessionTests {
         #expect(session.gate == .signedOut(notice: nil))
         #expect(tokens.read() == nil)
         await withCheckedContinuation { changed in
-            withObservationTracking { _ = session.gate } onChange: { changed.resume() }
+            withObservationTracking { _ = session.warning } onChange: { changed.resume() }
         }
-        guard case .signedOut(let notice?) = session.gate else {
-            Issue.record("no notice after an unconfirmed sign-out: \(session.gate)")
-            return
+        let warning = try #require(session.warning)
+        #expect(session.gate == .signedOut(notice: nil))
+        #expect(warning.contains("didn't confirm"))
+        #expect(warning.contains("http://localhost:18559/auth/account"))
+
+        var update = Hgmx_App_V1_UpdateRequired()
+        update.storeURL = "https://apps.apple.com/app/id1"
+        update.message = "Update to keep going."
+        for _ in 0..<2 {
+            _ = try? await session.call(Self.failing(.failedPrecondition, "hgmx.app.v1.UpdateRequired", update))
+            #expect(session.gate == .update(store: update.storeURL, message: update.message))
+            #expect(session.warning == warning)
         }
-        #expect(notice.contains("didn't confirm"))
-        #expect(notice.contains("http://localhost:18559/auth/account"))
+        try await session.signIn({ _ in ResponseMessage(result: .success(Self.grant("second"))) }) { $0.grant }
+        #expect(session.warning == nil)
+        tokens.clear()
     }
 
     @Test func offlineRecheckKeepsTheGate() async throws {

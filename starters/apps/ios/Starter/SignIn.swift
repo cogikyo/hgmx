@@ -65,11 +65,13 @@ final class SignInModel {
 
 struct SignIn: View {
     let notice: String?
+    let warning: String?
     let onDone: () -> Void
     @State private var model: SignInModel
 
-    init(session: Session, notice: String?, onDone: @escaping () -> Void = {}) {
+    init(session: Session, notice: String?, warning: String? = nil, onDone: @escaping () -> Void = {}) {
         self.notice = notice
+        self.warning = warning
         self.onDone = onDone
         _model = State(initialValue: SignInModel(session: session))
     }
@@ -81,6 +83,9 @@ struct SignIn: View {
                 Text("Sign in").font(.largeTitle)
                 if let notice {
                     Text(notice)
+                }
+                if let warning {
+                    Text(warning)
                 }
                 if model.passkeys {
                     Button("Sign in with a passkey") { act { await model.passkey() } }

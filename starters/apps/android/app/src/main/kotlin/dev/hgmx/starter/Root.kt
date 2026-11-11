@@ -42,6 +42,7 @@ sealed interface Route : NavKey {
 @Composable
 fun Root(session: Session) {
     val gate by session.gate.collectAsStateWithLifecycle()
+    val warning by session.warning.collectAsStateWithLifecycle()
     Surface(Modifier.fillMaxSize()) {
         when (val g = gate) {
             Gate.Starting -> Centered { CircularProgressIndicator() }
@@ -52,8 +53,8 @@ fun Root(session: Session) {
                     Button(onClick = { scope.launch { session.start() } }) { Text("Try again") }
                 }
             }
-            is Gate.Update -> UpdateScreen(g)
-            is Gate.SignedOut -> Scoped { SignInScreen(session, notice = g.notice, onDone = {}) }
+            is Gate.Update -> UpdateScreen(g, warning)
+            is Gate.SignedOut -> Scoped { SignInScreen(session, notice = g.notice, warning = warning, onDone = {}) }
             is Gate.SignedIn -> key(g.account.id) { Scoped { SignedIn(session) } }
         }
     }
@@ -65,12 +66,13 @@ private fun Scoped(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun UpdateScreen(update: Gate.Update) {
+private fun UpdateScreen(update: Gate.Update, warning: String?) {
     val context = LocalContext.current
     val store = update.storeUrl.toUri().takeIf { it.scheme == "https" }
     Centered {
         Text("Update required", style = MaterialTheme.typography.headlineSmall)
         Text(update.message)
+        warning?.let { Text(it) }
         if (store != null) {
             Button(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, store)) }) { Text("Open the store") }
         }

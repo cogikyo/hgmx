@@ -116,7 +116,7 @@ class SignInViewModel(private val session: Session) : ViewModel() {
 }
 
 @Composable
-fun SignInScreen(session: Session, notice: String?, onDone: () -> Unit) {
+fun SignInScreen(session: Session, notice: String?, warning: String? = null, onDone: () -> Unit) {
     val vm = viewModel { SignInViewModel(session) }
     val state by vm.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -129,6 +129,7 @@ fun SignInScreen(session: Session, notice: String?, onDone: () -> Unit) {
     ) {
         Text("Sign in", style = MaterialTheme.typography.headlineMedium)
         notice?.let { Text(it) }
+        warning?.let { Text(it) }
         if (vm.passkeys) {
             Button(onClick = { vm.passkey(context) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) {
                 Text("Sign in with a passkey")

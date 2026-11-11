@@ -42,6 +42,8 @@ class Session(
 ) {
     private val _gate = MutableStateFlow<Gate>(Gate.Starting)
     val gate: StateFlow<Gate> = _gate.asStateFlow()
+    private val _warning = MutableStateFlow<String?>(null)
+    val warning: StateFlow<String?> = _warning.asStateFlow()
 
     private val lock = Mutex()
     private val checking = Mutex()
@@ -62,7 +64,7 @@ class Session(
             val stored = withContext(Dispatchers.IO) { tokens.read() }
             lock.withLock {
                 token = stored
-                generation++
+                advance()
             }
             if (stored == null) {
                 _gate.value = Gate.SignedOut()
@@ -96,7 +98,7 @@ class Session(
             withContext(Dispatchers.IO) { tokens.write(g.token) }
             previous = token
             token = g.token
-            generation++
+            advance()
             _gate.value = Gate.SignedIn(g.account)
         }
         previous?.let { scope.launch { revoke(it) } }
@@ -121,10 +123,8 @@ class Session(
             if (old == null || revoke(old)) return@launch
             lock.withLock {
                 if (sent == generation) {
-                    _gate.value = Gate.SignedOut(
-                        "You're signed out on this device, but the server didn't confirm it. " +
-                            "To end that session, sign in at ${api.origin}/auth/account and sign out $label under Devices.",
-                    )
+                    _warning.value = "You're signed out on this device, but the server didn't confirm it. " +
+                        "To end that session, sign in at ${api.origin}/auth/account and sign out $label under Devices."
                 }
             }
         }
@@ -139,8 +139,13 @@ class Session(
     private suspend fun end(notice: String?) {
         withContext(Dispatchers.IO) { tokens.clear() }
         token = null
-        generation++
+        advance()
         _gate.value = Gate.SignedOut(notice)
+    }
+
+    private fun advance() {
+        generation++
+        _warning.value = null
     }
 
     private suspend fun configure(): GetConfigurationResponse =

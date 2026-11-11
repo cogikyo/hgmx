@@ -22,12 +22,13 @@ struct Root: View {
             Centered {
                 Text("Update required").font(.title2)
                 Text(message)
+                if let warning = session.warning { Text(warning) }
                 if let url = URL(string: store), url.scheme == "https" {
                     Link("Open the store", destination: url)
                 }
             }
         case .signedOut(let notice):
-            SignIn(session: session, notice: notice)
+            SignIn(session: session, notice: notice, warning: session.warning)
         case .signedIn(let account):
             SignedIn(session: session).id(account.id)
         }

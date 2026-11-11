@@ -16,6 +16,8 @@ import hgmx.auth.v1.SessionGrant
 import hgmx.auth.v1.SignInAgain
 import hgmx.auth.v1.VerifyCodeResponse
 import java.io.File
+import java.net.InetAddress
+import java.net.ServerSocket
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -24,7 +26,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.job
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import okio.ByteString.Companion.toByteString
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -88,11 +93,35 @@ class SessionTest {
         val offline = Session(Api("http://localhost:18559", "test-android", 1), tokens, scope)
         offline.signIn({ success(VerifyCodeResponse.newBuilder().setGrant(grant()).build()) }) { it.grant }
         offline.signOut()
-        val notice = offline.gate.first { it is Gate.SignedOut && it.notice != null }
-            .let { (it as Gate.SignedOut).notice.orEmpty() }
+        val warning = offline.warning.first { it != null }.orEmpty()
         assertNull(tokens.read())
-        assertTrue(notice, notice.contains("didn't confirm"))
-        assertTrue(notice, notice.contains("http://localhost:18559/auth/account"))
+        assertEquals(Gate.SignedOut(), offline.gate.value)
+        assertTrue(warning, warning.contains("didn't confirm"))
+        assertTrue(warning, warning.contains("http://localhost:18559/auth/account"))
+
+        val update = UpdateRequired.newBuilder().setStoreUrl("https://play.google.com/store").setMessage("Update to keep going.").build()
+        repeat(2) {
+            assertThrows(Problem::class.java) {
+                runBlocking { offline.call<GetAccountResponse> { failure("hgmx.app.v1.UpdateRequired", update) } }
+            }
+            assertEquals(Gate.Update("https://play.google.com/store", "Update to keep going."), offline.gate.value)
+            assertEquals(warning, offline.warning.value)
+        }
+        offline.signIn({ success(VerifyCodeResponse.newBuilder().setGrant(grant()).build()) }) { it.grant }
+        assertNull(offline.warning.value)
+
+        ServerSocket(0, 1, InetAddress.getByName("localhost")).use { server ->
+            val revoking = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+            val held = Session(Api("http://localhost:${server.localPort}", "test-android", 1), tokens, revoking)
+            held.signIn({ success(VerifyCodeResponse.newBuilder().setGrant(grant()).build()) }) { it.grant }
+            held.signOut()
+            val revocation = withContext(Dispatchers.IO) { server.accept() }
+            held.signIn({ success(VerifyCodeResponse.newBuilder().setGrant(grant()).build()) }) { it.grant }
+            revocation.close()
+            server.close()
+            revoking.coroutineContext.job.children.toList().joinAll()
+            assertNull(held.warning.value)
+        }
     }
 
     @Test

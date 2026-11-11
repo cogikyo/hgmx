@@ -29,6 +29,7 @@ final class Session {
     let api: Api
     let label = UIDevice.current.model
     private(set) var gate = Gate.starting
+    private(set) var warning: String?
 
     @ObservationIgnored private let tokens: TokenStore
     @ObservationIgnored private var token: String?
@@ -56,7 +57,7 @@ final class Session {
             if config.updateRequired { return }
             methods = Set(config.methods)
             token = tokens.read()
-            generation += 1
+            advance()
             guard token != nil else {
                 gate = .signedOut(notice: nil)
                 return
@@ -93,7 +94,7 @@ final class Session {
             try self.tokens.write(g.token)
             previous = self.token
             self.token = g.token
-            self.generation += 1
+            self.advance()
             self.gate = .signedIn(g.account)
         }
         if let previous {
@@ -120,7 +121,7 @@ final class Session {
         let sent = generation
         Task {
             guard await !revoke(old), sent == generation else { return }
-            gate = .signedOut(notice: "You're signed out on this device, but the server didn't confirm it. To end that session, sign in at \(api.origin)/auth/account and sign out \(label) under Devices.")
+            warning = "You're signed out on this device, but the server didn't confirm it. To end that session, sign in at \(api.origin)/auth/account and sign out \(label) under Devices."
         }
     }
 
@@ -135,8 +136,13 @@ final class Session {
     private func end(_ notice: String?) {
         tokens.clear()
         token = nil
-        generation += 1
+        advance()
         gate = .signedOut(notice: notice)
+    }
+
+    private func advance() {
+        generation += 1
+        warning = nil
     }
 
     private func configure() async throws -> Hgmx_App_V1_GetConfigurationResponse {
