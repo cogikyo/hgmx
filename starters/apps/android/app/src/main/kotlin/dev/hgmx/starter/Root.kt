@@ -11,6 +11,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
@@ -22,6 +23,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import androidx.lifecycle.viewmodel.compose.rememberViewModelStoreOwner
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
@@ -50,10 +53,15 @@ fun Root(session: Session) {
                 }
             }
             is Gate.Update -> UpdateScreen(g)
-            is Gate.SignedOut -> SignInScreen(session, notice = g.notice, onDone = {})
-            is Gate.SignedIn -> key(g.account.id) { SignedIn(session) }
+            is Gate.SignedOut -> Scoped { SignInScreen(session, notice = g.notice, onDone = {}) }
+            is Gate.SignedIn -> key(g.account.id) { Scoped { SignedIn(session) } }
         }
     }
+}
+
+@Composable
+private fun Scoped(content: @Composable () -> Unit) {
+    CompositionLocalProvider(LocalViewModelStoreOwner provides rememberViewModelStoreOwner(), content = content)
 }
 
 @Composable
