@@ -425,7 +425,7 @@ func skillsCmd() int {
 	defer root.Close()
 	ps, err := planSkills(s, root, skills.FS)
 	if err != nil {
-		log.Error("Failed to read installed skills; nothing was written", slog.String("error", err.Error()))
+		log.Error("Failed to read installed skills; no files were written", slog.String("error", err.Error()))
 		return 1
 	}
 	if len(ps.findings()) == 0 {
@@ -440,7 +440,7 @@ func skillsCmd() int {
 		}
 	}
 	if blocked > 0 {
-		log.Error("Skills not synced; nothing was written", slog.Int("blocked", blocked))
+		log.Error("Skills not synced; no files were written", slog.Int("blocked", blocked))
 		return 1
 	}
 	wrote, removed, err := ps.apply(s)
