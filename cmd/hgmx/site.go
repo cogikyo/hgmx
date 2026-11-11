@@ -17,6 +17,7 @@ const (
 	cssOutput = "views/static/css/main.min.css"
 	templPath = "github.com/a-h/templ"
 	readonly  = "-mod=readonly"
+	serverPkg = "./cmd/server"
 )
 
 type site struct {

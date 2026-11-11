@@ -21,8 +21,12 @@ func TestRules(t *testing.T) {
 				t.Fatal(err)
 			}
 			findings, err := runRules(s)
-			if err != nil {
+			wantErr, _ := os.ReadFile(filepath.Join(dir, "error"))
+			switch {
+			case len(wantErr) == 0 && err != nil:
 				t.Fatal(err)
+			case len(wantErr) > 0 && (err == nil || !strings.Contains(err.Error(), strings.TrimSpace(string(wantErr)))):
+				t.Fatalf("error: %v; want one containing %q", err, strings.TrimSpace(string(wantErr)))
 			}
 			var got strings.Builder
 			for _, f := range findings {

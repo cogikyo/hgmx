@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/constant"
+	"go/parser"
 	"go/token"
 	"go/types"
 	"path/filepath"
@@ -121,6 +122,46 @@ func (a *audit) goRules() error {
 		a.imports(sp, site)
 	}
 	return nil
+}
+
+type clause struct {
+	name string
+	test bool
+}
+
+func packageClause(file string) (clause, bool) {
+	f, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.PackageClauseOnly)
+	if err != nil {
+		return clause{}, false
+	}
+	c := clause{name: f.Name.Name, test: strings.HasSuffix(file, "_test.go")}
+	if c.test {
+		c.name = strings.TrimSuffix(c.name, "_test")
+	}
+	return c, true
+}
+
+func (a *audit) commands(dirs map[string][]clause) {
+	server := strings.TrimPrefix(serverPkg, "./")
+	found := false
+	for dir, clauses := range dirs {
+		cmd := dir == "cmd" || strings.HasPrefix(dir, "cmd/")
+		command := cmd && strings.Count(dir, "/") == 1
+		for _, c := range clauses {
+			switch {
+			case c.name == "main" && !command:
+				a.report(finding{file: dir + "/", rule: ruleCmd, msg: "package main outside cmd/<name>/"})
+			case c.name != "main" && cmd:
+				a.report(finding{file: dir + "/", rule: ruleCmd, msg: "package " + c.name + " inside cmd/"})
+			case dir == server && !c.test:
+				found = true
+			}
+		}
+	}
+	if !found {
+		a.report(finding{file: server + "/", rule: ruleCmd, msg: "no package main in " + server + "/",
+			fix: "move the site's package main into " + server + "/"})
+	}
 }
 
 func (a *audit) goReport(pos token.Position, r *rule, msg, fix string) {

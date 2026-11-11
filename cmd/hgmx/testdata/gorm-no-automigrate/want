@@ -1,3 +1,4 @@
 .agents/skills/ [hgmx-skills] hgmx skills not installed
+cmd/server/ [layout/cmd] no package main in cmd/server/
 go.mod [hgmx-tool] missing tool github.com/cogikyo/hgmx/cmd/hgmx
 store/store.go:8:9 [gorm/no-automigrate] AutoMigrate changes the schema outside a migration

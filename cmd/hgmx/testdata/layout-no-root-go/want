@@ -1,0 +1,7 @@
+.agents/skills/ [hgmx-skills] hgmx skills not installed
+go.mod [hgmx-tool] missing tool github.com/cogikyo/hgmx/cmd/hgmx
+page.templ [layout/no-root-go] templ file in the module root
+page_templ.go [layout/no-root-go] Go file in the module root
+tagged.go [layout/no-root-go] Go file in the module root
+wire.go [layout/no-root-go] Go file in the module root
+wire_test.go [layout/no-root-go] Go file in the module root

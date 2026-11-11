@@ -1,0 +1,7 @@
+.agents/skills/ [hgmx-skills] hgmx skills not installed
+cmd/a/b/ [layout/cmd] package main outside cmd/<name>/
+cmd/lib/ [layout/cmd] package lib inside cmd/
+cmd/server/ [layout/cmd] no package main in cmd/server/
+cmd/util/ [layout/cmd] package util inside cmd/
+go.mod [hgmx-tool] missing tool github.com/cogikyo/hgmx/cmd/hgmx
+jobs/ [layout/cmd] package main outside cmd/<name>/

@@ -24,5 +24,5 @@ var GoMod []byte
 //go:embed buf.yaml
 var BufYAML []byte
 
-//go:embed library/**
+//go:embed library/** library/.gitignore
 var LibraryFS embed.FS

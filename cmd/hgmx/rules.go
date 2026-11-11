@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 	"slices"
 	"strings"
 
@@ -55,6 +56,16 @@ var (
 		"layout/no-vendor",
 		"builds and deploys fetch modules from go.mod and go.sum, so a vendor/ copy only adds files that drift from them",
 		"run git rm -r vendor/, then go mod tidy",
+	}
+	ruleRootGo = &rule{
+		"layout/no-root-go",
+		"the module root holds repo files such as go.mod, credentials.json, buf.yaml, proto/ and apps/; it is not a Go package",
+		"move package main files to cmd/server/, and other code into the package that owns it",
+	}
+	ruleCmd = &rule{
+		"layout/cmd",
+		"dev, migrate, credentials and deploys build the site from cmd/server, and cmd/ names every command",
+		"move the command into cmd/<name>/, or the library code out of cmd/",
 	}
 	ruleGoVersion = &rule{
 		"layout/go-version",
@@ -140,7 +151,7 @@ var (
 
 var rules = []*rule{
 	ruleHgmxLatest, ruleHgmxTool, ruleHgmxSkills,
-	ruleJustfile, ruleInternal, ruleVendor, ruleGoVersion, ruleTemplVersion,
+	ruleJustfile, ruleInternal, ruleVendor, ruleRootGo, ruleCmd, ruleGoVersion, ruleTemplVersion,
 	ruleDirection, ruleStoreOnly, ruleLiveModels,
 	ruleAutoMigrate, ruleGlobal, ruleSlogContext, ruleExit,
 	ruleCSP, ruleInlineJS, ruleBoost, ruleIcons, ruleIconsSource, ruleIconsDrift, ruleIgnore,
@@ -211,15 +222,9 @@ func runRules(s site) ([]finding, error) {
 		return nil, err
 	}
 	if err := a.goRules(); err != nil {
-		var moved []finding
-		for _, f := range a.findings {
-			if slices.Contains([]*rule{ruleIcons, ruleIconsSource, ruleIconsDrift}, f.rule) {
-				moved = append(moved, f)
-			}
-		}
-		return moved, err
+		return a.resolve(false), err
 	}
-	return a.resolve(), nil
+	return a.resolve(true), nil
 }
 
 func (a *audit) tree() error {
@@ -229,8 +234,21 @@ func (a *audit) tree() error {
 	if _, err := os.Stat(a.site.path("vendor")); err == nil {
 		a.report(finding{file: "vendor/", rule: ruleVendor, msg: "vendor/ directory"})
 	}
-	return a.site.walk(func(rel string, d fs.DirEntry) error {
+	dirs := map[string][]clause{}
+	err := a.site.walk(func(rel string, d fs.DirEntry) error {
 		name := d.Name()
+		if !d.IsDir() {
+			switch dir, ext := path.Dir(rel), path.Ext(name); {
+			case dir == "." && ext == ".go":
+				a.report(finding{file: rel, rule: ruleRootGo, msg: "Go file in the module root"})
+			case dir == "." && ext == ".templ":
+				a.report(finding{file: rel, rule: ruleRootGo, msg: "templ file in the module root"})
+			case ext == ".go":
+				if c, ok := packageClause(a.site.path(rel)); ok {
+					dirs[dir] = append(dirs[dir], c)
+				}
+			}
+		}
 		switch {
 		case d.IsDir():
 			if name == "internal" {
@@ -246,6 +264,11 @@ func (a *audit) tree() error {
 		}
 		return nil
 	})
+	if err != nil {
+		return err
+	}
+	a.commands(dirs)
+	return nil
 }
 
 func (a *audit) gomod() error {
@@ -321,7 +344,7 @@ func (a *audit) directives(rel string) error {
 	return nil
 }
 
-func (a *audit) resolve() []finding {
+func (a *audit) resolve(complete bool) []finding {
 	seen := map[string]bool{}
 	var out []finding
 	for _, f := range a.findings {
@@ -339,7 +362,8 @@ func (a *audit) resolve() []finding {
 		switch {
 		case ig.bad != "":
 			out = append(out, finding{file: ig.file, line: ig.line, col: ig.col, rule: ruleIgnore, msg: ig.bad})
-		case !ig.used:
+		// A failed package load can hide the finding an ignore suppresses.
+		case !ig.used && complete:
 			out = append(out, finding{file: ig.file, line: ig.line, col: ig.col, rule: ruleIgnore,
 				msg: fmt.Sprintf("unused ignore: no %s finding on this or the next line", ig.rule)})
 		}

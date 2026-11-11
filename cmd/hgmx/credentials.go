@@ -110,7 +110,7 @@ func (s site) withBinary(fn func(bin string) error) error {
 	}
 	defer os.RemoveAll(dir)
 	bin := filepath.Join(dir, "site")
-	build := s.gocmd("build", "-o", bin, ".")
+	build := s.gocmd("build", "-o", bin, serverPkg)
 	build.Stdout = os.Stderr
 	if err := build.Run(); err != nil {
 		return fmt.Errorf("build site: %w", err)

@@ -15,19 +15,17 @@ go get -tool github.com/cogikyo/hgmx/cmd/hgmx@master
 go tool hgmx init
 go mod tidy
 go tool hgmx check
-go build -o site .
+go build -o site ./cmd/server
 ./site
 ```
 
-`init` writes `main.go`, `routes/`, `store/` and `views/`, including migrations, generated templ code and static assets.
-It requires `go.mod`, refuses to overwrite any scaffold target and pins templ to hgmx's compiled-in version.
-The scaffold serves Home, About and a full-page 404, with system-ui and OFL-licensed Iosevka fonts.
-`main` builds views with `views.New`, then passes the mux from `routes.New(store, views)` to `server.Site` and `server.Run`.
-`server.Site` supplies the base CSP and a fixed panic (500) page; set `InternalError` to custom HTML or leave it empty for hgmx's default.
-The database pool is lazy: the scaffold serves without Postgres.
-Set `PGHOST`, `PGDATABASE` and `PGUSER` for the site's database and `OTEL_*` for telemetry export.
-Serving never migrates; use `migrate up`, `down [track]` or `status`.
-See [the deploy contract](CONVENTIONS.md#deploy-contract) before deploying schema changes.
+`init` writes `.gitignore` (ignoring `/server`), `cmd/server/main.go`, `credentials.json`, `routes/`, `store/` and `views/`.
+It requires `go.mod`, pins templ to hgmx's version and refuses existing scaffold targets except `.gitignore`.
+It keeps existing `.gitignore` content and appends `/server` if missing.
+The [site layout](CONVENTIONS.md#layout) keeps the root free of Go packages and process wiring beside `cmd/server/main.go`.
+The scaffold serves Home, About and a full-page 404 without Postgres, using system-ui and OFL-licensed Iosevka fonts.
+Set `PGHOST`, `PGDATABASE` and `PGUSER` for the database and `OTEL_*` for telemetry.
+Serving never migrates; read [the deploy contract](CONVENTIONS.md#deploy-contract) before schema changes.
 
 ## Site Commands
 
@@ -38,22 +36,15 @@ Run these from the site's module root; there is no justfile.
 | `go tool hgmx gen`                  | Generate templ Go, minified CSS and app contract code               |
 | `go tool hgmx dev [-- site flags…]` | Watch templ and CSS; restart the site with disk-backed static files |
 | `go tool hgmx fmt`                  | Format Go and templ                                                 |
-| `go tool hgmx migrate …`            | Run the site's migration command through `go run .`                 |
+| `go tool hgmx migrate …`            | Run `go run ./cmd/server migrate …`                                 |
 | `go tool hgmx update`               | Update hgmx to master and tidy                                      |
 | `go tool hgmx credentials`          | Build the site and write `credentials.json`                         |
 | `go tool hgmx credentials check …`  | Test SMTP and Google client authentication                          |
-| `go tool hgmx check`                | Check generated files, credentials, rules, format, vet, build, test |
+| `go tool hgmx check`                | Check generated files, rules, credentials, format, vet, build, test |
 
-Generation and formatting use templ in-process; the site's templ version must match hgmx's.
 `check` compares generated output to the tree without writing.
-Its `credentials` stage fails if the site-root `credentials.json` is missing or differs from the site's declarations and registered flags, including formatting differences.
-Declare secrets in a site-owned `credential.Registry`, read through its handles, then run `go tool hgmx credentials` and commit the file with the code, even for sites with no secrets.
-See [credential wiring](CONVENTIONS.md#hgmx-credentials) for the early command dispatch.
-
-`go tool hgmx credentials check [name...] [-- site flags...]` requires a current manifest and checks the named SMTP/Google credentials regardless of feature state.
-With no names, it checks targets whose features are on for the given flags and env; the rest print `skipped; feature X is off`.
-It never prints secrets; SMTP sends no mail, and the Google probe does not test browser sign-in.
-Ordinary `check` does not run these live provider checks.
+Commit `credentials.json` even for zero-secret sites; the credentials stage compares it byte-for-byte.
+See [credential wiring and live checks](CONVENTIONS.md#hgmx-credentials); ordinary `check` skips live provider checks.
 
 Database tests use `pgtest.Open(t)`; put `initdb` and `pg_ctl` on PATH.
 Missing executables or a socket bind failure skip the test unless `HGMX_PGTEST=require`; other startup failures fail.

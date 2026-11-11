@@ -218,7 +218,7 @@ func devCmd(args []string) (code int) {
 		}()
 	}
 
-	run := "go run . -static views/static"
+	run := "go run " + serverPkg + " -static views/static"
 	for _, a := range args {
 		run += " '" + strings.ReplaceAll(a, "'", `'\''`) + "'"
 	}

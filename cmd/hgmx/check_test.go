@@ -36,8 +36,11 @@ func TestCheckNoVendor(t *testing.T) {
 				mod += "\nreplace example.com/dependency => ./.dependency\n"
 				src = "package main\n\nimport _ \"example.com/dependency\"\n\nfunc main() {}\n"
 			}
-			for name, data := range map[string]string{"go.mod": mod, "go.sum": "", "main.go": src} {
-				if err := os.WriteFile(filepath.Join(dir, name), []byte(data), 0o644); err != nil {
+			if err := os.MkdirAll(filepath.Join(dir, "cmd", "server"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			for name, data := range map[string]string{"go.mod": mod, "go.sum": "", "cmd/server/main.go": src} {
+				if err := os.WriteFile(filepath.Join(dir, filepath.FromSlash(name)), []byte(data), 0o644); err != nil {
 					t.Fatal(err)
 				}
 			}

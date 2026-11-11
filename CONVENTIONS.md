@@ -386,17 +386,21 @@ The `csp-literal` check rejects direct header values that are not calls to `serv
 
 ## Layout
 
-- **`main.go`** holds flags, wiring and the `migrate` dispatch; serving never migrates.
-  - It builds the store and `views.New` result, then calls `routes.New(store, views)` for the mux.
-- **`routes/routes.go`** holds the URL table in `New(*store.Store, *views.Site) *http.ServeMux`.
-  - Handlers in `routes/` parse input, call the store and render a full page.
-- **`store/`** holds `Store`, models and queries; `store/migrations/` holds `All []migrate.Step`.
-- **`views/`** owns embedded static files and the page shell.
-  - `views/pages/<name>/` holds templ and its view-model types, without HTTP handlers.
-- **`views/components/<name>/`** holds components copied from hgmx and the site's own.
-- **Add `middleware/`** when application routes need shared request handling.
-  - Add a root domain package when business rules need a home outside handlers and queries.
-  - Don't scaffold empty packages or add a DI framework.
+```text
+site/
+├── cmd/
+│   └── server/             # main.go, flags, credentials and command tests
+├── routes/                 # URL table and HTTP handlers
+├── store/                  # Store, models and queries
+│   └── migrations/         # All []migrate.Step
+└── views/                  # embedded static files and page shell
+    ├── pages/<name>/       # templ and view-model types
+    └── components/<name>/  # copied and site-owned components
+```
+
+`cmd/server` wires the store and `views.New` through `routes.New(*store.Store, *views.Site) *http.ServeMux` in `routes/routes.go`.
+Handlers parse input, call the store and render a full page; serving never migrates.
+Add top-level middleware or domain packages when needed; no empty packages or DI framework.
 
 ### Imports: Direction
 
@@ -420,12 +424,23 @@ The table governs site-internal edges; standard-library and external imports rem
 ### Layout: No Internal
 
 **No `internal/` directories.** A site is a main module nobody imports; `internal/` adds no useful boundary.
-Put packages at the root under the names above.
+Put packages in top-level directories under the names above.
 
 ### Layout: No Vendor
 
 **No `vendor/` at the site root.** Builds and deploys fetch modules from `go.mod` and `go.sum`.
 Run `git rm -r vendor/`, then `go mod tidy`.
+
+### Layout: No Root Go
+
+**No `.go` or `.templ` files in the module root.** It holds repo files such as `go.mod`, `go.sum`, `credentials.json`, `buf.yaml`, `proto/` and `apps/`; it is not a Go package.
+Move `package main` files to `cmd/server/` and other code to its owning package.
+
+### Layout: Cmd
+
+**The site program is `cmd/server/`; other commands live directly in `cmd/<name>/`.** Dev, migrate, credentials and deploys build `./cmd/server`.
+Keep process wiring, flags, credentials and command tests beside `main.go`; move library code out of `cmd/`.
+Build tags do not affect placement checks; `cmd/server/` needs a non-test file declaring `package main`.
 
 ### Layout: Go Version
 
@@ -538,6 +553,11 @@ Run `go tool hgmx update` to resolve master with git and run `go get -tool githu
 Update fails if master cannot be resolved or its module version is older than the site's current requirement.
 It prints the old → new hgmx version and suggests `go tool hgmx gen` before `go tool hgmx check` if templ changed.
 
+**Moving an existing site:** create `cmd/server/` and `git mv` root `package main` files there, including wiring and command tests.
+Move other root code to its owner, other commands to `cmd/<name>/` and library packages out of `cmd/`.
+Replace the old root binary entry in `.gitignore` with `/server`.
+Run `go tool hgmx update`, `go tool hgmx credentials` and `go tool hgmx check`, in order; point deploy builds at `./cmd/server`.
+
 ### hgmx: Tool
 
 **Declare `tool github.com/cogikyo/hgmx/cmd/hgmx` in the site's `go.mod` and use `go tool hgmx`.**
@@ -563,18 +583,19 @@ The `hgmx-skills` rule in `go tool hgmx check` fails on missing, stale, edited o
 
 **No justfile anywhere.** Run the shared hgmx commands from the site's module root.
 
-| Command                             | Task                                                                        |
-| ----------------------------------- | --------------------------------------------------------------------------- |
-| `go tool hgmx init`                 | Write `main.go`, `routes/`, `store/` and `views/` in a module with `go.mod` |
-| `go tool hgmx gen`                  | Generate templ, minified CSS and app contract code                          |
-| `go tool hgmx dev [-- site flags…]` | Watch templ and CSS, restarting `go run . -static views/static`             |
-| `go tool hgmx fmt`                  | Format Go and templ files                                                   |
-| `go tool hgmx migrate …`            | Run `go run . migrate …` for development                                    |
-| `go tool hgmx credentials`          | Build the site and write `credentials.json`                                 |
-| `go tool hgmx credentials check …`  | Test SMTP and Google client authentication                                  |
-| `go tool hgmx check`                | Check generated files, credentials, rules, format, vet, build, test         |
+| Command                             | Task                                                                           |
+| ----------------------------------- | ------------------------------------------------------------------------------ |
+| `go tool hgmx init`                 | Write `.gitignore`, `cmd/server/main.go`, credentials, routes, store and views |
+| `go tool hgmx gen`                  | Generate templ, minified CSS and app contract code                             |
+| `go tool hgmx dev [-- site flags…]` | Watch templ and CSS; restart `go run ./cmd/server -static views/static`        |
+| `go tool hgmx fmt`                  | Format Go and templ files                                                      |
+| `go tool hgmx migrate …`            | Run `go run ./cmd/server migrate …` for development                            |
+| `go tool hgmx credentials`          | Build the site and write `credentials.json`                                    |
+| `go tool hgmx credentials check …`  | Test SMTP and Google client authentication                                     |
+| `go tool hgmx check`                | Check generated files, rules, credentials, format, vet, build, test            |
 
-`init` refuses if any scaffold target already exists and pins the site's templ requirement to hgmx's.
+`init` requires `go.mod`, pins templ to hgmx's version and refuses existing scaffold targets except `.gitignore`.
+It keeps existing `.gitignore` content and appends `/server` if missing.
 It rewrites site imports and regenerates templ Go files for the site's module path.
 Tailwind generation uses `tailwindcss` from PATH when `views/static/css/main.css` exists.
 `check` compares generated output to the tree in its gen stage without writing.

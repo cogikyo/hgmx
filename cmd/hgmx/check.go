@@ -61,7 +61,6 @@ func checkCmd(skip []string) (code int) {
 		}})
 	}
 	stages = append(stages, []stage{
-		{"credentials", func() error { return s.checkCredentials(ctx) }},
 		{"rules", func() error {
 			findings, err := runRules(s)
 			for _, f := range findings {
@@ -75,6 +74,7 @@ func checkCmd(skip []string) (code int) {
 			}
 			return nil
 		}},
+		{"credentials", func() error { return s.checkCredentials(ctx) }},
 		{"fmt", func() error {
 			changed, err := formatSite(s, false)
 			if err != nil {
@@ -110,7 +110,7 @@ func checkCmd(skip []string) (code int) {
 func migrateCmd(args []string) (code int) {
 	log := newLogger(logLevel, os.Stderr)
 	signal.Notify(make(chan os.Signal, 1), os.Interrupt)
-	cmd := exec.Command("go", append([]string{"run", ".", "migrate"}, args...)...)
+	cmd := exec.Command("go", append([]string{"run", serverPkg, "migrate"}, args...)...)
 	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
 	err := cmd.Run()
 	var exit *exec.ExitError

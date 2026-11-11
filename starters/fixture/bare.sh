@@ -22,7 +22,8 @@ fi
 cp "$hgmx/starters/fixture/go.mod" "$dest/"
 cd "$dest"
 go mod edit -module example.com/bare -replace "github.com/cogikyo/hgmx=$hgmx"
-printf 'package main\n\nfunc main() {}\n' >main.go
+mkdir -p cmd/server
+printf 'package main\n\nfunc main() {}\n' >cmd/server/main.go
 go mod tidy -e
 go tool hgmx init apps "$platform" --name Bare --origin https://bare.example --app-id "bare-$platform" "${identity[@]}"
 go tool hgmx gen

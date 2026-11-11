@@ -274,7 +274,13 @@ func TestIconRulesBroken(t *testing.T) {
 	if err == nil {
 		t.Fatal("broken site loaded without error")
 	}
-	if len(findings) != 1 || !strings.Contains(findings[0].msg, "icons.BadgeExclamationPoint") {
+	var icons []finding
+	for _, f := range findings {
+		if f.rule == ruleIcons {
+			icons = append(icons, f)
+		}
+	}
+	if len(icons) != 1 || !strings.Contains(icons[0].msg, "icons.BadgeExclamationPoint") {
 		t.Fatalf("findings = %v", findings)
 	}
 }

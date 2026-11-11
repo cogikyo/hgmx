@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 
 	"github.com/a-h/templ"
@@ -49,11 +50,19 @@ func initCmd() (code int) {
 		log.Error("Failed to read scaffold", slog.String("error", err.Error()))
 		return 1
 	}
+	var ignore []byte
 	for _, e := range entries {
-		if _, err := os.Lstat(e.Name()); err == nil {
+		_, err := os.Lstat(e.Name())
+		switch {
+		case err == nil && e.Name() == ".gitignore":
+			if ignore, err = os.ReadFile(".gitignore"); err != nil {
+				log.Error("Failed to read .gitignore", slog.String("error", err.Error()))
+				return 1
+			}
+		case err == nil:
 			log.Error("Refusing to overwrite existing " + e.Name() + "; move it aside or run init in an empty project")
 			return 1
-		} else if !errors.Is(err, fs.ErrNotExist) {
+		case !errors.Is(err, fs.ErrNotExist):
 			log.Error("Failed to check "+e.Name(), slog.String("error", err.Error()))
 			return 1
 		}
@@ -112,6 +121,9 @@ func initCmd() (code int) {
 
 	var moved []string
 	for _, e := range entries {
+		if ignore != nil && e.Name() == ".gitignore" {
+			continue
+		}
 		if err := os.Rename(filepath.Join(tmp, e.Name()), e.Name()); err != nil {
 			for _, name := range moved {
 				os.RemoveAll(name)
@@ -121,6 +133,25 @@ func initCmd() (code int) {
 		}
 		moved = append(moved, e.Name())
 	}
+	if ignore != nil {
+		scaffold, err := fs.ReadFile(library, ".gitignore")
+		if err != nil {
+			log.Error("Failed to read scaffold .gitignore", slog.String("error", err.Error()))
+			return 1
+		}
+		if add := missingLines(ignore, scaffold); len(add) > 0 {
+			f, err := os.OpenFile(".gitignore", os.O_APPEND|os.O_WRONLY, 0)
+			if err == nil {
+				_, err = f.Write(add)
+				err = errors.Join(err, f.Close())
+			}
+			if err != nil {
+				log.Error("Failed to append to .gitignore", slog.String("error", err.Error()))
+				return 1
+			}
+			moved = append(moved, ".gitignore")
+		}
+	}
 	if err := writeAtomic("go.mod", gomod); err != nil {
 		log.Error("Failed to write go.mod", slog.String("error", err.Error()))
 		return 1
@@ -128,6 +159,23 @@ func initCmd() (code int) {
 
 	log.Info("hgmx project initialized", slog.String("files", strings.Join(moved, " ")), slog.String("templ", templ.Version()))
 	return 0
+}
+
+func missingLines(have, want []byte) []byte {
+	lines := strings.Split(string(have), "\n")
+	for i, line := range lines {
+		lines[i] = strings.TrimSpace(line)
+	}
+	var add []byte
+	for line := range strings.Lines(string(want)) {
+		if !slices.Contains(lines, strings.TrimSpace(line)) {
+			add = append(add, strings.TrimRight(line, "\r\n")+"\n"...)
+		}
+	}
+	if len(add) > 0 && len(have) > 0 && !bytes.HasSuffix(have, []byte("\n")) {
+		add = append([]byte("\n"), add...)
+	}
+	return add
 }
 
 // --- palette command ---

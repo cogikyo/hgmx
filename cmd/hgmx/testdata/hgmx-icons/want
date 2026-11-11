@@ -1,4 +1,5 @@
 .agents/skills/ [hgmx-skills] hgmx skills not installed
+cmd/server/ [layout/cmd] no package main in cmd/server/
 go.mod [hgmx-tool] missing tool github.com/cogikyo/hgmx/cmd/hgmx
 go.mod:7:1 [hgmx-latest] replace github.com/cogikyo/hgmx overrides the pinned hgmx version
 views/page.go:4:10 [hgmx/icons-source] imports hgmx's full catalog while views/icons holds a local icon set; one glyph handler serves only one

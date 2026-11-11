@@ -25,10 +25,11 @@ Re-read the module's conventions after an update.
 ## Daily loop
 
 Run commands from the site's module root through `go tool hgmx`.
-The site's `go.mod` must declare `tool github.com/cogikyo/hgmx/cmd/hgmx` so the CLI and library share one version.
+Declare `tool github.com/cogikyo/hgmx/cmd/hgmx` in `go.mod` so the CLI and library share one version.
+Keep the module root free of `.go` and `.templ` files, process wiring beside `cmd/server/main.go`, other commands in `cmd/<name>/` and library code outside `cmd/`.
 
 1. Run **`go tool hgmx check`** to find the current failures.
-   It checks contracts and runtime pins when present, generation, credentials, site rules, formatting, vet, build, and tests without writing fixes.
+   It checks contracts, generation, runtime pins, site rules, credentials, format, vet, build and tests without writing fixes; contracts and pins run only when present.
 2. Keep the site on **latest hgmx master** while hgmx is being built out.
    Run `go tool hgmx update` when behind; it updates the library and tool, tidies modules, and re-syncs skills.
    A failed remote lookup makes the latest-version check warn and skip, so an offline pass does not prove currency.

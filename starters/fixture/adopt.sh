@@ -14,7 +14,7 @@ if [ -n "$(ls -A "$dest")" ]; then
 fi
 
 cd "$hgmx/starters/fixture"
-cp -R go.mod main.go api proto "$dest/"
+cp -R go.mod cmd api proto "$dest/"
 cd "$dest"
 go mod edit -replace "github.com/cogikyo/hgmx=$hgmx"
 go mod tidy -e

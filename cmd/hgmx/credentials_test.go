@@ -10,7 +10,7 @@ import (
 )
 
 func TestLibraryCredentialsCurrent(t *testing.T) {
-	want, err := exec.Command("go", "run", hgmxPath+"/library", "credentials", "manifest").Output()
+	want, err := exec.Command("go", "run", hgmxPath+"/library/cmd/server", "credentials", "manifest").Output()
 	if err != nil {
 		t.Fatalf("library credentials manifest: %v", err)
 	}
@@ -19,6 +19,6 @@ func TestLibraryCredentialsCurrent(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(have, want) {
-		t.Errorf("library/%s is stale; regenerate it with go run ./library credentials manifest:\n%s", credentialsFile, want)
+		t.Errorf("library/%s is stale; regenerate it with go run ./library/cmd/server credentials manifest:\n%s", credentialsFile, want)
 	}
 }
