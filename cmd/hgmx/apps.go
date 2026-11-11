@@ -10,7 +10,6 @@ import (
 	"maps"
 	"os"
 	"path"
-	"regexp"
 	"slices"
 	"strings"
 	"unicode"
@@ -37,8 +36,8 @@ var appStarters = map[string]starter{
 	"android": {
 		dir: "apps/android",
 		identity: func(id identity) (texts, paths []string, err error) {
-			if !javaPackage.MatchString(id.pkg) {
-				return nil, nil, fmt.Errorf("--package %q: want a lowercase Java package such as com.example.notes", id.pkg)
+			if !appid.ValidPackage(id.pkg) {
+				return nil, nil, fmt.Errorf("--package %q: want an Android package name such as com.example.notes", id.pkg)
 			}
 			texts = []string{
 				"dev.hgmx.starter", id.pkg,
@@ -56,7 +55,7 @@ var appStarters = map[string]starter{
 	"ios": {
 		dir: "apps/ios",
 		identity: func(id identity) (texts, paths []string, err error) {
-			if !bundleID.MatchString(id.bundle) {
+			if !appid.ValidBundle(id.bundle) {
 				return nil, nil, fmt.Errorf("--bundle-id %q: want a reverse-DNS bundle ID such as com.example.notes", id.bundle)
 			}
 			if id.google != "" {
@@ -81,11 +80,6 @@ var appStarters = map[string]starter{
 		markers: []string{"dev.hgmx.starter", "starter-ios", "starter.hgmx.dev", "HGMX_RP_ID = hgmx.dev", "HGMX_STARTER = dev"},
 	},
 }
-
-var (
-	javaPackage = regexp.MustCompile(`^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$`)
-	bundleID    = regexp.MustCompile(`^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$`)
-)
 
 const compatInitial = `{
   "base": "origin/master",

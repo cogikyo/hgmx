@@ -59,8 +59,6 @@ type app struct {
 
 var (
 	iosPrefix      = regexp.MustCompile(`^[A-Z0-9]{10}$`)
-	iosBundle      = regexp.MustCompile(`^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$`)
-	androidPkg     = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)+$`)
 	googleClient   = regexp.MustCompile(`^[A-Za-z0-9-]+\.apps\.googleusercontent\.com$`)
 	stores         = map[authv1.ClientKind]string{authv1.ClientKind_CLIENT_KIND_IOS: "apps.apple.com", authv1.ClientKind_CLIENT_KIND_ANDROID: "play.google.com"}
 	associationAge = 24 * time.Hour
@@ -108,14 +106,14 @@ func parseApp(c App, h *host, rp string) (*app, []string, error) {
 	a := &app{id: c.ID, host: h, build: c.Build, google: slices.Clone(c.Google)}
 	var ids []string
 	if c.IOS != nil {
-		if !iosPrefix.MatchString(c.IOS.Prefix) || !iosBundle.MatchString(c.IOS.Bundle) {
+		if !iosPrefix.MatchString(c.IOS.Prefix) || !appid.ValidBundle(c.IOS.Bundle) {
 			return nil, nil, fmt.Errorf("IOS needs a 10-character app ID prefix and a bundle ID")
 		}
 		a.kind = authv1.ClientKind_CLIENT_KIND_IOS
 		a.origins = []string{"https://" + rp}
 		ids = []string{c.IOS.id()}
 	} else {
-		if !androidPkg.MatchString(c.Android.Package) || len(c.Android.Signers) == 0 {
+		if !appid.ValidPackage(c.Android.Package) || len(c.Android.Signers) == 0 {
 			return nil, nil, fmt.Errorf("Android needs a package name and signing certificate digests")
 		}
 		a.kind = authv1.ClientKind_CLIENT_KIND_ANDROID
