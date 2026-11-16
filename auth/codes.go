@@ -37,15 +37,15 @@ var digits = regexp.MustCompile(`^[0-9]{6}$`)
 type code struct {
 	ID        pg.ID
 	Origin    string
-	Email     string
-	Purpose   string
-	Mac       []byte
-	Attempts  int
-	Created   time.Time
-	Expires   time.Time
+	Email     string    `gorm:"not null;index:auth_codes_email,priority:1"`
+	Purpose   string    `gorm:"not null;check:auth_codes_purpose_check,purpose IN ('signin', 'link', 'verify')"`
+	Mac       []byte    `gorm:"not null"`
+	Attempts  int       `gorm:"type:integer;not null;default:0"`
+	Created   time.Time `gorm:"not null;index:auth_codes_email,priority:2;index:auth_codes_created"`
+	Expires   time.Time `gorm:"not null"`
 	Consumed  *time.Time
 	SessionID *pg.ID
-	UserID    *pg.ID
+	UserID    *pg.ID `gorm:"index:auth_codes_user"`
 }
 
 func (code) TableName() string { return "auth_codes" }

@@ -4,7 +4,7 @@
 //
 // # Site wiring
 //
-// Run [Track] before the site's migration track, never at server startup.
+// Pass [Schema] to migrate.Run before site schemas, never at server startup.
 // Read the site's auth-key through a handle declared from [KeyCredential].
 // Its fallback is HGMX_AUTH_KEY; the key needs at least 32 bytes.
 // Start queue with mail.NewQueue and pass queue.Close to server.Run's after hooks.

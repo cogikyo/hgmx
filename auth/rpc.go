@@ -308,13 +308,13 @@ const (
 
 type nativeFlow struct {
 	ID        []byte
-	Provider  string
-	Intent    string
-	Nonce     string
-	ClientID  string
-	Origin    string
-	SessionID *pg.ID
-	Expires   time.Time
+	Provider  string    `gorm:"not null"`
+	Intent    string    `gorm:"not null;check:auth_native_flows_intent_check,intent IN ('signin', 'link')"`
+	Nonce     string    `gorm:"not null"`
+	ClientID  string    `gorm:"not null"`
+	Origin    string    `gorm:"not null"`
+	SessionID *pg.ID    `gorm:"check:auth_native_flows_check,(intent = 'signin' AND session_id IS NULL) OR (intent = 'link' AND session_id IS NOT NULL)"`
+	Expires   time.Time `gorm:"not null"`
 }
 
 func (nativeFlow) TableName() string { return "auth_native_flows" }

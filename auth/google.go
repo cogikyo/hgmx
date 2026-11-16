@@ -78,13 +78,13 @@ func (p *provider) config(origin string) oauth2.Config {
 type flow struct {
 	ID        []byte
 	Origin    string
-	Provider  string
-	Intent    string
-	Verifier  string
-	Nonce     string
+	Provider  string `gorm:"not null"`
+	Intent    string `gorm:"not null;check:auth_flows_intent_check,intent IN ('signin', 'link')"`
+	Verifier  string `gorm:"not null"`
+	Nonce     string `gorm:"not null"`
 	SessionID *pg.ID
-	Next      string
-	Expires   time.Time
+	Next      string    `gorm:"not null"`
+	Expires   time.Time `gorm:"not null"`
 }
 
 func (flow) TableName() string { return "auth_flows" }

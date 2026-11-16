@@ -7,9 +7,55 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/cogikyo/hgmx/migrate"
+	"github.com/cogikyo/hgmx/pg"
 )
 
-// Track is the auth schema; list it before the site's own track.
+// Schema registers auth's tables; pass it to migrate.Run before site schemas.
+var Schema = migrate.Schema{Name: "auth", Models: []any{
+	// Parse userTable's has-many foreign keys before migrating child tables.
+	&userTable{}, &passkey{}, &code{}, &ceremony{}, &sessionTable{}, &identityTable{}, &flow{}, &nativeFlow{},
+}}
+
+type userTable struct {
+	ID         pg.ID
+	Email      *string         `gorm:"unique"`
+	Handle     []byte          `gorm:"not null;unique"`
+	Created    time.Time       `gorm:"not null"`
+	Username   *string         `gorm:"uniqueIndex:auth_users_username,expression:lower(username COLLATE \"C\")"`
+	Passkeys   []passkey       `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+	Ceremonies []ceremony      `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+	Sessions   []sessionTable  `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+	Identities []identityTable `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+}
+
+func (userTable) TableName() string { return "auth_users" }
+
+type sessionTable struct {
+	ID        pg.ID
+	UserID    pg.ID     `gorm:"not null;index:auth_sessions_user;index:auth_sessions_user_origin,priority:1"`
+	TokenHash []byte    `gorm:"not null;unique"`
+	Created   time.Time `gorm:"not null"`
+	Seen      time.Time `gorm:"not null"`
+	Expires   time.Time `gorm:"not null"`
+	Origin    *string   `gorm:"index:auth_sessions_user_origin,priority:2"`
+	ClientID  *string
+	Label     *string
+}
+
+func (sessionTable) TableName() string { return "auth_sessions" }
+
+type identityTable struct {
+	UserID  pg.ID     `gorm:"not null;index:auth_identities_user"`
+	Kind    string    `gorm:"primaryKey"`
+	Subject string    `gorm:"primaryKey"`
+	Created time.Time `gorm:"not null"`
+}
+
+func (identityTable) TableName() string { return "auth_identities" }
+
+// Track is auth's legacy migration history.
+//
+// Deprecated: Use [Schema] with migrate.Run; Track is removed in v0.9.0.
 var Track = migrate.Track{Name: "auth", Steps: []migrate.Step{
 	{Version: 1, Name: "accounts", Up: accountsUp, Down: accountsDown},
 	{Version: 2, Name: "usernames", Up: usernamesUp, Down: usernamesDown},

@@ -32,10 +32,10 @@ const (
 
 type passkey struct {
 	ID         []byte
-	UserID     pg.ID
-	Name       string
-	Credential pg.JSON[webauthn.Credential]
-	Created    time.Time
+	UserID     pg.ID                        `gorm:"not null;index:auth_passkeys_user"`
+	Name       string                       `gorm:"not null"`
+	Credential pg.JSON[webauthn.Credential] `gorm:"not null"`
+	Created    time.Time                    `gorm:"not null"`
 	Used       *time.Time
 }
 
@@ -43,12 +43,12 @@ func (passkey) TableName() string { return "auth_passkeys" }
 
 type ceremony struct {
 	ID        []byte
-	Kind      string
-	Session   pg.JSON[webauthn.SessionData]
+	Kind      string                        `gorm:"not null;check:auth_ceremonies_kind_check,kind IN ('login', 'register')"`
+	Session   pg.JSON[webauthn.SessionData] `gorm:"not null"`
 	UserID    *pg.ID
-	Library   string
-	Expires   time.Time
-	ClientID  *string
+	Library   string    `gorm:"not null"`
+	Expires   time.Time `gorm:"not null"`
+	ClientID  *string   `gorm:"check:auth_ceremonies_native_scope,(client_id IS NULL AND origin IS NULL AND session_id IS NULL) OR (client_id IS NOT NULL AND origin IS NOT NULL AND ((kind = 'login' AND session_id IS NULL) OR (kind = 'register' AND session_id IS NOT NULL)))"`
 	Origin    *string
 	SessionID *pg.ID
 }
