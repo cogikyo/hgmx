@@ -12,6 +12,7 @@ func Gorm(log *slog.Logger) *gorm.Config {
 	return &gorm.Config{
 		DisableAutomaticPing: true,
 		TranslateError:       true,
+		NamingStrategy:       naming{},
 		NowFunc:              func() time.Time { return time.Now().UTC() },
 		Logger: logger.NewSlogLogger(log, logger.Config{
 			SlowThreshold:             200 * time.Millisecond,
