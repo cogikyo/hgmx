@@ -1,4 +1,5 @@
-// Package migrate runs Go-defined Postgres schema steps through goose.
+// Package migrate applies Postgres schemas from GORM models and init SQL.
+// Use [Run]; the goose-based [Command] is deprecated.
 package migrate
 
 import (
@@ -19,6 +20,8 @@ import (
 
 // Step is a schema change; versions run 1, 2, 3, ... per track in list order.
 // Steps run in transactions with a 5-second lock_timeout unless NoTx is set.
+//
+// Deprecated: Use [Schema] with [Run]; Step is removed in v0.9.0.
 type Step struct {
 	Version int64
 	Name    string
@@ -31,6 +34,8 @@ type Step struct {
 // Track groups steps under an independent migration history.
 // An empty Name uses goose_db_version; other names use hgmx_<name>_migrations.
 // Names must match [a-z][a-z0-9_]{0,46} unless empty.
+//
+// Deprecated: Use [Schema] with [Run]; Track is removed in v0.9.0.
 type Track struct {
 	Name  string
 	Steps []Step
@@ -44,6 +49,8 @@ var trackName = regexp.MustCompile(`^[a-z][a-z0-9_]{0,46}$`)
 // Down defaults to the unnamed site track; pass a name to target another.
 // With steps, PGDATABASE is required and one session lock covers the command.
 // The pool needs two open connections, or three when running NoTx steps.
+//
+// Deprecated: Use [Run]; Command is removed in v0.9.0.
 func Command(ctx context.Context, db *gorm.DB, tracks []Track, args []string, out io.Writer) (retErr error) {
 	if len(args) == 0 || len(args) > 2 || (args[0] != "up" && args[0] != "down" && args[0] != "status") || (len(args) == 2 && args[0] != "down") {
 		return errors.New(usage)
