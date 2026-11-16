@@ -109,7 +109,7 @@ func migrateMain(args []string) int {
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	db, err := pg.Open(log)
 	if err == nil {
-		err = migrate.Command(context.Background(), db, []migrate.Track{auth.Track}, args, os.Stdout)
+		err = migrate.Run(context.Background(), db, []migrate.Schema{auth.Schema}, args, os.Stdout)
 	}
 	if err != nil {
 		log.Error("migrate", "err", err)

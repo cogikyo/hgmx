@@ -16,7 +16,6 @@ import (
 
 	"github.com/cogikyo/hgmx/library/routes"
 	"github.com/cogikyo/hgmx/library/store"
-	"github.com/cogikyo/hgmx/library/store/migrations"
 	"github.com/cogikyo/hgmx/library/views"
 )
 
@@ -83,7 +82,7 @@ func migrateMain(args []string) int {
 
 	db, err := pg.Open(log)
 	if err == nil {
-		err = migrate.Command(ctx, db, []migrate.Track{{Steps: migrations.All}}, args, os.Stdout)
+		err = migrate.Run(ctx, db, []migrate.Schema{store.Schema}, args, os.Stdout)
 	}
 	if err != nil {
 		log.ErrorContext(ctx, "migrate", "err", err)
