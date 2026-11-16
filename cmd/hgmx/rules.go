@@ -94,8 +94,8 @@ var (
 	}
 	ruleAutoMigrate = &rule{
 		"gorm/no-automigrate",
-		"schema changes run only as migrate steps during deploys, never at startup",
-		"write a migrate.Step in store/migrations",
+		"schema changes run only through migrate.Run, which holds the migration lock, commits enums first, and records init files",
+		"add the model to the package's migrate.Schema and let migrate.Run apply it",
 	}
 	ruleGlobal = &rule{
 		"gorm/no-global",

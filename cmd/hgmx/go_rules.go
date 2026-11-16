@@ -311,7 +311,7 @@ func callRule(p *packages.Package, call *ast.CallExpr, exitOK bool) (r *rule, ms
 	switch fn.Pkg().Path() {
 	case gormPath:
 		if name == "AutoMigrate" {
-			return ruleAutoMigrate, "AutoMigrate changes the schema outside a migration", ""
+			return ruleAutoMigrate, "AutoMigrate changes the schema outside migrate.Run", ""
 		}
 	case "net/http":
 		if recv := fn.Signature().Recv(); (name == "Set" || name == "Add") && recv != nil && isNamed(recv.Type(), "net/http", "Header") && cspLiteral(p, call.Args[0], call.Args[1]) {
