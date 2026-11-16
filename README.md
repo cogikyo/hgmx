@@ -61,6 +61,12 @@ Do not edit managed copies: the `hgmx-skills` check reports drift, and sync stop
 
 `auth` provides per-site passwordless accounts with passkeys, email codes and revocable sessions.
 See the [package docs](https://pkg.go.dev/github.com/cogikyo/hgmx/auth) for migration setup, `Config`, modes and styling hooks.
+Use `auth.ParseEmails(list)` to prepare addresses for `Host.Allow`; it normalises a comma-separated list, skips blanks and rejects invalid entries.
+
+Build the SMTP sender with `mail.FromEnv(password)`, passing the value read through a handle declared from `mail.PasswordCredential`.
+It returns `mail.ErrNoSMTP` when all settings are empty; the site chooses whether to allow a fallback.
+Partial settings or an invalid sender address return an error.
+
 With the database, mail queue and config ready:
 
 ```go
@@ -106,6 +112,7 @@ Before planning a store release, read [App Launch Requirements](CONVENTIONS.md#a
 - **`render`** buffers templ HTML with ETags and conditional requests.
 - **`telemetry`** exports OTLP/HTTP traces, logs and metrics from `OTEL_*` settings, with local logging and a browser beacon.
 - **`pg`** opens Postgres from `PG*` settings and supplies IDs, JSON, enums and query scopes; `pg/pgtest` supplies test databases.
+  - `pg.Open` stays lazy; use `pg.Ping(ctx, db)` to require connectivity at startup.
 - **`migrate`** runs Go-defined schema steps with transactions and a session lock.
 - **`static`** serves file sets at hashed URLs or fixed root URLs, with a disk-backed dev mode.
 - **`scripts`** serves selected htmx, hx-preload, navigation support, hyperscript and Motion scripts in dependency order.

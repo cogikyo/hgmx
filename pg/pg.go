@@ -3,7 +3,9 @@ package pg
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/cogikyo/hgmx/pg/internal/config"
 	"gorm.io/driver/postgres"
@@ -23,6 +25,20 @@ var (
 // The caller must [Close] the pool; SQL logs use placeholders, not bound values.
 func Open(log *slog.Logger) (*gorm.DB, error) {
 	return gorm.Open(postgres.New(postgres.Config{}), config.Gorm(log))
+}
+
+// Ping checks connectivity within 5 seconds without closing db on failure.
+func Ping(ctx context.Context, db *gorm.DB) error {
+	pool, err := db.DB()
+	if err != nil {
+		return fmt.Errorf("postgres: %w", err)
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	if err := pool.PingContext(ctx); err != nil {
+		return fmt.Errorf("postgres: %w", err)
+	}
+	return nil
 }
 
 // Close closes db's pool and returns ctx.Err() if ctx ends first.

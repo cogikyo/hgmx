@@ -696,6 +696,7 @@ Ordinary `go tool hgmx check` does not run live provider checks.
   - hgmx defines no database URL variable.
 - **`pg.Open` opens a lazy pool**, so serving can start without a reachable database.
   - The first query establishes connectivity.
+  - Opt into `pg.Ping(ctx, db)` to require connectivity at startup; it waits at most 5 seconds.
   - Close it on shutdown with `pg.Close`.
   - SQL logs retain placeholders and never include bound parameter values.
 - **`OTEL_*`** configures telemetry; export uses HTTP/protobuf.
@@ -712,6 +713,8 @@ Ordinary `go tool hgmx check` does not run live provider checks.
   - `auth.New` requires both `ClientID` and `ClientSecret` when `Config.Google` is set; it does not read credentials.
   - `$CREDENTIALS_DIRECTORY/google-client-secret` takes priority; if missing, `HGMX_GOOGLE_CLIENT_SECRET` is read instead.
 - **`HGMX_SMTP_HOST`, `HGMX_SMTP_USER`, `HGMX_SMTP_FROM`** configure the site's `mail.SMTP` sender.
+  - `mail.FromEnv(password)` reads these vars and validates the sender address; pass the credential value as `password`.
+  - All four values empty returns `mail.ErrNoSMTP`; a partial set returns an error naming the missing settings.
   - Use port 465, the default; `mail.SMTP` uses implicit TLS, not STARTTLS.
   - Cloudflare Email Sending uses host `smtp.mx.cloudflare.net` and user `api_token`.
   - One account-scoped token sends for every onboarded domain.

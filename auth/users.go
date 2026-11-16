@@ -2,6 +2,7 @@ package auth
 
 import (
 	"crypto/rand"
+	"fmt"
 	stdmail "net/mail"
 	"regexp"
 	"strings"
@@ -23,6 +24,23 @@ func parseEmail(raw string) (string, bool) {
 		return "", false
 	}
 	return email, true
+}
+
+// ParseEmails normalises a comma list like [User.Email] for [Host.Allow].
+// It skips blank entries and rejects invalid addresses or display names.
+func ParseEmails(list string) ([]string, error) {
+	var emails []string
+	for raw := range strings.SplitSeq(list, ",") {
+		if strings.TrimSpace(raw) == "" {
+			continue
+		}
+		email, ok := parseEmail(raw)
+		if !ok {
+			return nil, fmt.Errorf("auth: %q is not an email address", strings.TrimSpace(raw))
+		}
+		emails = append(emails, email)
+	}
+	return emails, nil
 }
 
 var nameChars = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
