@@ -518,6 +518,7 @@ _A fresh database must replay each step against the schema of its own time._
 **With `runtime.migrate = true`, the site unit runs `<site> migrate up` as `ExecStartPre`** on every start and restart, with the unit's user, environment, credentials and sandbox.
 The unit uses `Restart=always` with a 2-second restart delay.
 A failed migration prevents `ExecStart` and is retried; it does not leave the old process running.
+Production never runs `down`; rollback reverts binaries only.
 
 **While auth schema v5 is live, rollback to v0.3.0 or older weakens credential isolation.**
 Those binaries accept a copied native app token as a browser cookie on the same origin because they do not check `client_id`.
