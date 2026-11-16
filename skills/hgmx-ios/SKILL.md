@@ -46,6 +46,6 @@ The starter has no Google sign-in, and `init apps ios` rejects `--google-client-
 Apple sign-in is also absent; do not add a placeholder button or call the app buyer-launch ready.
 Follow App Launch Requirements for the content owner's Apple account, provider revocation, deletion and physical-device prerequisites.
 Preserve the documented foreground-refresh gap in any handoff until it is implemented and verified.
-When server sign-out is unconfirmed, the starter shows a recovery notice pointing to `<origin>/auth/account` → **Devices**; preserve that notice rather than promising remote revocation.
+When server sign-out is unconfirmed, the starter shows a recovery notice pointing to `<origin>/auth/account` → **Sessions**; preserve that notice rather than promising remote revocation.
 
 If `SITE.md` sits beside this file, read it; its rules override this skill.

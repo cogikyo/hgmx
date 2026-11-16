@@ -124,7 +124,7 @@ class Session(
             lock.withLock {
                 if (sent == generation) {
                     _warning.value = "You're signed out on this device, but the server didn't confirm it. " +
-                        "To end that session, sign in at ${api.origin}/auth/account and sign out $label under Devices."
+                        "To end that session, sign in at ${api.origin}/auth/account and sign out $label under Sessions."
                 }
             }
         }

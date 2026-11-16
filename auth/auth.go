@@ -69,7 +69,7 @@
 //
 // Auth ships no CSS; the site styles these hooks:
 //   - .auth[data-auth]: page roots (signin, code, link, email, account, continue or forbidden).
-//   - .auth-field: field labels, including the delete confirmation.
+//   - .auth-field: field wrappers, including the delete confirmation.
 //   - .auth-primary, .auth-secondary and .auth-danger: action buttons.
 //   - .auth-note: supporting text; .auth-problem: error messages.
 //   - .auth-passkeys and .auth-sessions: passkey and session lists.

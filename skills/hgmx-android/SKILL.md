@@ -41,6 +41,6 @@ From `apps/android/`, run `./gradlew :app:lintDebug :app:assembleDebug :app:asse
 Commit dependency locks and verification metadata, and verify dependency changes with a fresh Gradle cache so a warm cache cannot hide missing checksums.
 Builds do not prove the installed signer, passkeys, associations or store readiness.
 Preserve the documented foreground-refresh gap in handoffs until implemented and verified.
-When server sign-out is unconfirmed, the starter shows a recovery notice pointing to `<origin>/auth/account` → **Devices**; preserve that notice rather than promising remote revocation.
+When server sign-out is unconfirmed, the starter shows a recovery notice pointing to `<origin>/auth/account` → **Sessions**; preserve that notice rather than promising remote revocation.
 
 If `SITE.md` sits beside this file, read it; its rules override this skill.

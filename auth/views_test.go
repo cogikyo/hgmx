@@ -73,7 +73,7 @@ func TestCustomViews(t *testing.T) {
 		{"custom signin on a validation failure", "POST", apex + "/auth/code", url.Values{"email": {"nope"}, "next": {"//evil.example"}}, 422, "signin", `signin /auth/account</h1><p role="alert" data-auth-problem>Enter a valid email address.`, true, true},
 		{"default code page", "POST", apex + "/auth/code/verify", url.Values{"email": {"a@example.com"}, "code": {"x"}}, 422, "code", `<h1>Check your email</h1>`, false, true},
 		{"custom account", "GET", apex + "/auth/account", nil, 200, "account", `<h1 class="brand">account brand@example.com</h1>`, true, true},
-		{"custom account on a validation failure", "POST", apex + "/auth/account/username", url.Values{"username": {"a b"}}, 422, "account", `data-auth-problem>Usernames need`, true, true},
+		{"custom account on a validation failure", "POST", apex + "/auth/account/username", url.Values{"username": {"a b"}}, 422, "account", `data-auth-problem>Use 1–64 letters`, true, true},
 		{"defaults on the other host", "GET", admin + "/auth/signin", nil, 200, "signin", `<h1>Sign in</h1>`, true, false},
 	} {
 		status, body := serve(c.method, c.target, c.form)

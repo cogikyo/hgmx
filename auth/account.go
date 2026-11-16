@@ -24,6 +24,12 @@ var (
 	errRecent  = errors.New("auth: the session is too old for this change")
 )
 
+const (
+	nameRule     = "Use 1–64 letters (A–Z), digits, dots, dashes or underscores."
+	nameTaken    = "That username is taken. Choose another."
+	sentRecently = "A link was sent recently. Use the latest link or try again later."
+)
+
 func (a *Auth) account(w http.ResponseWriter, r *http.Request, h *host) {
 	s, ok := a.signedIn(w, r, h)
 	if !ok {
@@ -95,7 +101,7 @@ func (a *Auth) renderAccount(w http.ResponseWriter, r *http.Request, h *host, s 
 		Notice:     notice,
 	}
 	for _, row := range rows {
-		v.Sessions = append(v.Sessions, SessionRow{ID: row.ID.String(), Device: a.device(row), Seen: row.Seen, Current: row.ID == s.id})
+		v.Sessions = append(v.Sessions, SessionRow{ID: row.ID.String(), Device: a.device(row), Created: row.Created, Seen: row.Seen, Current: row.ID == s.id})
 	}
 	for _, k := range keys {
 		row := PasskeyRow{ID: encodeID(k.ID), Name: k.Name, Created: k.Created, Used: k.Used}
@@ -209,16 +215,16 @@ func (a *Auth) setUsername(w http.ResponseWriter, r *http.Request, h *host) {
 		return
 	}
 	if !validName(name, s.user.Email) {
-		msg := "Usernames need 1 to 64 letters, digits, dots, dashes or underscores."
+		msg := nameRule
 		if strings.Contains(name, "@") {
-			msg = "A username can contain @ only when it's your own email."
+			msg = "Use your account email as-is, or choose a username without @."
 		}
 		a.accountPage(w, r, h, s, http.StatusUnprocessableEntity, msg)
 		return
 	}
 	err := a.saveUsername(r.Context(), browser(r, h), s, name)
 	if errors.Is(err, pg.ErrDuplicate) {
-		a.accountPage(w, r, h, s, http.StatusConflict, "That username is taken.")
+		a.accountPage(w, r, h, s, http.StatusConflict, nameTaken)
 		return
 	}
 	if errors.Is(err, errMissing) {
@@ -280,7 +286,7 @@ func (a *Auth) changeEmail(w http.ResponseWriter, r *http.Request, h *host) {
 		return
 	}
 	if sent.limited {
-		a.accountPage(w, r, h, s, http.StatusTooManyRequests, "An email was sent to that address recently. Use the latest link, or ask again in a little while.")
+		a.accountPage(w, r, h, s, http.StatusTooManyRequests, sentRecently)
 		return
 	}
 	if sent.deliver {

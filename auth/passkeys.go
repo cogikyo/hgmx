@@ -25,6 +25,11 @@ const (
 	register = "register"
 )
 
+const (
+	addUnreadable = "The passkey couldn't be added. Try again."
+	addUnverified = "The passkey couldn't be verified. Try adding it again."
+)
+
 type passkey struct {
 	ID         []byte
 	UserID     pg.ID
@@ -329,12 +334,12 @@ func (a *Auth) addFinish(w http.ResponseWriter, r *http.Request, h *host) {
 		return
 	}
 	if parseErr != nil {
-		problem(w, http.StatusBadRequest, "That passkey response was not readable.")
+		problem(w, http.StatusBadRequest, addUnreadable)
 		return
 	}
 	name, u, err := a.finishAdd(r.Context(), browser(r, h), s, c, parsed)
 	if errors.Is(err, errUnverified) {
-		problem(w, http.StatusBadRequest, "That passkey could not be verified.")
+		problem(w, http.StatusBadRequest, addUnverified)
 		return
 	}
 	if errors.Is(err, errDenied) {

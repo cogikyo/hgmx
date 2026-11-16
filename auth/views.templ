@@ -104,15 +104,14 @@ templ accountBody(v AccountView) {
 		<p class="auth-note" role="status">{ v.Notice }</p>
 	}
 	<section>
-		<h2>Username</h2>
+		<h2><label for="auth-username">Username</label></h2>
 		<form method="post" action="/auth/account/username">
-			<label class="auth-field">
-				<span>Username</span>
-				<input name="username" value={ v.Username } maxlength="254" autocomplete="nickname" required/>
-			</label>
+			<div class="auth-field">
+				<input id="auth-username" name="username" value={ v.Username } maxlength="254" autocomplete="nickname" required/>
+			</div>
 			<button type="submit" class="auth-secondary">Save</button>
 		</form>
-		<p class="auth-note">Letters, digits, dots, dashes and underscores, or your own email.</p>
+		<p class="auth-note">Use 1–64 letters (A–Z), digits, dots, dashes or underscores—or your account email.</p>
 	</section>
 	<section>
 		<h2>Email</h2>
@@ -128,7 +127,7 @@ templ accountBody(v AccountView) {
 						<span>New email</span>
 						<input type="email" name="email" autocomplete="email" required/>
 					</label>
-					<button type="submit" class="auth-secondary">Change email</button>
+					<button type="submit" class="auth-secondary">Send confirmation link</button>
 				</form>
 			} else {
 				@reauth("to change your email")
@@ -168,8 +167,8 @@ templ accountBody(v AccountView) {
 			@reauth("to add or remove passkeys")
 		}
 		if len(v.Older) > 0 {
-			<h3>Older passkeys</h3>
-			<p class="auth-note">These were saved for an earlier address of this site and can't sign you in here.</p>
+			<h3>Other passkeys</h3>
+			<p class="auth-note">These passkeys can't sign you in at this address.</p>
 			<ul class="auth-passkeys">
 				for _, k := range v.Older {
 					<li>
@@ -189,7 +188,6 @@ templ accountBody(v AccountView) {
 		<section>
 			<h2>Google</h2>
 			if v.Linked {
-				<p class="auth-note">You can sign in with your linked Google account.</p>
 				if v.KeepGoogle {
 					<p class="auth-note">Google is your only way to sign in. Add a passkey before removing it.</p>
 				} else if v.Recent {
@@ -209,17 +207,21 @@ templ accountBody(v AccountView) {
 		</section>
 	}
 	<section>
-		<h2>Devices</h2>
+		<h2>Sessions</h2>
 		<ul class="auth-sessions">
 			for _, d := range v.Sessions {
 				<li>
-					<p>{ d.Device }</p>
-					if d.Current {
-						<p class="auth-note">This device.</p>
-					} else {
-						<p class="auth-note">Last active { date(d.Seen) }.</p>
+					<p>
+						{ d.Device }
+						if d.Current {
+							· This session
+						}
+					</p>
+					<p class="auth-note">Signed in { sessionDate(d.Created) }</p>
+					if !d.Current {
+						<p class="auth-note">Last active { date(d.Seen) }</p>
 						<form method="post" action={ "/auth/account/sessions/" + d.ID + "/revoke" }>
-							<button type="submit" class="auth-secondary">Sign out</button>
+							<button type="submit" class="auth-secondary">Sign out session</button>
 						</form>
 					}
 				</li>
@@ -227,13 +229,11 @@ templ accountBody(v AccountView) {
 		</ul>
 		if len(v.Sessions) > 1 {
 			<form method="post" action="/auth/account/signout-others">
-				<button type="submit" class="auth-secondary">Sign out other devices</button>
+				<button type="submit" class="auth-secondary">Sign out other sessions</button>
 			</form>
-		} else {
-			<p class="auth-note">You're not signed in anywhere else.</p>
 		}
 		<form method="post" action="/auth/signout">
-			<button type="submit" class="auth-secondary">Sign out</button>
+			<button type="submit" class="auth-secondary">Sign out here</button>
 		</form>
 	</section>
 	if v.Delete {
@@ -243,7 +243,7 @@ templ accountBody(v AccountView) {
 				<form method="post" action="/auth/account/delete">
 					<label class="auth-field">
 						<input type="checkbox" name="confirm" value="yes" required/>
-						<span>Delete my account and its passkeys</span>
+						<span>Permanently delete my account and passkeys</span>
 					</label>
 					<button type="submit" class="auth-danger">Delete account</button>
 				</form>

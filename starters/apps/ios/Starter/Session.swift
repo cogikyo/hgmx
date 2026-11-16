@@ -121,7 +121,7 @@ final class Session {
         let sent = generation
         Task {
             guard await !revoke(old), sent == generation else { return }
-            warning = "You're signed out on this device, but the server didn't confirm it. To end that session, sign in at \(api.origin)/auth/account and sign out \(label) under Devices."
+            warning = "You're signed out on this device, but the server didn't confirm it. To end that session, sign in at \(api.origin)/auth/account and sign out \(label) under Sessions."
         }
     }
 

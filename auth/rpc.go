@@ -248,14 +248,14 @@ func (s *authService) FinishPasskeyAdd(ctx context.Context, req *authv1.FinishPa
 	}
 	parsed, err := protocol.ParseCredentialCreationResponseBytes(req.GetCredentialJson())
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, "That passkey response was not readable.")
+		return nil, connect.NewError(connect.CodeInvalidArgument, addUnreadable)
 	}
 	name, u, err := s.a.finishAdd(ctx, c.caller, c.session, cer, parsed)
 	switch {
 	case errors.Is(err, errOrigin):
 		return nil, connect.NewError(connect.CodeInvalidArgument, "That passkey response doesn't belong to this app.")
 	case errors.Is(err, errUnverified):
-		return nil, connect.NewError(connect.CodeInvalidArgument, "That passkey could not be verified.")
+		return nil, connect.NewError(connect.CodeInvalidArgument, addUnverified)
 	case errors.Is(err, errStale):
 		return nil, fault(ctx, errRecent)
 	case err != nil:
@@ -452,7 +452,7 @@ func (s *authService) FinishGoogleLink(ctx context.Context, req *authv1.FinishGo
 	case taken:
 		return nil, connect.NewError(connect.CodeAlreadyExists, "That Google account is linked to another account here.")
 	case linked:
-		return nil, connect.NewError(connect.CodeAlreadyExists, "Your account already has a Google account. Remove it before linking another.")
+		return nil, connect.NewError(connect.CodeAlreadyExists, googleLinked)
 	default:
 		return nil, fault(ctx, errRecent)
 	}
@@ -547,12 +547,12 @@ func (s *authService) SetUsername(ctx context.Context, req *authv1.SetUsernameRe
 	c := callOf(ctx)
 	name := strings.TrimSpace(req.GetUsername())
 	if !validName(name, c.session.user.Email) {
-		return nil, connect.NewError(connect.CodeInvalidArgument, "Usernames need 1 to 64 letters, digits, dots, dashes or underscores.")
+		return nil, connect.NewError(connect.CodeInvalidArgument, nameRule)
 	}
 	err := s.a.saveUsername(ctx, c.caller, c.session, name)
 	switch {
 	case errors.Is(err, pg.ErrDuplicate):
-		return nil, connect.NewError(connect.CodeAlreadyExists, "That username is taken.")
+		return nil, connect.NewError(connect.CodeAlreadyExists, nameTaken)
 	case errors.Is(err, errMissing):
 		return nil, connect.NewError(connect.CodeAborted, "Your email changed while saving. Try again.")
 	case err != nil:
@@ -582,7 +582,7 @@ func (s *authService) ChangeEmail(ctx context.Context, req *authv1.ChangeEmailRe
 		return nil, fault(ctx, err)
 	}
 	if sent.limited {
-		return nil, connect.NewError(connect.CodeResourceExhausted, "An email was sent to that address recently. Use the latest link, or ask again in a little while.")
+		return nil, connect.NewError(connect.CodeResourceExhausted, sentRecently)
 	}
 	if sent.deliver {
 		s.a.notify(s.a.verifyMail(ctx, to, c.host.origin+confirmPath+"#"+sent.link))

@@ -29,6 +29,7 @@ const (
 	googleCallback = prefix + "google/callback"
 	flowCookie     = "__Host-oidc"
 	flowLife       = 10 * time.Minute
+	googleLinked   = "A Google account is already linked. Remove that link before linking another."
 )
 
 var googleIssuer = oidc.ProviderConfig{
@@ -333,7 +334,7 @@ func (a *Auth) googleCallback(w http.ResponseWriter, r *http.Request, h *host) {
 	}
 	q := r.URL.Query()
 	if q.Get("error") != "" {
-		fail(http.StatusBadRequest, "Google sign-in was cancelled.")
+		fail(http.StatusBadRequest, "Google sign-in wasn't completed. Try again.")
 		return
 	}
 	id, err := a.google.identify(r.Context(), f, q.Get("code"))
@@ -358,7 +359,7 @@ func (a *Auth) googleCallback(w http.ResponseWriter, r *http.Request, h *host) {
 		case taken:
 			fail(http.StatusConflict, "That Google account is linked to another account here.")
 		case linked:
-			fail(http.StatusConflict, "Your account already has a Google account. Remove it before linking another.")
+			fail(http.StatusConflict, googleLinked)
 		default:
 			fail(http.StatusForbidden, "Your sign-in changed while linking Google. Sign in again.")
 		}

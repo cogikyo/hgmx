@@ -338,7 +338,7 @@ The configured transport refuses redirects; do not add cookie authentication or 
 After mutations, apply the returned snapshot or reload it, and cancel screen work when its lifetime ends.
 Preserve the session generation guard so a late response cannot restore an old sign-in.
 Sign-out clears the local token, then attempts server revocation.
-If revocation is unconfirmed and the session has not changed, both starters show a notice directing the user to sign in at `<origin>/auth/account` and end that device's session under **Devices**.
+If revocation is unconfirmed and the session has not changed, both starters show a notice directing the user to sign in at `<origin>/auth/account` and end that device's session under **Sessions**.
 
 ### App Launch Requirements
 

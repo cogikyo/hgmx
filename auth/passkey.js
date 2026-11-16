@@ -35,7 +35,7 @@ function show(el, err) {
   const problem = el.closest("[data-auth]")?.querySelector("[data-auth-problem]");
   if (!problem) return;
   problem.textContent =
-    err.name === "NotAllowedError" ? "The passkey prompt was closed. Try again." : err.message;
+    err.name === "NotAllowedError" ? "The passkey step wasn't completed. Try again." : err.message;
 }
 
 let autofill;

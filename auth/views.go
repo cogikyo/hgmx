@@ -83,6 +83,7 @@ type PasskeyRow struct {
 type SessionRow struct {
 	ID      string
 	Device  string
+	Created time.Time // Sign-in time, not last activity.
 	Seen    time.Time
 	Current bool
 }
@@ -143,6 +144,8 @@ func (a *Auth) forbid(w http.ResponseWriter, r *http.Request, h *host, u User) {
 }
 
 func date(t time.Time) string { return t.UTC().Format("2 Jan 2006") }
+
+func sessionDate(t time.Time) string { return t.UTC().Format("2 Jan 2006, 15:04 UTC") }
 
 func used(t *time.Time) string {
 	if t == nil {
