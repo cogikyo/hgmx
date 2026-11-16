@@ -392,7 +392,8 @@ site/
 │   └── server/             # main.go, flags, credentials and command tests
 ├── routes/                 # URL table and HTTP handlers
 ├── store/                  # Store, models and queries
-│   └── migrations/         # All []migrate.Step
+│   ├── schema.go           # Schema registration
+│   └── init/               # optional pre/ and post/ SQL
 └── views/                  # embedded static files and page shell
     ├── pages/<name>/       # templ and view-model types
     └── components/<name>/  # copied and site-owned components
@@ -417,6 +418,8 @@ Each package may also import its own layer, subject to the page restriction belo
 | `store/migrations`     | `store/migrations/...` only                                 |
 | `views` and components | `views/...`, excluding `views/pages/...`                    |
 | `views/pages/...`      | `views/...`, including other page views                     |
+
+The `store/migrations` boundary applies only to the deprecated step-based path.
 
 **Views only render:** they do not import `net/http`, routes, middleware, store or domain packages.
 The table governs site-internal edges; standard-library and external imports remain available, except for the `net/http` and gorm restrictions.
@@ -474,8 +477,8 @@ The check exempts test files.
 - **`pg.JSON[T]` stores `V` as `jsonb`** and marshals as `V`, without a wrapper object.
   - SQL NULL scans to the zero value of `T`; saving writes non-NULL JSON, even for a nil value.
   - Use it on `NOT NULL DEFAULT` columns; it does not preserve SQL NULL.
-- **`pg.Enum[T]`** validates string values and creates or extends a Postgres enum in a migration.
-  - Keep each migration's values local to that migration, and use a new value in a later step.
+- **`pg.Enum[T]`** validates string values and creates or extends a Postgres enum.
+  - Register current values in `Schema.Enums`; `migrate.Run` commits them before models and init SQL.
 - **`pg.Page.Scope`** clamps a negative offset to zero, defaults a non-positive limit to 20 and caps it at 100.
   - `pg.List[T]` counts the supplied query, then fetches the requested page.
 - **`pg.Like`** trims the query and matches a case-insensitive substring, escaping `%`, `_` and `\`.
@@ -487,37 +490,63 @@ The check exempts test files.
 
 ### Gorm: No AutoMigrate
 
-**Site schema changes are `migrate.Step` entries in `store/migrations.All`.** Never call `AutoMigrate` or migrate at server startup.
-Versions must be exactly **1, 2, 3, … in list order within each track**; append steps without deleting or reordering applied ones.
+**Sites call `migrate.Run`, never `AutoMigrate` directly or migrations at server startup.**
+GORM models and tags define the target schema; `Run` supplies the lock, enum phase and init-file ledger.
 
-Pass `migrate.Track{Steps: migrations.All}` as the unnamed site track in the `[]migrate.Track` passed to `migrate.Command`, after any named library tracks.
-The site track keeps `goose_db_version`; named tracks use `hgmx_<name>_migrations`.
+**Do not switch a production site to `Run` until COGICTL's migrate gate is live; hgmx.dev moves first.**
+v0.8.0 provides the new API while existing sites stay on the old path until that gate is ready.
+Auth's schema is frozen until v0.9.0.
 
-- **`Up` is required.** A nil `Down` makes rollback fail and leaves the history row in place.
-- **Each step runs in a transaction** with a 5-second `lock_timeout`, unless `NoTx` is set.
-- **`NoTx` steps must be rerunnable:** the operation and its history row are not atomic.
-  - Keep one concurrent statement per step, plus the cleanup needed to retry it.
-  - For an index, run `DROP INDEX CONCURRENTLY IF EXISTS`, then `CREATE INDEX CONCURRENTLY`.
-  - Use separate `Exec` calls; a multi-statement call cannot run these outside a transaction.
-- **`migrate.Command`** accepts `up`, `down [track]` and `status`.
-  - `up` runs tracks in slice order; `status` lists every track.
-  - `down` rolls back one site step; `down auth` rolls back one step in the named `auth` track.
-  - With steps registered, all commands require `PGDATABASE` and ping the database.
-  - With steps registered, one session lock covers the whole command, including `status`.
-  - `status` can wait behind a deploy; it is not a lock-free probe.
-  - The pool needs at least two open connections, or three when running `NoTx` steps.
+### Register a Schema
 
-### Migrate: No Live Models
+Export `Schema` from `store/schema.go` as a `migrate.Schema` with a unique, non-empty `Name`, current `Enums` and all `Models`.
+Call `migrate.Run(ctx, db, []migrate.Schema{auth.Schema, store.Schema}, args, out)` from the site's migrate command; omit `auth.Schema` if unused.
+Put library schemas before site schemas that depend on them.
+`Run` requires `PGDATABASE` and accepts only `up`; it refuses `down` and `status`.
+The COGICTL gate owns schema comparison and deployment approval.
 
-**Migrations never import live models**, directly or through another package.
-Declare the columns a step needs inside that step, or write SQL.
-_A fresh database must replay each step against the schema of its own time._
+When SQL is needed, put files in `store/init/pre/*.sql` or `store/init/post/*.sql`.
+Import `embed`, declare `//go:embed init` above `var initFS embed.FS`, and set `Init: initFS` in `Schema`.
+Omit `Init` and the embed directive when there are no files; Go cannot embed an empty directory.
+Remove `store/migrations` when moving a site to this path.
+
+### Run Order and Init SQL
+
+One connection holds an advisory lock across both transactions:
+
+1. **Commit enums** for every schema in one transaction.
+2. **Apply schemas** in slice order in a second transaction.
+   - Run each schema's pre files, AutoMigrate its models, then run its post files.
+   - Rewrite the `hgmx_init` ledger after all schemas succeed.
+
+Each transaction sets a 5-second `lock_timeout`.
+With transactional init SQL, a failed second transaction rolls back its schema, SQL and ledger changes, but the enum labels remain committed.
+The ledger is a snapshot of `(schema, file, sha256)`, with paths such as `pre/fix.sql` and hashes of the exact file bytes.
+It is not migration history: **every file runs on every `up`**, in filename order within its phase, so SQL must be idempotent.
+Init SQL runs inside the second transaction: no `CONCURRENTLY`, `COMMIT` or `ROLLBACK`.
+A file that commits can persist changes before `Run` reports the violation.
+
+### Model Changes
+
+**Additive model changes need no SQL file.**
+For a changed CHECK, index or foreign key, add a small pre file that drops the old object with `IF EXISTS`; AutoMigrate recreates it from the model tag.
+The tag stays the only definition of that object.
+A drop or rename also needs a pre file to remove the old shape; preserve any data needed for a rename before dropping it.
+Delete the fix-up file once every database has crossed the change.
+
+GORM's generated names follow Postgres defaults: `<table>_<cols>_key`, `_check`, `_fkey` and `_idx`.
+Explicit tag names still take precedence.
+Use post files for work that needs the migrated tables, such as cross-package foreign keys or seeds.
+
+**Deprecated in v0.8.0:** `Step`, `Track`, `Command` and `auth.Track` still work and are removed in v0.9.0.
+Until cutover, keep applied steps unchanged and independent of live models; their import and `migrate/no-live-models` checks still apply.
 
 ### Deploy Contract
 
-**With `runtime.migrate = true`, the site unit runs `<site> migrate up` as `ExecStartPre`** on every start and restart, with the unit's user, environment, credentials and sandbox.
+**The legacy deploy hook uses `runtime.migrate = true` to run `<site> migrate up` as `ExecStartPre`** on every start and restart, with the unit's user, environment, credentials and sandbox.
 The unit uses `Restart=always` with a 2-second restart delay.
 A failed migration prevents `ExecStart` and is retried; it does not leave the old process running.
+Do not use this hook for `migrate.Run`; production cutover waits for the COGICTL gate above.
 Production never runs `down`; rollback reverts binaries only.
 
 **While auth schema v5 is live, rollback to v0.3.0 or older weakens credential isolation.**
@@ -525,7 +554,7 @@ Those binaries accept a copied native app token as a browser cookie on the same 
 Recover by deploying forward.
 
 **Expand, then contract:** add schema compatible with the old binary, deploy code that uses it, and remove obsolete schema in a later deploy after old binaries no longer need it.
-An applied migration can remain after a later step fails, so every intermediate schema must support the old binary.
+Committed enum additions, a successful `up`, or applied legacy steps can survive a later failure, so each resulting schema must support the rollback binary.
 
 **After Google identities exist, use the current CLI for account recovery.**
 An older binary's `auth reset` leaves linked Google accounts in place; deploy forward first if the current CLI is not available.

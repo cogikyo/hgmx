@@ -25,7 +25,8 @@ It keeps existing `.gitignore` content and appends `/server` if missing.
 The [site layout](CONVENTIONS.md#layout) keeps the root free of Go packages and process wiring beside `cmd/server/main.go`.
 The scaffold serves Home, About and a full-page 404 without Postgres, using system-ui and OFL-licensed Iosevka fonts.
 Set `PGHOST`, `PGDATABASE` and `PGUSER` for the database and `OTEL_*` for telemetry.
-Serving never migrates; read [the deploy contract](CONVENTIONS.md#deploy-contract) before schema changes.
+Serving never migrates; register GORM models with `migrate.Run` as described in [Migrations](CONVENTIONS.md#migrations).
+Production cutover waits for COGICTL's migrate gate; read [the deploy contract](CONVENTIONS.md#deploy-contract) before switching.
 
 ## Site Commands
 
@@ -113,7 +114,7 @@ Before planning a store release, read [App Launch Requirements](CONVENTIONS.md#a
 - **`telemetry`** exports OTLP/HTTP traces, logs and metrics from `OTEL_*` settings, with local logging and a browser beacon.
 - **`pg`** opens Postgres from `PG*` settings and supplies IDs, JSON, enums and query scopes; `pg/pgtest` supplies test databases.
   - `pg.Open` stays lazy; use `pg.Ping(ctx, db)` to require connectivity at startup.
-- **`migrate`** runs Go-defined schema steps with transactions and a session lock.
+- **`migrate`** applies GORM models and idempotent init SQL with an enum phase and a session lock.
 - **`static`** serves file sets at hashed URLs or fixed root URLs, with a disk-backed dev mode.
 - **`scripts`** serves selected htmx, hx-preload, navigation support, hyperscript and Motion scripts in dependency order.
 - **`palette`** generates OKLCH shades and semantic colour tokens from one seed.
