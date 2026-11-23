@@ -287,13 +287,17 @@ func (a *Auth) linkGoogle(ctx context.Context, c caller, s session, from *pg.ID,
 	case errors.Is(err, pg.ErrDuplicate):
 		return taken, u, nil
 	}
+	if err == nil && v == accepted {
+		a.notify(a.googleMail(ctx, c.host, u.Email, true))
+	}
 	return v, u, err
 }
 
 func (a *Auth) googleSignin(w http.ResponseWriter, r *http.Request, h *host) {
 	to := next(r.FormValue("next"))
 	if !h.begins.allow(clientip.From(r)) {
-		a.signinPage(w, r, h, http.StatusTooManyRequests, to, "", "Too many sign-in attempts. Try again in a few minutes.")
+		status, text := shown(errThrottled)
+		a.signinPage(w, r, h, status, to, "", text)
 		return
 	}
 	a.startFlow(w, r, h, signin, nil, to)
@@ -304,15 +308,14 @@ func (a *Auth) googleLink(w http.ResponseWriter, r *http.Request, h *host) {
 	if !ok {
 		return
 	}
-	if !s.recent() {
-		a.accountPage(w, r, h, s, http.StatusForbidden, "Sign in again to link Google.")
-		return
+	switch {
+	case !s.recent():
+		a.refused(w, r, h, s, errRecent)
+	case !h.begins.allow(clientip.From(r)):
+		a.refused(w, r, h, s, errThrottled)
+	default:
+		a.startFlow(w, r, h, link, &s.id, accountPath)
 	}
-	if !h.begins.allow(clientip.From(r)) {
-		a.accountPage(w, r, h, s, http.StatusTooManyRequests, "Too many attempts. Try again in a few minutes.")
-		return
-	}
-	a.startFlow(w, r, h, link, &s.id, accountPath)
 }
 
 func (a *Auth) googleCallback(w http.ResponseWriter, r *http.Request, h *host) {
@@ -352,7 +355,6 @@ func (a *Auth) googleCallback(w http.ResponseWriter, r *http.Request, h *host) {
 		}
 		switch v {
 		case accepted:
-			a.notify(a.googleMail(r.Context(), h, u.Email, true))
 			http.Redirect(w, r, accountPath, http.StatusSeeOther)
 		case denied:
 			a.forbid(w, r, h, u)
@@ -361,7 +363,7 @@ func (a *Auth) googleCallback(w http.ResponseWriter, r *http.Request, h *host) {
 		case linked:
 			fail(http.StatusConflict, googleLinked)
 		default:
-			fail(http.StatusForbidden, "Your sign-in changed while linking Google. Sign in again.")
+			fail(shown(errRecent))
 		}
 		return
 	}
@@ -389,31 +391,17 @@ func (a *Auth) googleUnlink(w http.ResponseWriter, r *http.Request, h *host) {
 	if !ok {
 		return
 	}
-	if !s.recent() {
-		a.accountPage(w, r, h, s, http.StatusForbidden, "Sign in again to remove Google.")
+	err := errRecent
+	if s.recent() {
+		err = a.unlinkGoogle(r.Context(), browser(r, h), s.user.ID)
+	}
+	if !errors.Is(err, errMissing) && a.refused(w, r, h, s, err) {
 		return
 	}
-	u, err := a.unlinkGoogle(r.Context(), browser(r, h), s.user.ID)
-	last := errors.Is(err, errLast)
-	if last {
-		err = nil
-	}
-	if errors.Is(err, errMissing) {
-		http.Redirect(w, r, accountPath, http.StatusSeeOther)
-		return
-	}
-	if a.refused(w, r, h, s, err) {
-		return
-	}
-	if last {
-		a.accountPage(w, r, h, s, http.StatusConflict, "Google is your only way to sign in. Add a passkey before removing it.")
-		return
-	}
-	a.notify(a.googleMail(r.Context(), h, u.Email, false))
 	http.Redirect(w, r, accountPath, http.StatusSeeOther)
 }
 
-func (a *Auth) unlinkGoogle(ctx context.Context, c caller, user pg.ID) (User, error) {
+func (a *Auth) unlinkGoogle(ctx context.Context, c caller, user pg.ID) error {
 	var u User
 	err := a.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var err error
@@ -436,5 +424,8 @@ func (a *Auth) unlinkGoogle(ctx context.Context, c caller, user pg.ID) (User, er
 		}
 		return res.Error
 	})
-	return u, err
+	if err == nil {
+		a.notify(a.googleMail(ctx, c.host, u.Email, false))
+	}
+	return err
 }

@@ -18,7 +18,6 @@ import (
 	"github.com/cogikyo/hgmx/pg"
 	appv1 "github.com/cogikyo/hgmx/proto/hgmx/app/v1"
 	"github.com/cogikyo/hgmx/proto/hgmx/app/v1/appv1connect"
-	authv1 "github.com/cogikyo/hgmx/proto/hgmx/auth/v1"
 	"github.com/cogikyo/hgmx/proto/hgmx/auth/v1/authv1connect"
 )
 
@@ -253,20 +252,9 @@ func fault(ctx context.Context, err error) error {
 		return nil
 	case errors.As(err, &ce):
 		return ce
-	case errors.Is(err, errStale), errors.Is(err, pg.ErrNotFound):
-		return connect.NewError(connect.CodeUnauthenticated, "Your session ended. Sign in again.")
-	case errors.Is(err, errRecent):
-		return detailed(connect.NewError(connect.CodeFailedPrecondition, "Sign in again to make this change."),
-			&authv1.SignInAgain{Message: "Sign in again to make this change."})
-	case errors.Is(err, errLast):
-		return detailed(connect.NewError(connect.CodeFailedPrecondition, "This is your only way to sign in. Add another one first."),
-			&authv1.LastSignInMethod{Message: "This is your only way to sign in. Add another one first."})
-	case errors.Is(err, errDenied):
-		return connect.NewError(connect.CodePermissionDenied, "This account can't sign in here.")
-	case errors.Is(err, errMissing):
-		return connect.NewError(connect.CodeNotFound, "That item no longer exists.")
-	case errors.Is(err, pg.ErrDuplicate):
-		return connect.NewError(connect.CodeAlreadyExists, "That already exists.")
+	}
+	if r, ok := reasonOf(err); ok {
+		return r.rpc()
 	}
 	slog.ErrorContext(ctx, "auth: rpc failed", "err", err)
 	return connect.NewError(connect.CodeInternal, "Something went wrong. Try again.").WithCause(err)

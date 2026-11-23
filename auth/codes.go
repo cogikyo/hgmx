@@ -18,6 +18,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/cogikyo/hgmx/clientip"
+	"github.com/cogikyo/hgmx/mail"
 	"github.com/cogikyo/hgmx/pg"
 )
 
@@ -33,6 +34,11 @@ const (
 )
 
 var digits = regexp.MustCompile(`^[0-9]{6}$`)
+
+func parseCode(raw string) (string, bool) {
+	guess := strings.Join(strings.Fields(raw), "")
+	return guess, digits.MatchString(guess)
+}
 
 type code struct {
 	ID        pg.ID
@@ -90,43 +96,46 @@ FROM auth_codes WHERE origin = ? AND email = ? AND purpose IN (?, ?) AND created
 	return n.Minute >= sendsPerMinute || n.Hour >= sendsPerHour, err
 }
 
-type sent struct {
-	code    string
-	link    string
-	limited bool
-	deliver bool
-	known   bool
-}
-
-func (a *Auth) issueCode(ctx context.Context, h *host, email string) (sent, error) {
-	var s sent
+func (a *Auth) issueCode(ctx context.Context, h *host, email string, compose func(pin, ticket string) mail.Message) error {
+	var pin, ticket string
+	var known bool
 	db := a.db.WithContext(ctx)
 	if err := sweep(db, a.library); err != nil {
-		return s, err
+		return err
 	}
 	err := db.Transaction(func(tx *gorm.DB) error {
 		if err := lock(tx, email); err != nil {
 			return err
 		}
-		var err error
-		if s.limited, err = throttled(tx, h.origin, email); err != nil || s.limited {
+		limited, err := throttled(tx, h.origin, email)
+		if err != nil {
 			return err
 		}
-		if err := tx.Raw("SELECT EXISTS (SELECT 1 FROM auth_users WHERE email = ?)", email).Scan(&s.known).Error; err != nil {
+		if limited {
+			return errTooSoon
+		}
+		if err := tx.Raw("SELECT EXISTS (SELECT 1 FROM auth_users WHERE email = ?)", email).Scan(&known).Error; err != nil {
 			return err
 		}
 		d, err := rand.Int(rand.Reader, big.NewInt(1_000_000))
 		if err != nil {
 			return err
 		}
-		s.code = fmt.Sprintf("%06d", d.Int64())
-		s.deliver = s.known || h.mode == Open
+		pin = fmt.Sprintf("%06d", d.Int64())
 		// Undelivered codes keep unknown addresses on the same rate-accounting path.
-		c, err := newCode(tx, a.key, code{Origin: h.origin, Email: email, Purpose: signin}, s.code, codeLife)
-		s.link = c.ID.String() + "." + mailSecret(a.key, c)
+		c, err := newCode(tx, a.key, code{Origin: h.origin, Email: email, Purpose: signin}, pin, codeLife)
+		ticket = c.ID.String() + "." + mailSecret(a.key, c)
 		return err
 	})
-	return s, err
+	if err != nil {
+		return err
+	}
+	// Compose unconditionally so timing does not reveal whether the address exists.
+	m := compose(pin, ticket)
+	if known || h.mode == Open {
+		a.notify(m)
+	}
+	return nil
 }
 
 type verdict int
@@ -221,7 +230,24 @@ func (a *Auth) checkCode(ctx context.Context, k caller, email, guess string) (ve
 		v, err = enter(tx, k, email)
 		return err
 	})
+	if err == nil && v.passkeys {
+		a.notify(a.signedInMail(ctx, k.host, email))
+	}
 	return v, admitted(err)
+}
+
+func (v verified) codeErr() error {
+	switch v.verdict {
+	case accepted:
+		return nil
+	case denied:
+		return errDenied
+	case wrong:
+		return errWrongCode
+	case exhausted:
+		return errExhausted
+	}
+	return errOldCode
 }
 
 func admitted(err error) error {
@@ -353,6 +379,9 @@ func (a *Auth) redeem(ctx context.Context, r *http.Request, h *host, raw string)
 	if errors.Is(err, pg.ErrNotFound) {
 		return verified{verdict: stale}, mailed, nil
 	}
+	if err == nil && mailed && v.passkeys {
+		a.notify(a.signedInMail(ctx, h, v.user.Email))
+	}
 	return v, mailed, admitted(err)
 }
 
@@ -364,28 +393,24 @@ func (a *Auth) sendCode(w http.ResponseWriter, r *http.Request, h *host) {
 	v := CodeView{Next: next(r.FormValue("next")), Open: h.mode == Open}
 	email, ok := parseEmail(r.FormValue("email"))
 	if !ok {
-		a.signinPage(w, r, h, http.StatusUnprocessableEntity, v.Next, r.FormValue("email"), "Enter a valid email address.")
+		status, text := shown(errBadEmail)
+		a.signinPage(w, r, h, status, v.Next, r.FormValue("email"), text)
 		return
 	}
 	v.Email = email
 	if !h.sends.allow(clientip.From(r)) {
-		a.signinPage(w, r, h, http.StatusTooManyRequests, v.Next, email, "Too many codes from this network. Try again later.")
+		status, text := shown(errThrottled)
+		a.signinPage(w, r, h, status, v.Next, email, text)
 		return
 	}
-	s, err := a.issueCode(r.Context(), h, email)
+	err := a.issueCode(r.Context(), h, email, func(pin, ticket string) mail.Message {
+		return a.codeMail(r.Context(), email, pin, h.origin+"/auth/link?"+url.Values{"next": {v.Next}}.Encode()+"#"+ticket)
+	})
+	status := http.StatusOK
 	if err != nil {
-		panic(err)
+		status, v.Problem = shown(err)
 	}
-	if s.limited {
-		v.Problem = "A code was sent recently. Use the latest one, or ask again in a little while."
-		a.codePage(w, r, h, http.StatusTooManyRequests, v)
-		return
-	}
-	m := a.codeMail(r.Context(), email, s.code, h.origin+"/auth/link?"+url.Values{"next": {v.Next}}.Encode()+"#"+s.link)
-	if s.deliver {
-		a.mail.Enqueue(m)
-	}
-	a.codePage(w, r, h, http.StatusOK, v)
+	a.codePage(w, r, h, status, v)
 }
 
 func (a *Auth) verifyCode(w http.ResponseWriter, r *http.Request, h *host) {
@@ -396,44 +421,37 @@ func (a *Auth) verifyCode(w http.ResponseWriter, r *http.Request, h *host) {
 	v := CodeView{Next: next(r.FormValue("next")), Open: h.mode == Open}
 	email, ok := parseEmail(r.FormValue("email"))
 	if !ok {
-		a.signinPage(w, r, h, http.StatusUnprocessableEntity, v.Next, "", "Enter a valid email address.")
+		status, text := shown(errBadEmail)
+		a.signinPage(w, r, h, status, v.Next, "", text)
 		return
 	}
 	v.Email = email
-	guess := strings.Join(strings.Fields(r.FormValue("code")), "")
-	if !digits.MatchString(guess) {
-		v.Problem = "Enter the 6-digit code from the email."
-		a.codePage(w, r, h, http.StatusUnprocessableEntity, v)
+	fail := func(err error) {
+		var status int
+		status, v.Problem = shown(err)
+		a.codePage(w, r, h, status, v)
+	}
+	guess, ok := parseCode(r.FormValue("code"))
+	if !ok {
+		fail(errBadCode)
 		return
 	}
 	if !h.verifies.allow(clientip.From(r)) {
-		v.Problem = "Too many tries from this network. Try again later."
-		a.codePage(w, r, h, http.StatusTooManyRequests, v)
+		fail(errThrottled)
 		return
 	}
 	res, err := a.checkCode(r.Context(), browser(r, h), email, guess)
 	if err != nil {
 		panic(err)
 	}
-	switch res.verdict {
-	case accepted:
-		if res.passkeys {
-			a.notify(a.signedInMail(r.Context(), h, email))
-		}
+	switch err := res.codeErr(); {
+	case err == nil:
 		setCookie(w, sessionCookie, res.token, sessionLife)
 		http.Redirect(w, r, v.Next, http.StatusSeeOther)
-		return
-	case denied:
+	case errors.Is(err, errDenied):
 		a.forbid(w, r, h, res.user)
-	case wrong:
-		v.Problem = "That code isn't right. Check the latest email and try again."
-		a.codePage(w, r, h, http.StatusUnprocessableEntity, v)
-	case stale:
-		v.Problem = "That code has expired or was replaced. Ask for a new one."
-		a.codePage(w, r, h, http.StatusUnprocessableEntity, v)
-	case exhausted:
-		v.Problem = "Too many wrong codes for this address. Use the link in the email, or try again tomorrow."
-		a.codePage(w, r, h, http.StatusTooManyRequests, v)
+	default:
+		fail(err)
 	}
 }
 
@@ -457,9 +475,6 @@ func (a *Auth) redeemLink(w http.ResponseWriter, r *http.Request, h *host) {
 	}
 	to := accountPath + "?" + url.Values{"next": {"/"}}.Encode()
 	if mailed {
-		if v.passkeys {
-			a.notify(a.signedInMail(r.Context(), h, v.user.Email))
-		}
 		to = next(r.FormValue("next"))
 	}
 	setCookie(w, sessionCookie, v.token, sessionLife)

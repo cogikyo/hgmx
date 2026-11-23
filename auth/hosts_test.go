@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/cogikyo/hgmx/mail"
 	"github.com/cogikyo/hgmx/pg"
 	"github.com/go-webauthn/webauthn/webauthn"
 )
@@ -119,11 +120,11 @@ func TestSendBudgetPerHost(t *testing.T) {
 		t.Fatal(err)
 	}
 	send := func(origin string) bool {
-		s, err := a.issueCode(t.Context(), at(a, origin), email)
-		if err != nil {
+		err := a.issueCode(t.Context(), at(a, origin), email, func(string, string) mail.Message { return mail.Message{} })
+		if err != nil && !errors.Is(err, errTooSoon) {
 			t.Fatal(err)
 		}
-		return s.limited
+		return err != nil
 	}
 	if send(apex) || !send(apex) {
 		t.Fatal("apex: want one code, then a limited send")

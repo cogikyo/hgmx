@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"net/http"
+	"slices"
 	"time"
 
 	"gorm.io/gorm"
@@ -184,6 +185,14 @@ func (a *Auth) signoutOthers(w http.ResponseWriter, r *http.Request, h *host) {
 		return
 	}
 	http.Redirect(w, r, accountPath, http.StatusSeeOther)
+}
+
+func (a *Auth) sessions(db *gorm.DB, h *host, user pg.ID) ([]sessionTable, error) {
+	var rows []sessionTable
+	now := time.Now()
+	err := db.Raw("SELECT id, client_id, label, created, seen, expires FROM auth_sessions WHERE user_id = ? AND origin = ? AND expires > ? AND seen > ? ORDER BY seen DESC, id",
+		user, h.origin, now, now.Add(-idleLife)).Scan(&rows).Error
+	return slices.DeleteFunc(rows, func(r sessionTable) bool { return r.ClientID != nil && a.apps[*r.ClientID] == nil }), err
 }
 
 func (a *Auth) revoke(ctx context.Context, c caller, user pg.ID, id *pg.ID) error {

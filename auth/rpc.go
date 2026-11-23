@@ -14,8 +14,8 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-webauthn/webauthn/protocol"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"gorm.io/gorm"
 
+	"github.com/cogikyo/hgmx/mail"
 	"github.com/cogikyo/hgmx/pg"
 	appv1 "github.com/cogikyo/hgmx/proto/hgmx/app/v1"
 	authv1 "github.com/cogikyo/hgmx/proto/hgmx/auth/v1"
@@ -72,11 +72,6 @@ func (a *Auth) googleOn(h *host) bool {
 
 type authService struct{ a *Auth }
 
-var (
-	tooMany = connect.NewError(connect.CodeResourceExhausted, "Too many attempts from this network. Try again later.")
-	expired = connect.NewError(connect.CodeInvalidArgument, "That took too long. Start again.")
-)
-
 func labeled(c caller, raw string) (caller, error) {
 	l := strings.TrimSpace(raw)
 	if len([]rune(l)) > 64 || strings.ContainsFunc(l, func(r rune) bool { return !unicode.IsPrint(r) }) {
@@ -104,31 +99,19 @@ func (s *authService) grant(ctx context.Context, c caller, token string) (*authv
 	if !ok {
 		return nil, errStale
 	}
-	acc, err := s.a.profile(ctx, c, cur)
+	acc, err := s.a.protoAccount(ctx, c, cur)
 	if err != nil {
 		return nil, err
 	}
 	return &authv1.SessionGrant{Token: token, ExpiresAt: timestamppb.New(cur.expires), Account: acc}, nil
 }
 
-func (a *Auth) profile(ctx context.Context, c caller, s session) (*authv1.Account, error) {
-	db := a.db.WithContext(ctx)
-	var u User
-	if err := db.Raw("SELECT "+userColumns+" FROM auth_users WHERE id = ?", s.user.ID).Take(&u).Error; err != nil {
-		return nil, err
-	}
-	var keys []passkey
-	if err := db.Select("id", "name", "credential", "created", "used").Where("user_id = ?", u.ID).Order("created").Find(&keys).Error; err != nil {
-		return nil, err
-	}
-	total, err := a.methods(db, c.host, u)
+func (a *Auth) protoAccount(ctx context.Context, c caller, s session) (*authv1.Account, error) {
+	p, err := a.loadProfile(a.db.WithContext(ctx), c.host, s.user)
 	if err != nil {
 		return nil, err
 	}
-	var linked bool
-	if err := db.Raw("SELECT EXISTS (SELECT 1 FROM auth_identities WHERE user_id = ? AND kind = ?)", u.ID, googleKind).Scan(&linked).Error; err != nil {
-		return nil, err
-	}
+	u := p.user
 	acc := &authv1.Account{
 		Id:          u.ID.String(),
 		Username:    u.Username,
@@ -145,29 +128,33 @@ func (a *Auth) profile(ctx context.Context, c caller, s session) (*authv1.Accoun
 	if u.Email != "" {
 		acc.Email = &u.Email
 	}
-	for _, k := range keys {
+	for _, k := range p.passkeys {
 		usable := compatible(k.Credential.V, a.rp)
-		p := &authv1.Passkey{Id: encodeID(k.ID), Name: k.Name, CreatedAt: timestamppb.New(k.Created), Usable: usable, Removable: !usable || total > 1}
+		key := &authv1.Passkey{Id: encodeID(k.ID), Name: k.Name, CreatedAt: timestamppb.New(k.Created), Usable: usable, Removable: !usable || p.methods > 1}
 		if k.Used != nil {
-			p.UsedAt = timestamppb.New(*k.Used)
+			key.UsedAt = timestamppb.New(*k.Used)
 		}
-		acc.Passkeys = append(acc.Passkeys, p)
+		acc.Passkeys = append(acc.Passkeys, key)
 	}
-	if linked {
-		acc.Identities = append(acc.Identities, &authv1.Identity{Provider: authv1.Provider_PROVIDER_GOOGLE, Removable: total > 1})
+	if p.linked {
+		acc.Identities = append(acc.Identities, &authv1.Identity{Provider: authv1.Provider_PROVIDER_GOOGLE, Removable: p.methods > 1})
 	}
 	return acc, nil
 }
 
 func (s *authService) current(ctx context.Context, c call) (*authv1.Account, error) {
-	acc, err := s.a.profile(ctx, c.caller, c.session)
+	cur, err := live(s.a.db.WithContext(ctx), c.caller, c.session.user.ID)
+	if err != nil {
+		return nil, fault(ctx, err)
+	}
+	acc, err := s.a.protoAccount(ctx, c.caller, cur)
 	return acc, fault(ctx, err)
 }
 
 func (s *authService) BeginPasskeySignin(ctx context.Context, _ *authv1.BeginPasskeySigninRequest) (*authv1.BeginPasskeySigninResponse, error) {
 	c := callOf(ctx)
 	if !c.host.begins.allow(c.ip) {
-		return nil, tooMany
+		return nil, fault(ctx, errThrottled)
 	}
 	options, t, err := s.a.beginLogin(ctx, c.caller)
 	if err != nil {
@@ -191,21 +178,14 @@ func (s *authService) FinishPasskeySignin(ctx context.Context, req *authv1.Finis
 		return nil, fault(ctx, err)
 	}
 	if !ok {
-		return nil, expired
+		return nil, fault(ctx, errExpired)
 	}
 	parsed, err := protocol.ParseCredentialRequestResponseBytes(req.GetCredentialJson())
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, "That passkey response was not readable.")
+		return nil, fault(ctx, errUnreadable)
 	}
 	t, err := s.a.passkeyLogin(ctx, k, cer, parsed)
-	switch {
-	case errors.Is(err, errUnknown):
-		return nil, connect.NewError(connect.CodeUnauthenticated, "That passkey is not registered here.")
-	case errors.Is(err, errOrigin):
-		return nil, connect.NewError(connect.CodeUnauthenticated, "That passkey response doesn't belong to this app.")
-	case errors.Is(err, errStale):
-		return nil, expired
-	case err != nil:
+	if err != nil {
 		return nil, fault(ctx, err)
 	}
 	g, err := s.grant(ctx, k, t)
@@ -221,7 +201,7 @@ func (s *authService) BeginPasskeyAdd(ctx context.Context, _ *authv1.BeginPasske
 		return nil, fault(ctx, err)
 	}
 	if !c.host.begins.allow(c.ip) {
-		return nil, tooMany
+		return nil, fault(ctx, errThrottled)
 	}
 	options, t, err := s.a.beginAdd(ctx, c.caller, c.session)
 	if err != nil {
@@ -241,27 +221,18 @@ func (s *authService) FinishPasskeyAdd(ctx context.Context, req *authv1.FinishPa
 		return nil, fault(ctx, err)
 	}
 	if !ok || cer.UserID == nil || *cer.UserID != c.session.user.ID || cer.SessionID == nil || *cer.SessionID != c.session.id {
-		return nil, expired
+		return nil, fault(ctx, errExpired)
 	}
 	if err := recently(c.session); err != nil {
 		return nil, fault(ctx, err)
 	}
 	parsed, err := protocol.ParseCredentialCreationResponseBytes(req.GetCredentialJson())
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, addUnreadable)
+		return nil, fault(ctx, errUnverified)
 	}
-	name, u, err := s.a.finishAdd(ctx, c.caller, c.session, cer, parsed)
-	switch {
-	case errors.Is(err, errOrigin):
-		return nil, connect.NewError(connect.CodeInvalidArgument, "That passkey response doesn't belong to this app.")
-	case errors.Is(err, errUnverified):
-		return nil, connect.NewError(connect.CodeInvalidArgument, addUnverified)
-	case errors.Is(err, errStale):
-		return nil, fault(ctx, errRecent)
-	case err != nil:
+	if err := s.a.finishAdd(ctx, c.caller, c.session, cer, parsed); err != nil {
 		return nil, fault(ctx, err)
 	}
-	s.a.notify(s.a.passkeyMail(ctx, c.host, u.Email, name, true))
 	acc, err := s.current(ctx, c)
 	return &authv1.FinishPasskeyAddResponse{Account: acc}, err
 }
@@ -272,11 +243,7 @@ func (s *authService) RenamePasskey(ctx context.Context, req *authv1.RenamePassk
 	if !ok {
 		return nil, fault(ctx, errMissing)
 	}
-	name := strings.TrimSpace(req.GetName())
-	if !validPasskeyName(name) {
-		return nil, connect.NewError(connect.CodeInvalidArgument, "Passkey names need 1 to 64 characters.")
-	}
-	if err := s.a.renamePasskey(ctx, c.caller, c.session.user.ID, id, name); err != nil {
+	if err := s.a.renamePasskey(ctx, c.caller, c.session.user.ID, id, req.GetName()); err != nil {
 		return nil, fault(ctx, err)
 	}
 	acc, err := s.current(ctx, c)
@@ -292,11 +259,9 @@ func (s *authService) RemovePasskey(ctx context.Context, req *authv1.RemovePassk
 	if !ok {
 		return nil, fault(ctx, errMissing)
 	}
-	name, u, err := s.a.removePasskey(ctx, c.caller, c.session.user.ID, id)
-	if err != nil {
+	if err := s.a.removePasskey(ctx, c.caller, c.session.user.ID, id); err != nil {
 		return nil, fault(ctx, err)
 	}
-	s.a.notify(s.a.passkeyMail(ctx, c.host, u.Email, name, false))
 	acc, err := s.current(ctx, c)
 	return &authv1.RemovePasskeyResponse{Account: acc}, err
 }
@@ -321,7 +286,7 @@ func (nativeFlow) TableName() string { return "auth_native_flows" }
 
 func (a *Auth) beginFlow(ctx context.Context, c caller, intent string, from *pg.ID) (*authv1.GoogleFlow, error) {
 	if !c.host.begins.allow(c.ip) {
-		return nil, tooMany
+		return nil, errThrottled
 	}
 	db := a.db.WithContext(ctx)
 	if err := sweep(db, a.library); err != nil {
@@ -372,14 +337,14 @@ func (a *Auth) proveGoogle(ctx context.Context, c caller, flow, raw, intent stri
 		return f, identity{}, err
 	}
 	if !ok {
-		return f, identity{}, expired
+		return f, identity{}, errExpired
 	}
 	id, err := a.googleToken(ctx, c.app, raw, f.Nonce)
 	if err != nil {
 		return f, id, connect.NewError(connect.CodeUnauthenticated, "That Google sign-in didn't check out. Try again.").WithCause(err)
 	}
 	if !time.Now().Before(f.Expires) {
-		return f, id, expired
+		return f, id, errExpired
 	}
 	return f, id, nil
 }
@@ -441,7 +406,7 @@ func (s *authService) FinishGoogleLink(ctx context.Context, req *authv1.FinishGo
 	if err != nil {
 		return nil, fault(ctx, err)
 	}
-	v, u, err := s.a.linkGoogle(ctx, c.caller, c.session, f.SessionID, id)
+	v, _, err := s.a.linkGoogle(ctx, c.caller, c.session, f.SessionID, id)
 	if err != nil {
 		return nil, fault(ctx, err)
 	}
@@ -456,7 +421,6 @@ func (s *authService) FinishGoogleLink(ctx context.Context, req *authv1.FinishGo
 	default:
 		return nil, fault(ctx, errRecent)
 	}
-	s.a.notify(s.a.googleMail(ctx, c.host, u.Email, true))
 	acc, err := s.current(ctx, c)
 	return &authv1.FinishGoogleLinkResponse{Account: acc}, err
 }
@@ -466,11 +430,9 @@ func (s *authService) UnlinkGoogle(ctx context.Context, _ *authv1.UnlinkGoogleRe
 	if err := recently(c.session); err != nil {
 		return nil, fault(ctx, err)
 	}
-	u, err := s.a.unlinkGoogle(ctx, c.caller, c.session.user.ID)
-	if err != nil {
+	if err := s.a.unlinkGoogle(ctx, c.caller, c.session.user.ID); err != nil {
 		return nil, fault(ctx, err)
 	}
-	s.a.notify(s.a.googleMail(ctx, c.host, u.Email, false))
 	acc, err := s.current(ctx, c)
 	return &authv1.UnlinkGoogleResponse{Account: acc}, err
 }
@@ -479,20 +441,16 @@ func (s *authService) SendCode(ctx context.Context, req *authv1.SendCodeRequest)
 	c := callOf(ctx)
 	email, ok := parseEmail(req.GetEmail())
 	if !ok {
-		return nil, connect.NewError(connect.CodeInvalidArgument, "Enter a valid email address.")
+		return nil, fault(ctx, errBadEmail)
 	}
 	if !c.host.sends.allow(c.ip) {
-		return nil, tooMany
+		return nil, fault(ctx, errThrottled)
 	}
-	sent, err := s.a.issueCode(ctx, c.host, email)
+	err := s.a.issueCode(ctx, c.host, email, func(pin, _ string) mail.Message {
+		return s.a.appCodeMail(ctx, email, pin)
+	})
 	if err != nil {
 		return nil, fault(ctx, err)
-	}
-	if sent.limited {
-		return nil, connect.NewError(connect.CodeResourceExhausted, "A code was sent recently. Use the latest one, or ask again in a little while.")
-	}
-	if sent.deliver {
-		s.a.notify(s.a.appCodeMail(ctx, email, sent.code))
 	}
 	return &authv1.SendCodeResponse{}, nil
 }
@@ -504,32 +462,21 @@ func (s *authService) VerifyCode(ctx context.Context, req *authv1.VerifyCodeRequ
 	}
 	email, ok := parseEmail(req.GetEmail())
 	if !ok {
-		return nil, connect.NewError(connect.CodeInvalidArgument, "Enter a valid email address.")
+		return nil, fault(ctx, errBadEmail)
 	}
-	guess := strings.Join(strings.Fields(req.GetCode()), "")
-	if !digits.MatchString(guess) {
-		return nil, connect.NewError(connect.CodeInvalidArgument, "Enter the 6-digit code from the email.")
+	guess, ok := parseCode(req.GetCode())
+	if !ok {
+		return nil, fault(ctx, errBadCode)
 	}
 	if !k.host.verifies.allow(k.ip) {
-		return nil, tooMany
+		return nil, fault(ctx, errThrottled)
 	}
 	v, err := s.a.checkCode(ctx, k, email, guess)
 	if err != nil {
 		return nil, fault(ctx, err)
 	}
-	switch v.verdict {
-	case accepted:
-	case denied:
-		return nil, fault(ctx, errDenied)
-	case wrong:
-		return nil, connect.NewError(connect.CodeInvalidArgument, "That code isn't right. Check the latest email and try again.")
-	case exhausted:
-		return nil, connect.NewError(connect.CodeResourceExhausted, "Too many wrong codes for this address. Try again tomorrow.")
-	default:
-		return nil, connect.NewError(connect.CodeInvalidArgument, "That code has expired or was replaced. Ask for a new one.")
-	}
-	if v.passkeys {
-		s.a.notify(s.a.signedInMail(ctx, k.host, email))
+	if err := v.codeErr(); err != nil {
+		return nil, fault(ctx, err)
 	}
 	g, err := s.grant(ctx, k, v.token)
 	if err != nil {
@@ -545,17 +492,7 @@ func (s *authService) GetAccount(ctx context.Context, _ *authv1.GetAccountReques
 
 func (s *authService) SetUsername(ctx context.Context, req *authv1.SetUsernameRequest) (*authv1.SetUsernameResponse, error) {
 	c := callOf(ctx)
-	name := strings.TrimSpace(req.GetUsername())
-	if !validName(name, c.session.user.Email) {
-		return nil, connect.NewError(connect.CodeInvalidArgument, nameRule)
-	}
-	err := s.a.saveUsername(ctx, c.caller, c.session, name)
-	switch {
-	case errors.Is(err, pg.ErrDuplicate):
-		return nil, connect.NewError(connect.CodeAlreadyExists, nameTaken)
-	case errors.Is(err, errMissing):
-		return nil, connect.NewError(connect.CodeAborted, "Your email changed while saving. Try again.")
-	case err != nil:
+	if err := s.a.saveUsername(ctx, c.caller, c.session, req.GetUsername()); err != nil {
 		return nil, fault(ctx, err)
 	}
 	acc, err := s.current(ctx, c)
@@ -567,25 +504,15 @@ func (s *authService) ChangeEmail(ctx context.Context, req *authv1.ChangeEmailRe
 	if err := recently(c.session); err != nil {
 		return nil, fault(ctx, err)
 	}
-	to, ok := parseEmail(req.GetEmail())
-	if !ok || to == c.session.user.Email {
-		return nil, connect.NewError(connect.CodeInvalidArgument, "Enter a new valid email address.")
-	}
-	if !c.host.sends.allow(c.ip) {
-		return nil, tooMany
-	}
-	sent, err := s.a.issueVerify(ctx, c.caller, c.session.user.ID, to)
-	if errors.Is(err, errStale) {
-		err = errRecent
-	}
+	to, err := newEmail(req.GetEmail(), c.session.user.Email)
 	if err != nil {
 		return nil, fault(ctx, err)
 	}
-	if sent.limited {
-		return nil, connect.NewError(connect.CodeResourceExhausted, sentRecently)
+	if !c.host.sends.allow(c.ip) {
+		return nil, fault(ctx, errThrottled)
 	}
-	if sent.deliver {
-		s.a.notify(s.a.verifyMail(ctx, to, c.host.origin+confirmPath+"#"+sent.link))
+	if err := s.a.issueVerify(ctx, c.caller, c.session.user.ID, to); err != nil {
+		return nil, fault(ctx, err)
 	}
 	return &authv1.ChangeEmailResponse{}, nil
 }
@@ -647,36 +574,13 @@ func (s *authService) SignOut(ctx context.Context, _ *authv1.SignOutRequest) (*a
 func (s *authService) DeleteAccount(ctx context.Context, req *authv1.DeleteAccountRequest) (*authv1.DeleteAccountResponse, error) {
 	c := callOf(ctx)
 	if !req.GetConfirm() {
-		return nil, connect.NewError(connect.CodeInvalidArgument, "Confirm deleting your account.")
+		return nil, fault(ctx, errUnconfirmed)
 	}
 	if err := recently(c.session); err != nil {
 		return nil, fault(ctx, err)
 	}
-	err := s.a.erase(ctx, c.caller, c.session)
-	switch {
-	case errors.Is(err, pg.ErrForeignKey):
-		return nil, connect.NewError(connect.CodeFailedPrecondition, "This account still owns data on this site, so it can't be deleted here.")
-	case errors.Is(err, errStale):
-		return nil, fault(ctx, errRecent)
-	case err != nil:
+	if err := s.a.erase(ctx, c.caller, c.session); err != nil {
 		return nil, fault(ctx, err)
 	}
 	return &authv1.DeleteAccountResponse{}, nil
-}
-
-type sessionRow struct {
-	ID       pg.ID
-	ClientID *string
-	Label    *string
-	Created  time.Time
-	Seen     time.Time
-	Expires  time.Time
-}
-
-func (a *Auth) sessions(db *gorm.DB, h *host, user pg.ID) ([]sessionRow, error) {
-	var rows []sessionRow
-	now := time.Now()
-	err := db.Raw("SELECT id, client_id, label, created, seen, expires FROM auth_sessions WHERE user_id = ? AND origin = ? AND expires > ? AND seen > ? ORDER BY seen DESC, id",
-		user, h.origin, now, now.Add(-idleLife)).Scan(&rows).Error
-	return slices.DeleteFunc(rows, func(r sessionRow) bool { return r.ClientID != nil && a.apps[*r.ClientID] == nil }), err
 }

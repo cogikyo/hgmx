@@ -52,7 +52,8 @@ func (a *Auth) refused(w http.ResponseWriter, r *http.Request, h *host, s sessio
 	case errors.Is(err, errDenied):
 		a.forbid(w, r, h, s.user)
 	default:
-		panic(err)
+		status, text := shown(err)
+		a.accountPage(w, r, h, s, status, text)
 	}
 	return true
 }
@@ -65,11 +66,12 @@ func writeJSON(w http.ResponseWriter, v any) {
 	}
 }
 
-func problem(w http.ResponseWriter, status int, msg string) {
+func problem(w http.ResponseWriter, err error) {
+	status, text := shown(err)
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]string{"problem": msg})
+	json.NewEncoder(w).Encode(map[string]string{"problem": text})
 }
 
 func next(raw string) string {

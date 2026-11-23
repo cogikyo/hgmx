@@ -357,9 +357,9 @@ func TestUsernameAt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ch, err := a.confirm(t.Context(), at(a, apex), pending(t, a, u.ID, "new@example.com"))
-	if err != nil || ch.verdict != accepted {
-		t.Fatalf("confirm: verdict %d, err %v; want accepted", ch.verdict, err)
+	v, err := a.confirm(t.Context(), at(a, apex), pending(t, a, u.ID, "new@example.com"))
+	if err != nil || v != accepted {
+		t.Fatalf("confirm: verdict %d, err %v; want accepted", v, err)
 	}
 	if _, err := createUser(a.db, "old@example.com"); err != nil {
 		t.Fatalf("a new user for the released address: %v", err)
@@ -473,9 +473,9 @@ func TestOldResetCancelsEmailChange(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ch, err := a.confirm(t.Context(), at(a, apex), raw)
-	if err != nil || ch.verdict == accepted {
-		t.Fatalf("confirm after a v1 reset: verdict %d, err %v; want refused", ch.verdict, err)
+	v, err := a.confirm(t.Context(), at(a, apex), raw)
+	if err != nil || v == accepted {
+		t.Fatalf("confirm after a v1 reset: verdict %d, err %v; want refused", v, err)
 	}
 	if got, err := findUser(a.db, "victim@example.com"); err != nil || got.ID != u.ID {
 		t.Fatalf("victim's email after the refused change: %v, %v", got, err)
@@ -489,4 +489,29 @@ func attested(t *testing.T, rp, id string) webauthn.Credential {
 		t.Fatal(err)
 	}
 	return webauthn.Credential{ID: []byte(id), Attestation: webauthn.CredentialAttestation{Object: object}}
+}
+
+func TestChangeEmailThrottleHidesTakenAddress(t *testing.T) {
+	a := setup(t)
+	h := at(a, apex)
+	if _, err := createUser(a.db, "taken@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	u, err := createUser(a.db, "me@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, err := startSession(a.db, caller{host: h}, u.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := caller{host: h, token: token}
+	for _, to := range []string{"taken@example.com", "free@example.com"} {
+		if err := a.issueVerify(t.Context(), c, u.ID, to); err != nil {
+			t.Fatalf("first change to %s: %v", to, err)
+		}
+		if err := a.issueVerify(t.Context(), c, u.ID, to); !errors.Is(err, errTooSoon) {
+			t.Fatalf("second change to %s: %v, want errTooSoon", to, err)
+		}
+	}
 }
