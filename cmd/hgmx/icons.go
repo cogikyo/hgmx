@@ -1,10 +1,7 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -425,9 +422,12 @@ func syncIcons(root *os.Root, cat iconCatalog, mode iconMode, add []string) (ico
 		}
 	}
 	slices.Sort(list)
-	lock, err := readIconSum(root)
+	lock, _, err := readLedger(root, iconsSum, "svg/<name>.svg or anim/<name>.js", func(rel string) bool {
+		name, ok := relIcon(rel)
+		return ok && iconName.MatchString(name)
+	})
 	if err != nil {
-		return res, err
+		return res, fmt.Errorf("%s: %w", iconsSum, err)
 	}
 	p, err := planIcons(list, lock, disk, cat, mode)
 	if err != nil {
@@ -550,35 +550,14 @@ func readIconList(root *os.Root, create bool) ([]string, error) {
 	return list, nil
 }
 
-func readIconSum(root *os.Root) (map[string]string, error) {
-	out := map[string]string{}
-	data, err := root.ReadFile(iconsSum)
-	if errors.Is(err, fs.ErrNotExist) {
-		return out, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	sc := bufio.NewScanner(bytes.NewReader(data))
-	for n := 1; sc.Scan(); n++ {
-		hash, rel, ok := strings.Cut(sc.Text(), "  ")
-		name, isIcon := relIcon(rel)
-		if _, err := hex.DecodeString(hash); !ok || err != nil || len(hash) != sha256.Size*2 || !isIcon || !iconName.MatchString(name) {
-			return nil, fmt.Errorf("%s line %d: want <sha256>  svg/<name>.svg or anim/<name>.js", iconsSum, n)
-		}
-		out[rel] = hash
-	}
-	return out, sc.Err()
-}
-
 type iconPlan struct {
 	items []iconItem
 	list  []string
 	files map[string][]byte
-	lock  map[string]string
+	lock  ledger
 }
 
-func planIcons(list []string, lock map[string]string, disk map[string][]byte, cat iconCatalog, mode iconMode) (*iconPlan, error) {
+func planIcons(list []string, lock ledger, disk map[string][]byte, cat iconCatalog, mode iconMode) (*iconPlan, error) {
 	p := &iconPlan{files: maps.Clone(disk), lock: maps.Clone(lock)}
 	byName := map[string]bool{}
 	for _, m := range []map[string]string{lock, hashes(disk)} {
@@ -723,7 +702,7 @@ func (p *iconPlan) judge(name string, cat iconCatalog, mode iconMode) iconVerdic
 			return iconCurrent
 		}
 		for _, rel := range rels {
-			if l[rel] != "" && l[rel] != k[rel] && l[rel] != c[rel] {
+			if judge(c[rel], l[rel], k[rel]).blocks() {
 				return iconUnlisted
 			}
 		}
@@ -741,26 +720,26 @@ func (p *iconPlan) judge(name string, cat iconCatalog, mode iconMode) iconVerdic
 	if len(l) == 0 {
 		return iconCopy
 	}
-	var edited, stale bool
+	var local, upstream bool
 	for _, rel := range rels {
-		switch {
-		case l[rel] == c[rel]:
-		case l[rel] != k[rel]:
-			edited = true
+		switch d := judge(c[rel], l[rel], k[rel]); {
+		case d == current:
+		case d.blocks(), d == missing && k[rel] != "":
+			local = true
 		case len(k) > 0:
-			stale = true
+			upstream = true
 		}
 	}
 	switch {
-	case edited && len(k) == 0:
+	case local && len(k) == 0:
 		return iconForeign
-	case edited && maps.Equal(k, c):
+	case local && maps.Equal(k, c):
 		return iconEdited
-	case edited:
+	case local:
 		return iconConflict
-	case stale && mode.refresh:
+	case upstream && mode.refresh:
 		return iconRefresh
-	case stale:
+	case upstream:
 		return iconStale
 	case !maps.Equal(l, c):
 		return iconCopy
@@ -768,14 +747,6 @@ func (p *iconPlan) judge(name string, cat iconCatalog, mode iconMode) iconVerdic
 		return iconAdopt
 	}
 	return iconCurrent
-}
-
-func hashes(files map[string][]byte) map[string]string {
-	out := make(map[string]string, len(files))
-	for rel, data := range files {
-		out[rel] = hashOf(data)
-	}
-	return out
 }
 
 func (p *iconPlan) generate(root *os.Root, cat iconCatalog) (map[string][]byte, error) {
@@ -818,15 +789,11 @@ func (p *iconPlan) generate(root *os.Root, cat iconCatalog) (map[string][]byte, 
 	if err != nil {
 		return nil, err
 	}
-	var sum bytes.Buffer
-	for _, rel := range slices.Sorted(maps.Keys(p.lock)) {
-		fmt.Fprintf(&sum, "%s  %s\n", p.lock[rel], rel)
-	}
 	return map[string][]byte{
 		iconsList: append(list, '\n'),
 		iconsTags: append(tagsJSON, '\n'),
 		iconsGo:   code,
-		iconsSum:  sum.Bytes(),
+		iconsSum:  p.lock.format(),
 	}, nil
 }
 

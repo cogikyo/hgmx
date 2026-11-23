@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -99,7 +98,7 @@ func initAppsCmd(platform string, id identity) (code int) {
 		log.Error("Refusing to adopt the "+platform+" starter", slog.String("error", err.Error()))
 		return 1
 	}
-	if err := install(s, appStarters[platform].dir, files); err != nil {
+	if err := install(s, appStarters[platform].dir, files, log); err != nil {
 		log.Error("Failed to write the starter", slog.String("error", err.Error()))
 		return 1
 	}
@@ -108,29 +107,46 @@ func initAppsCmd(platform string, id identity) (code int) {
 	return 0
 }
 
-func install(s site, dir string, files []starterFile) error {
+func install(s site, dir string, files []starterFile, log *slog.Logger) (err error) {
 	root, err := os.OpenRoot(s.dir)
 	if err != nil {
 		return err
 	}
 	defer root.Close()
-	tmp := path.Join(path.Dir(dir), "."+path.Base(dir)+".hgmx-"+rand.Text())
+	leftovers, err := fs.Glob(root.FS(), tempGlob(dir))
+	if err != nil {
+		return err
+	}
+	for _, l := range leftovers {
+		log.Warn("Left a possible staging directory from an interrupted adoption in place; delete it if no adoption is running", slog.String("dir", l))
+	}
+	if err := root.MkdirAll(path.Dir(dir), 0o755); err != nil {
+		return err
+	}
+	tmp := tempName(dir)
+	if err := root.Mkdir(tmp, 0o755); err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			err = errors.Join(err, root.RemoveAll(tmp))
+		}
+	}()
 	for _, f := range files {
 		name := path.Join(tmp, f.path)
 		if err := root.MkdirAll(path.Dir(name), 0o755); err != nil {
-			return errors.Join(err, root.RemoveAll(tmp))
+			return err
 		}
 		if err := root.WriteFile(name, f.data, f.mode); err != nil {
-			return errors.Join(err, root.RemoveAll(tmp))
+			return err
 		}
 	}
-	if err := root.Rename(tmp, dir); err != nil {
-		return errors.Join(err, root.RemoveAll(tmp))
-	}
 	if _, err := root.Lstat(compatFile); errors.Is(err, fs.ErrNotExist) {
-		return writeRoot(root, compatFile, []byte(compatInitial))
+		if err := writeRoot(root, compatFile, []byte(compatInitial)); err != nil {
+			return err
+		}
 	}
-	return nil
+	return root.Rename(tmp, dir)
 }
 
 type starterFile struct {

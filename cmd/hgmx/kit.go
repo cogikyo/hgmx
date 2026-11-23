@@ -20,21 +20,35 @@ import (
 
 	"github.com/cogikyo/hgmx"
 	"github.com/cogikyo/hgmx/proto"
+	"github.com/cogikyo/hgmx/starters"
 )
 
 const (
 	bufFile     = "buf.yaml"
 	managedDir  = "proto/hgmx"
+	kitSum      = managedDir + "/hgmx.sum"
 	compatFile  = "apps/compatibility.json"
 	androidLock = "apps/android/app/gradle.lockfile"
 	iosLock     = "apps/ios/Starter.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
 )
 
-var managedHistory = map[string][]string{}
-
 var mobileRuntimes = map[string]string{
-	"com.google.protobuf:protobuf-javalite": "4.36.2",
+	"com.google.protobuf:protobuf-javalite": starterVersion("protobuf"),
 	"com.connectrpc:connect-kotlin":         connectKotlin.version,
+}
+
+func starterVersion(key string) string {
+	data, err := starters.FS.ReadFile("apps/android/gradle/libs.versions.toml")
+	if err != nil {
+		panic(err)
+	}
+	for line := range strings.Lines(string(data)) {
+		k, v, ok := strings.Cut(line, "=")
+		if ok && strings.TrimSpace(k) == key {
+			return strings.Trim(strings.TrimSpace(v), `"`)
+		}
+	}
+	panic("the Android starter's libs.versions.toml pins no " + key)
 }
 
 type platform struct {
@@ -52,6 +66,7 @@ var platforms = []platform{
 type kit struct {
 	site
 	self      bool
+	shipped   map[string][]byte
 	platforms []platform
 	skipped   []string
 	apps      bool
@@ -91,6 +106,20 @@ func loadKit(s site, skip []string, log *slog.Logger) (*kit, error) {
 		return nil, nil
 	}
 	k.platforms = append([]platform{platforms[0]}, k.platforms...)
+	if k.self {
+		return k, nil
+	}
+	k.shipped = map[string][]byte{bufFile: hgmx.BufYAML}
+	err := fs.WalkDir(proto.FS, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		k.shipped["proto/"+p], err = proto.FS.ReadFile(p)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
 	return k, nil
 }
 
@@ -112,70 +141,94 @@ func exists(name string) bool {
 	return err == nil
 }
 
-func temp(name string) bool {
-	return strings.HasPrefix(name, ".") && strings.Contains(name, ".hgmx-")
+type inputs struct {
+	plan    *copyPlan
+	temps   []string
+	refused []string
 }
 
-func (k *kit) managed() (changes []change, refused []string, err error) {
-	want := map[string][]byte{bufFile: hgmx.BufYAML}
-	if !k.self {
-		err := fs.WalkDir(proto.FS, ".", func(p string, d fs.DirEntry, err error) error {
-			if err != nil || d.IsDir() {
-				return err
-			}
-			want["proto/"+p], err = proto.FS.ReadFile(p)
-			return err
-		})
-		if err != nil {
-			return nil, nil, err
-		}
-	}
-	for _, rel := range slices.Sorted(maps.Keys(want)) {
-		got, err := os.ReadFile(k.path(rel))
-		switch {
-		case errors.Is(err, fs.ErrNotExist):
-			changes = append(changes, change{rel, want[rel], "missing"})
-		case err != nil:
-			return nil, nil, err
-		case bytes.Equal(got, want[rel]):
-		case slices.Contains(managedHistory[rel], hashOf(got)):
-			changes = append(changes, change{rel, want[rel], "out of date"})
-		default:
-			refused = append(refused, rel+": differs from hgmx's copy; managed contracts are not edited in sites, so restore it with git checkout or delete it")
-		}
-	}
-	leftovers, err := filepath.Glob(k.path("." + bufFile + ".hgmx-*"))
-	if err != nil {
-		return nil, nil, err
-	}
-	for _, l := range leftovers {
-		changes = append(changes, change{filepath.Base(l), nil, "interrupted write"})
-	}
+func (k *kit) inputs(root *os.Root) (*inputs, error) {
 	if k.self {
-		return changes, refused, nil
+		return &inputs{plan: &copyPlan{}}, nil
 	}
-	err = filepath.WalkDir(k.path(managedDir), func(name string, d fs.DirEntry, err error) error {
+	rec, _, err := readLedger(root, kitSum, bufFile+" or "+managedDir+"/<file>", func(rel string) bool {
+		return rel == bufFile || fs.ValidPath(rel) && strings.HasPrefix(rel, managedDir+"/") && rel != kitSum
+	})
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w; delete it, then run go tool hgmx gen", kitSum, err)
+	}
+	plan, err := planCopy(root, kitSum, rec, k.shipped)
+	if err != nil {
+		return nil, err
+	}
+	in := &inputs{plan: plan}
+	for _, f := range plan.files {
+		_, ok := k.shipped[f.rel]
+		switch {
+		case !f.drift.blocks():
+		case !ok:
+			in.refused = append(in.refused, f.rel+": edited, and hgmx no longer ships it; move site changes under proto/<site>/, then delete it")
+		default:
+			in.refused = append(in.refused, f.rel+": differs from hgmx's copy; managed contracts are not edited in sites, so restore it with git checkout or delete it")
+		}
+	}
+	if in.temps, err = fs.Glob(root.FS(), tempGlob(bufFile)); err != nil {
+		return nil, err
+	}
+	err = fs.WalkDir(root.FS(), managedDir, func(rel string, d fs.DirEntry, err error) error {
 		if errors.Is(err, fs.ErrNotExist) {
 			return nil
 		}
 		if err != nil || d.IsDir() {
 			return err
 		}
-		rel, err := filepath.Rel(k.dir, name)
-		if err != nil {
-			return err
-		}
-		rel = filepath.ToSlash(rel)
+		_, ok := k.shipped[rel]
+		_, had := rec[rel]
 		switch {
-		case want[rel] != nil, goOutput(d.Name()):
+		case ok, had, rel == kitSum, goOutput(d.Name()):
 		case temp(d.Name()):
-			changes = append(changes, change{rel, nil, "interrupted write"})
+			in.temps = append(in.temps, rel)
 		default:
-			refused = append(refused, rel+": not shipped by hgmx; proto/hgmx holds only hgmx's contracts, so move it under proto/<site>/")
+			in.refused = append(in.refused, rel+": not shipped by hgmx; proto/hgmx holds only hgmx's contracts, so move it under proto/<site>/")
 		}
 		return nil
 	})
-	return changes, refused, err
+	return in, err
+}
+
+func (in *inputs) stale() []string {
+	var out []string
+	for _, f := range in.plan.files {
+		switch f.drift {
+		case missing:
+			out = append(out, f.rel+": missing")
+		case stale:
+			out = append(out, f.rel+": out of date")
+		case dropped:
+			out = append(out, f.rel+": no longer shipped by hgmx")
+		}
+	}
+	if len(out) == 0 && !in.plan.recorded() {
+		out = append(out, kitSum+": out of date")
+	}
+	for _, rel := range in.temps {
+		out = append(out, rel+": interrupted write")
+	}
+	return out
+}
+
+func (in *inputs) sync(root *os.Root) (wrote, removed int, err error) {
+	if len(in.refused) > 0 {
+		return 0, 0, errors.New(strings.Join(in.refused, "\n"))
+	}
+	for _, rel := range in.temps {
+		if err := root.Remove(rel); err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return 0, removed, err
+		}
+		removed++
+	}
+	wrote, n, err := in.plan.apply()
+	return wrote, removed + n, err
 }
 
 func goOutput(name string) bool {
@@ -362,12 +415,7 @@ func (k *kit) diff(p platform, out string) ([]change, error) {
 	return changes, err
 }
 
-func (k *kit) apply(changes []change) error {
-	root, err := os.OpenRoot(k.dir)
-	if err != nil {
-		return err
-	}
-	defer root.Close()
+func (k *kit) apply(root *os.Root, changes []change) error {
 	for _, c := range changes {
 		if c.data != nil {
 			if err := writeRoot(root, c.path, c.data); err != nil {
@@ -390,40 +438,48 @@ func (k *kit) apply(changes []change) error {
 }
 
 func (k *kit) gen(ctx context.Context) error {
-	changes, refused, err := k.managed()
+	root, err := os.OpenRoot(k.dir)
 	if err != nil {
 		return err
 	}
-	if len(refused) > 0 {
-		return errors.New(strings.Join(refused, "\n"))
+	defer root.Close()
+	in, err := k.inputs(root)
+	if err != nil {
+		return err
 	}
-	if err := k.apply(changes); err != nil {
+	wrote, removed, err := in.sync(root)
+	if err != nil {
 		return err
 	}
 	generated, err := k.generate(ctx)
 	if err != nil {
 		return fmt.Errorf("%w\nno generated files were replaced", err)
 	}
-	if err := k.apply(generated); err != nil {
+	if err := k.apply(root, generated); err != nil {
 		return err
 	}
-	all := slices.Concat(changes, generated)
-	removed := 0
-	for _, c := range all {
+	for _, c := range generated {
 		if c.data == nil {
 			removed++
+		} else {
+			wrote++
 		}
 	}
-	if len(all) == 0 {
+	if wrote+removed == 0 {
 		k.log.Info("Contracts up to date")
 		return nil
 	}
-	k.log.Info("Contracts generated", slog.Int("written", len(all)-removed), slog.Int("removed", removed))
+	k.log.Info("Contracts generated", slog.Int("written", wrote), slog.Int("removed", removed))
 	return nil
 }
 
 func (k *kit) stale(ctx context.Context) ([]string, error) {
-	changes, _, err := k.managed()
+	root, err := os.OpenRoot(k.dir)
+	if err != nil {
+		return nil, err
+	}
+	defer root.Close()
+	in, err := k.inputs(root)
 	if err != nil {
 		return nil, err
 	}
@@ -431,23 +487,28 @@ func (k *kit) stale(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	var stale []string
-	for _, c := range slices.Concat(changes, generated) {
+	stale := in.stale()
+	for _, c := range generated {
 		stale = append(stale, c.path+": "+c.why)
 	}
 	return stale, nil
 }
 
 func (k *kit) contracts(ctx context.Context) error {
-	_, refused, err := k.managed()
+	root, err := os.OpenRoot(k.dir)
 	if err != nil {
 		return err
 	}
-	for _, line := range refused {
+	defer root.Close()
+	in, err := k.inputs(root)
+	if err != nil {
+		return err
+	}
+	for _, line := range in.refused {
 		fmt.Fprintln(os.Stdout, line)
 	}
-	if len(refused) > 0 {
-		return fmt.Errorf("edited or unowned managed files: %d", len(refused))
+	if len(in.refused) > 0 {
+		return fmt.Errorf("edited or unowned managed files: %d", len(in.refused))
 	}
 	for _, args := range [][]string{{"format", "--diff", "--exit-code"}, {"lint"}} {
 		cmd := bufCmd(ctx, k.dir, args...)

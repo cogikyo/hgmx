@@ -57,11 +57,11 @@ func TestSkillSync(t *testing.T) {
 			for rel, data := range tt.disk {
 				write(skillsDir+"/"+rel, data)
 			}
-			sum := map[string][]byte{}
+			sum := ledger{}
 			for rel, data := range tt.sum {
-				sum[rel] = []byte(data)
+				sum[rel] = hashOf([]byte(data))
 			}
-			write(skillsSum, string(formatSum(sum)))
+			write(skillsSum, string(sum.format()))
 			root, err := openSkills(s)
 			if err != nil {
 				t.Fatal(err)
