@@ -40,7 +40,7 @@ Use JDK 21, the pinned SDK packages and the committed Gradle wrapper.
 From `apps/android/`, run `./gradlew :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest`; use `:app:connectedDebugAndroidTest` with a device or emulator for session tests.
 Commit dependency locks and verification metadata, and verify dependency changes with a fresh Gradle cache so a warm cache cannot hide missing checksums.
 Builds do not prove the installed signer, passkeys, associations or store readiness.
-Preserve the documented foreground-refresh gap in handoffs until implemented and verified.
+Foreground recheck (`Session.recheck`) rechecks the minimum-build gate and ignores offline failures, but does not refresh the cached method list.
 When server sign-out is unconfirmed, the starter shows a recovery notice pointing to `<origin>/auth/account` → **Sessions**; preserve that notice rather than promising remote revocation.
 
 If `SITE.md` sits beside this file, read it; its rules override this skill.

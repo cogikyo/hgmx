@@ -12,7 +12,8 @@ Use **hgmx-ios** or **hgmx-android** for the client side.
 ## Contract and handler
 
 - **Keep site contracts in `proto/<site>/api/v1/`**, under a distinct protobuf package.
-  Leave `proto/hgmx/` and `buf.yaml` managed by hgmx.
+  Leave `buf.yaml`, `proto/hgmx/` and its committed ledger `proto/hgmx/hgmx.sum` managed by hgmx.
+  Unedited copies recorded in the ledger upgrade on `gen`; without a ledger, matching copies are adopted and differing ones are refused, so existing sites should run `gen` and commit `proto/hgmx/hgmx.sum` before the next kit change.
 - Put Connect adapters in `api/`, importing generated types, domain code and store, never routes or views.
   Share business rules at their domain/store owner instead of calling an HTML handler.
 - Build `api` with `accounts.API()`, register services on `api.Server()`, and classify each procedure through `api.Allow`.

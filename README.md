@@ -6,7 +6,7 @@ Each site imports only what it uses.
 
 ## Start a Site
 
-Use Go 1.27 or later and put the standalone Tailwind CLI 4.3.3 on PATH.
+Use Go 1.27 or later and put the standalone Tailwind CLI 4.3.4 on PATH.
 In a new project directory:
 
 ```bash
@@ -14,6 +14,7 @@ go mod init example.com/site
 go get -tool github.com/cogikyo/hgmx/cmd/hgmx@master
 go tool hgmx init
 go mod tidy
+go tool hgmx skills
 go tool hgmx check
 go build -o site ./cmd/server
 ./site
@@ -22,10 +23,11 @@ go build -o site ./cmd/server
 `init` writes `.gitignore` (ignoring `/server`), `cmd/server/main.go`, `credentials.json`, `routes/`, `store/` and `views/`.
 It requires `go.mod`, pins templ to hgmx's version and refuses existing scaffold targets except `.gitignore`.
 It keeps existing `.gitignore` content and appends `/server` if missing.
+`skills` installs hgmx's agent skills and `hgmx.sum` ledger into `.agents/skills/` (required by `check`), and links them into `.claude/skills/` when `.claude/` exists.
 The [site layout](CONVENTIONS.md#layout) keeps the root free of Go packages and process wiring beside `cmd/server/main.go`.
 The scaffold serves Home, About and a full-page 404 without Postgres, using system-ui and OFL-licensed Iosevka fonts.
 Set `PGHOST`, `PGDATABASE` and `PGUSER` for the database and `OTEL_*` for telemetry.
-Serving never migrates; register GORM models with `migrate.Run` as described in [Migrations](CONVENTIONS.md#migrations).
+Serving never migrates; register `migrate.Run` with `cli.Dispatch` as described in [Migrations](CONVENTIONS.md#migrations).
 Production cutover waits for COGICTL's migrate gate; read [the deploy contract](CONVENTIONS.md#deploy-contract) before switching.
 
 ## Site Commands
@@ -109,12 +111,17 @@ Before planning a store release, read [App Launch Requirements](CONVENTIONS.md#a
 
 ## Packages
 
+- **`cli`** handles site subcommand dispatch, exit codes and signal contexts.
 - **`server`** composes the root handler, version reloads, recovery and graceful shutdown.
 - **`render`** buffers templ HTML with ETags and conditional requests.
 - **`telemetry`** exports OTLP/HTTP traces, logs and metrics from `OTEL_*` settings, with local logging and a browser beacon.
 - **`pg`** opens Postgres from `PG*` settings and supplies IDs, JSON, enums and query scopes; `pg/pgtest` supplies test databases.
   - `pg.Open` stays lazy; use `pg.Ping(ctx, db)` to require connectivity at startup.
 - **`migrate`** applies GORM models and idempotent init SQL with an enum phase and a session lock.
+- **`auth`** provides passwordless accounts, origin-bound sessions and the native Connect API.
+- **`mail`** queues messages for background delivery and builds the SMTP sender from env.
+- **`credential`** declares site secrets, exports `credentials.json` and runs live provider checks.
+- **`clientip`** selects client addresses behind `HGMX_TRUSTED_PROXY`.
 - **`static`** serves file sets at hashed URLs or fixed root URLs, with a disk-backed dev mode.
 - **`scripts`** serves selected htmx, hx-preload, navigation support, hyperscript and Motion scripts in dependency order.
 - **`palette`** generates OKLCH shades and semantic colour tokens from one seed.

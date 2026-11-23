@@ -227,7 +227,7 @@ The `htmx/boost` check rejects literal boost values, including string expression
 
 ## Tailwind v4
 
-- **Standalone CLI 4.3.3** with one input, `main.css`.
+- **Standalone CLI 4.3.4** with one input, `main.css`.
   - It starts with `@import "tailwindcss" source(none);` plus explicit `@source` for `**/*.templ` and `**/*.go`.
 - **Palette sites** import `palette` CSS output, which defines `:root` shades and `@theme` tokens.
   - Generate from one hex seed.
@@ -297,12 +297,44 @@ mux.Handle(webapp.Path, app)
   - `Run` drains for up to 5 seconds, then closes on drain failure and runs shutdown hooks.
   - All hooks share a context ending 8 seconds after shutdown starts; after bind failure they get the full 8 seconds.
   - After a drain timeout, handlers may outlive `Run`; closing their resources can race them.
-- **`telemetry.FromEnv(local)` never returns nil**, even with export disabled or invalid configuration.
-  - Log its configuration error through `Logger()`; local logs and access lines still work.
+- **`telemetry.Setup(local)`** calls `telemetry.FromEnv(local)`, sets `slog`'s default logger, and logs invalid configuration while leaving export disabled.
+  - `FromEnv` never returns nil; local logs and access lines still work without export.
   - Export is OTLP HTTP/protobuf, configured by supported `OTEL_*` environment variables.
   - Pass `p.Shutdown`, then `func(ctx context.Context) error { return pg.Close(ctx, db) }` to `server.Run`.
   - `Shutdown` logs dropped telemetry and returns nil if the final export fails or times out.
 - **`server.Site` serves `/healthz` as `ok <version>`** with `no-store`; set the build version via `-X main.version`.
+
+### Site Main
+
+Register server flags, dispatch subcommands through `cli.Dispatch`, then parse flags and set up telemetry:
+
+```go
+func main() {
+	addr := flag.String("addr", "127.0.0.1:8080", "listen address")
+	dir := flag.String("static", "", "serve /static/ from this directory instead of the embedded files")
+	if code, ok := cli.Dispatch(cli.Commands{
+		"credentials": credential.Run(&secrets, flag.CommandLine, nil),
+		"migrate":     migrate.Run(store.Schema),
+	}); ok {
+		os.Exit(code)
+	}
+	flag.Parse()
+
+	p := telemetry.Setup(slog.NewTextHandler(os.Stderr, nil))
+	if err := run(p, *addr, *dir); err != nil {
+		p.Logger().Error("exit", "err", err)
+		os.Exit(1)
+	}
+}
+```
+
+- **One exit contract covers every subcommand:** `0` on success, `2` on usage errors (`cli.ErrUsage` or `cli.Usage`), and `1` on other errors.
+- **`cli.Dispatch` runs before `flag.Parse`** and before opening serving databases, queues or telemetry; subcommands such as `migrate` open what they need.
+  - When `os.Args[1]` is absent or starts with `-`, it returns `ok == false` and serving proceeds.
+  - An unknown first word prints a usage error to stderr and exits `2` instead of starting the server.
+  - Commands receive `cli.NotifyContext()` and a text `slog` default on stderr.
+  - Errors returned to `Dispatch` print plainly for usage errors and log otherwise; invalid flags after `credentials check --` exit directly under `flag.CommandLine`'s `ExitOnError`.
+- **Use `cli.NotifyContext()` in `run`** so the first `SIGINT` or `SIGTERM` cancels the server context and a second signal ends the process.
 
 ### Serving an App API
 
@@ -358,8 +390,9 @@ For Android, register the package and SHA-256 certificates of supported installe
 Serve AASA and assetlinks publicly from the RP host without redirects or challenges, then prove passkeys on physical devices.
 
 Report generation, native compilation, live calls, physical-device checks and store readiness separately.
-Both starters check configuration at launch and handle update faults on calls; neither currently refreshes configuration on foreground.
-Add and verify foreground refresh before treating that requirement as complete.
+Both starters check configuration at launch, handle update faults on calls, and call `Session.recheck` on return to foreground.
+Foreground recheck updates the minimum-build gate (keeping the current gate if offline) but does not refresh the cached method list.
+Verify the foreground update gate on each target platform before marking it complete.
 
 ### CSP Literal
 
@@ -412,6 +445,7 @@ Each package may also import its own layer, subject to the page restriction belo
 | ---------------------- | ----------------------------------------------------------- |
 | `routes`               | `middleware`, `store`, domain packages, `views`, page views |
 | `api`                  | `store`, domain packages, generated `proto/...`             |
+| `proto`                | `proto/...` only                                            |
 | `middleware`           | `store`, domain packages                                    |
 | A domain package       | Its own domain and `store`                                  |
 | `store`                | `store/...`, excluding `store/migrations/...`               |
@@ -483,6 +517,7 @@ The check exempts test files.
   - `pg.List[T]` counts the supplied query, then fetches the requested page.
 - **`pg.Like`** trims the query and matches a case-insensitive substring, escaping `%`, `_` and `\`.
   - Empty or whitespace-only input leaves the query unchanged.
+  - Use **`pg.Contains`** for custom `ILIKE` filters; it escapes wildcards and wraps the pattern without trimming.
 - **Use `db.Where("x IN ?", vs)` for membership.** An empty or nil slice produces `IN (NULL)` and matches no rows.
 - **`pg.Sort`** uses an allowlist of keys to columns; an unknown key adds no order.
 
@@ -494,16 +529,17 @@ The check exempts test files.
 GORM models and tags define the target schema; `Run` supplies the lock, enum phase and init-file ledger.
 
 **Do not switch a production site to `Run` until COGICTL's migrate gate is live; hgmx.dev moves first.**
-v0.8.0 provides the new API while existing sites stay on the old path until that gate is ready.
-Auth's schema is frozen until v0.9.0.
+Existing sites stay on the old path until that gate is ready.
+Auth's schema stays frozen until the legacy path is removed.
 
 ### Register a Schema
 
 Export `Schema` from `store/schema.go` as a `migrate.Schema` with a unique, non-empty `Name`, current `Enums` and all `Models`.
-Call `migrate.Run(ctx, db, []migrate.Schema{auth.Schema, store.Schema}, args, out)` from the site's migrate command; omit `auth.Schema` if unused.
+Register `migrate.Run(auth.Schema, store.Schema)` under `"migrate"` in `cli.Dispatch`; omit `auth.Schema` if unused.
+`Run` opens a pool from `PG*` env, closes it before returning, and accepts only `up`; it refuses `down` and `status`.
+Call `migrate.Up(ctx, db, schemas, out)` directly when a caller already holds a `*gorm.DB` pool.
 Put library schemas before site schemas that depend on them.
-`Run` requires `PGDATABASE` and accepts only `up`; it refuses `down` and `status`.
-The COGICTL gate owns schema comparison and deployment approval.
+Both `Run` and `Up` require `PGDATABASE`; the COGICTL gate owns schema comparison and deployment approval.
 
 When SQL is needed, put files in `store/init/pre/*.sql` or `store/init/post/*.sql`.
 Import `embed`, declare `//go:embed init` above `var initFS embed.FS`, and set `Init: initFS` in `Schema`.
@@ -538,7 +574,7 @@ GORM's generated names follow Postgres defaults: `<table>_<cols>_key`, `_check`,
 Explicit tag names still take precedence.
 Use post files for work that needs the migrated tables, such as cross-package foreign keys or seeds.
 
-**Deprecated in v0.8.0:** `Step`, `Track`, `Command` and `auth.Track` still work and are removed in v0.9.0.
+**Deprecated in v0.8.0:** `Step`, `Track`, `Command` and `auth.Track` still work; removal is planned for v0.10.0, after all six sites switch to `migrate.Run`.
 Until cutover, keep applied steps unchanged and independent of live models; their import and `migrate/no-live-models` checks still apply.
 
 ### Deploy Contract
@@ -613,16 +649,22 @@ The `hgmx-skills` rule in `go tool hgmx check` fails on missing, stale, edited o
 
 **No justfile anywhere.** Run the shared hgmx commands from the site's module root.
 
-| Command                             | Task                                                                           |
-| ----------------------------------- | ------------------------------------------------------------------------------ |
-| `go tool hgmx init`                 | Write `.gitignore`, `cmd/server/main.go`, credentials, routes, store and views |
-| `go tool hgmx gen`                  | Generate templ, minified CSS and app contract code                             |
-| `go tool hgmx dev [-- site flags…]` | Watch templ and CSS; restart `go run ./cmd/server -static views/static`        |
-| `go tool hgmx fmt`                  | Format Go and templ files                                                      |
-| `go tool hgmx migrate …`            | Run `go run ./cmd/server migrate …` for development                            |
-| `go tool hgmx credentials`          | Build the site and write `credentials.json`                                    |
-| `go tool hgmx credentials check …`  | Test SMTP and Google client authentication                                     |
-| `go tool hgmx check`                | Check generated files, rules, credentials, format, vet, build, test            |
+| Command                               | Task                                                                             |
+| ------------------------------------- | -------------------------------------------------------------------------------- |
+| `go tool hgmx init`                   | Write `.gitignore`, `cmd/server/main.go`, credentials, routes, store and views   |
+| `go tool hgmx init apps <platform>`   | Copy the `android` or `ios` starter into `apps/` with site identity              |
+| `go tool hgmx gen`                    | Generate templ, minified CSS and app contract code                               |
+| `go tool hgmx dev [-- site flags…]`   | Watch templ and CSS; restart `go run ./cmd/server -static views/static`          |
+| `go tool hgmx fmt`                    | Format Go and templ files                                                        |
+| `go tool hgmx migrate …`              | Run `go run ./cmd/server migrate …` for development                              |
+| `go tool hgmx credentials`            | Build the site and write `credentials.json`                                      |
+| `go tool hgmx credentials check …`    | Test SMTP and Google client authentication                                       |
+| `go tool hgmx icons …`                | Add, sync, update or check site-owned copies in `views/icons/`                   |
+| `go tool hgmx skills`                 | Sync skills into `.agents/skills/` (link `.claude/skills/` if `.claude/` exists) |
+| `go tool hgmx update`                 | Update hgmx to master, tidy modules and sync skills                              |
+| `go tool hgmx palette --lua <hex>`    | Write an OKLCH Lua palette from a hex seed to stdout                             |
+| `go tool hgmx info`                   | Print hgmx and Go versions                                                       |
+| `go tool hgmx check`                  | Check generated files, rules, credentials, format, vet, build, test              |
 
 `init` requires `go.mod`, pins templ to hgmx's version and refuses existing scaffold targets except `.gitignore`.
 It keeps existing `.gitignore` content and appends `/server` if missing.
@@ -649,7 +691,9 @@ Adoption copies the whole platform project, substitutes identity and refuses an 
 It does not configure Apple signing, server registrations or provider consoles.
 
 The presence of `proto/` or a native platform directory enables contract generation alongside templ/CSS.
-`gen` materializes hgmx's exact `buf.yaml` and `proto/hgmx/` contracts and refuses edited or unowned managed inputs.
+`gen` materializes hgmx's `buf.yaml` and `proto/hgmx/` contracts and records them in `proto/hgmx/hgmx.sum`, which sites commit.
+Unedited copies recorded in the ledger upgrade when hgmx changes; without a ledger, matching copies are adopted and differing ones are refused.
+Existing sites should run `go tool hgmx gen` and commit `proto/hgmx/hgmx.sum` before the next kit change.
 Sites import hgmx's generated Go types instead of generating duplicate hgmx descriptors.
 
 | Target  | Generated output                                                                  |
@@ -705,9 +749,9 @@ The manifest serializes them for Nix; unnamed live checks evaluate them against 
 `Declare(definition, requirement, shared)` copies the metadata and returns a handle; read values through `handle.Read()`.
 Use `"site"` for site-local secrets or a shared label such as `"smtp"`.
 
-Register server flags before dispatching the site's `credentials` subcommand to `credential.Command`, before opening databases, queues or telemetry.
+Register server flags before dispatching the site's `credentials` subcommand to `credential.Run` in `cli.Dispatch`, before opening databases, queues or telemetry.
 Pass that same FlagSet and a `credential.Checks` map keyed by each SMTP/Google handle's `Name()`, with callbacks using the site's provider settings.
-The scaffold includes the dispatch and an empty registry for sites with no secrets.
+The scaffold includes the dispatch and an empty registry for sites with no secrets; `credential.Command` is deprecated, and `credential.Read` is removed.
 
 Run **`go tool hgmx credentials`** after changing declarations or registered flags, then commit the site-root `credentials.json` with the code, even for zero-secret sites.
 It builds the site and exports metadata without secret values; cogictl uses the file to select deployment secrets.
@@ -798,11 +842,16 @@ Copy styled components; import infrastructure.
 
 The infrastructure packages are:
 
+- **`cli`** owns site subcommand dispatch, exit codes and signal contexts.
 - **`server`** owns HTTP composition, recovery, version reloads and shutdown.
 - **`render`** buffers templ HTML with cache validation.
 - **`telemetry`** owns local logging, OTLP export and browser beacons.
 - **`pg`** owns Postgres connections, column types and query scopes; `pg/pgtest` supplies test databases.
-- **`migrate`** runs Go-defined schema steps under a session lock.
+- **`migrate`** applies GORM models and idempotent init SQL under a session lock, plus the deprecated step-based path (removal planned for v0.10.0).
+- **`auth`** provides passwordless accounts, origin-bound sessions and the native Connect API.
+- **`mail`** queues messages for background delivery and builds the SMTP sender from env.
+- **`credential`** declares site secrets, exports `credentials.json` and runs live provider checks.
+- **`clientip`** resolves client addresses behind `HGMX_TRUSTED_PROXY`.
 - **`static`** serves the site's files at set-hash URLs or fixed root URLs.
 - **`scripts`** serves selected scripts and navigation support with ordered head tags.
 - **`webapp`** serves the install manifest and icons.

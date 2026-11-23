@@ -55,7 +55,7 @@ func (identityTable) TableName() string { return "auth_identities" }
 
 // Track is auth's legacy migration history.
 //
-// Deprecated: Use [Schema] with migrate.Run; Track is removed in v0.9.0.
+// Deprecated: Use [Schema] with migrate.Run; Track is removed in v0.10.0.
 var Track = migrate.Track{Name: "auth", Steps: []migrate.Step{
 	{Version: 1, Name: "accounts", Up: accountsUp, Down: accountsDown},
 	{Version: 2, Name: "usernames", Up: usernamesUp, Down: usernamesDown},
