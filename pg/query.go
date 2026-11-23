@@ -43,6 +43,11 @@ func List[T any](db *gorm.DB, p Page) (ListResult[T], error) {
 
 var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 
+// Contains escapes LIKE wildcards in q and wraps it in % without trimming.
+func Contains(q string) string {
+	return "%" + likeEscaper.Replace(q) + "%"
+}
+
 // Like matches a literal, case-insensitive substring of column.
 // It trims whitespace; blank input adds no filter.
 func Like(column, q string) func(*gorm.DB) *gorm.DB {
@@ -51,7 +56,7 @@ func Like(column, q string) func(*gorm.DB) *gorm.DB {
 		if q == "" {
 			return db
 		}
-		return db.Where("? ILIKE ?", clause.Column{Name: column}, "%"+likeEscaper.Replace(q)+"%")
+		return db.Where("? ILIKE ?", clause.Column{Name: column}, Contains(q))
 	}
 }
 
