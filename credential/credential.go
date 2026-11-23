@@ -12,15 +12,6 @@ import (
 // ErrMissing means neither the credential file nor its env fallback was found.
 var ErrMissing = errors.New("credential missing")
 
-// Read is the legacy name-based reader; new sites use [Handle.Read].
-// The env name is HGMX_ plus name uppercased with hyphens changed to _.
-func Read(name string) (string, error) {
-	if !filepath.IsLocal(name) || filepath.Base(name) != name || name == "." {
-		return "", fmt.Errorf("credential %q: invalid name", name)
-	}
-	return read(name, "HGMX_"+strings.ToUpper(strings.ReplaceAll(name, "-", "_")))
-}
-
 func read(name, env string) (string, error) {
 	if dir := os.Getenv("CREDENTIALS_DIRECTORY"); dir != "" {
 		b, err := os.ReadFile(filepath.Join(dir, name))
