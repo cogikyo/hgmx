@@ -198,27 +198,40 @@ var colors = Colors{
 	Black:    "#0d0d0d",
 }
 
-var mappings = Mappings{
-	Info:    Pair{Alpha: Azure, Beta: Sky},
-	Success: Pair{Alpha: Green, Beta: Emerald},
-	Warning: Pair{Alpha: Yellow, Beta: Honey},
-	Error:   Pair{Alpha: Red, Beta: Ruby},
+var builtins = []struct {
+	motif Motif
+	pair  Pair
+}{
+	{Info, Pair{Alpha: Azure, Beta: Sky}},
+	{Success, Pair{Alpha: Green, Beta: Emerald}},
+	{Warning, Pair{Alpha: Yellow, Beta: Honey}},
+	{Error, Pair{Alpha: Red, Beta: Ruby}},
 
-	Primary: Pair{Alpha: Blue, Beta: Cobalt},
-	Subtle:  Pair{Alpha: Slate, Beta: Stone},
-	Accent:  Pair{Alpha: Orange, Beta: Sun},
+	{Primary, Pair{Alpha: Blue, Beta: Cobalt}},
+	{Subtle, Pair{Alpha: Slate, Beta: Stone}},
+	{Accent, Pair{Alpha: Orange, Beta: Sun}},
 
-	Positive: Pair{Alpha: Coral, Beta: Pumpkin},
-	Negative: Pair{Alpha: Sapphire, Beta: Indigo},
-	True:     Pair{Alpha: Aqua, Beta: Teal},
-	False:    Pair{Alpha: Pink, Beta: Rose},
-	In:       Pair{Alpha: Lavender, Beta: Violet},
-	Out:      Pair{Alpha: Honey, Beta: Lemon},
+	{Positive, Pair{Alpha: Coral, Beta: Pumpkin}},
+	{Negative, Pair{Alpha: Sapphire, Beta: Indigo}},
+	{True, Pair{Alpha: Aqua, Beta: Teal}},
+	{False, Pair{Alpha: Pink, Beta: Rose}},
+	{In, Pair{Alpha: Lavender, Beta: Violet}},
+	{Out, Pair{Alpha: Honey, Beta: Lemon}},
 
-	Change: Pair{Alpha: Azure, Beta: Blue},
-	Link:   Pair{Alpha: Jade, Beta: Leaf},
-	Delete: Pair{Alpha: Cherry, Beta: Ruby},
+	{Change, Pair{Alpha: Azure, Beta: Blue}},
+	{Link, Pair{Alpha: Jade, Beta: Leaf}},
+	{Delete, Pair{Alpha: Cherry, Beta: Ruby}},
 }
+
+var motifs, mappings = func() ([]Motif, Mappings) {
+	order := make([]Motif, 0, len(builtins))
+	m := make(Mappings, len(builtins))
+	for _, b := range builtins {
+		order = append(order, b.motif)
+		m[b.motif] = b.pair
+	}
+	return order, m
+}()
 
 // === Handlers ================================================================
 
@@ -323,7 +336,11 @@ func (c ColorDetails) ToTheme(w io.Writer, color Color) {
 }
 
 func (m Mappings) ToMotifs(w io.Writer) {
-	for motif, pair := range m {
+	for _, motif := range motifs {
+		pair, ok := m[motif]
+		if !ok {
+			continue
+		}
 		for _, shadeKey := range Shades {
 			rootVar := fmt.Sprintf("var(--%s-%d)", pair.Alpha, shadeKey)
 			fmt.Fprintf(w, "  --color-%s-%d: %s;\n", motif, shadeKey, rootVar)
