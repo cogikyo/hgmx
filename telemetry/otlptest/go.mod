@@ -8,4 +8,6 @@ require (
 	google.golang.org/protobuf v1.36.12
 )
 
+require connectrpc.com/connect/v2 v2.0.2 // indirect
+
 replace github.com/cogikyo/hgmx => ../..
