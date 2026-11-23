@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -14,6 +16,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
+	"github.com/cogikyo/hgmx/cli"
 	"github.com/cogikyo/hgmx/migrate"
 	"github.com/cogikyo/hgmx/pg"
 )
@@ -61,7 +64,7 @@ func (r *recorder) Trace(_ context.Context, _ time.Time, fc func() (string, int6
 
 func up(t *testing.T, db *gorm.DB, schemas ...migrate.Schema) error {
 	t.Helper()
-	return migrate.Run(t.Context(), db, schemas, []string{"up"}, io.Discard)
+	return migrate.Up(t.Context(), db, schemas, io.Discard)
 }
 
 func files(m map[string]string) fstest.MapFS {
@@ -153,5 +156,36 @@ func TestRerun(t *testing.T) {
 	}
 	if len(r.ddl) > 0 {
 		t.Errorf("rerun issued %q", r.ddl)
+	}
+}
+
+func TestRunExit(t *testing.T) {
+	db := open(t)
+	name := scalar[string](t, db, "SELECT current_database()")
+	t.Setenv("PGHOST", filepath.Join(os.TempDir(), fmt.Sprintf("hgmx-pgtest-%d", os.Getuid())))
+	t.Setenv("PGPORT", "5432")
+	t.Setenv("PGUSER", name)
+	t.Setenv("PGSSLMODE", "disable")
+	run := migrate.Run(migrate.Schema{Name: "site", Models: []any{&owner{}}})
+	for _, tc := range []struct {
+		db   string
+		args []string
+		code int
+	}{
+		{name, nil, 2},
+		{name, []string{"down"}, 2},
+		{name, []string{"status"}, 2},
+		{name, []string{"up", "site"}, 2},
+		{"", []string{"up"}, 1},
+		{name, []string{"up"}, 0},
+	} {
+		t.Setenv("PGDATABASE", tc.db)
+		err := run(t.Context(), tc.args)
+		if got := cli.Exit(err); got != tc.code {
+			t.Errorf("PGDATABASE=%q %q: exit %d (%v), want %d", tc.db, tc.args, got, err, tc.code)
+		}
+	}
+	if got := scalar[int](t, db, "SELECT count(*) FROM owners"); got != 0 {
+		t.Errorf("owners has %d rows after up, want an empty table", got)
 	}
 }

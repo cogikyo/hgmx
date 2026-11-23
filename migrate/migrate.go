@@ -16,6 +16,8 @@ import (
 	"github.com/pressly/goose/v3"
 	"github.com/pressly/goose/v3/lock"
 	"gorm.io/gorm"
+
+	"github.com/cogikyo/hgmx/cli"
 )
 
 // Step is a schema change; versions run 1, 2, 3, ... per track in list order.
@@ -53,7 +55,7 @@ var trackName = regexp.MustCompile(`^[a-z][a-z0-9_]{0,46}$`)
 // Deprecated: Use [Run]; Command is removed in v0.9.0.
 func Command(ctx context.Context, db *gorm.DB, tracks []Track, args []string, out io.Writer) (retErr error) {
 	if len(args) == 0 || len(args) > 2 || (args[0] != "up" && args[0] != "down" && args[0] != "status") || (len(args) == 2 && args[0] != "down") {
-		return errors.New(usage)
+		return cli.Usage(usage)
 	}
 	target := ""
 	if len(args) == 2 {
@@ -84,7 +86,7 @@ func Command(ctx context.Context, db *gorm.DB, tracks []Track, args []string, ou
 		count += len(track.Steps)
 	}
 	if len(args) == 2 && !names[target] {
-		return fmt.Errorf("unknown track %q", target)
+		return cli.Usage("unknown track %q", target)
 	}
 	if count == 0 {
 		if args[0] == "status" && len(tracks) > 0 {

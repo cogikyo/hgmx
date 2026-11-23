@@ -7,12 +7,16 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path"
 	"slices"
 
 	"github.com/pressly/goose/v3/lock"
 	"gorm.io/gorm"
+
+	"github.com/cogikyo/hgmx/cli"
+	"github.com/cogikyo/hgmx/pg"
 )
 
 // Schema registers a package's target models, enums and optional init SQL.
@@ -44,19 +48,31 @@ type script struct {
 
 type phases struct{ pre, post []script }
 
-// Run applies schemas in slice order; args must be ["up"].
-// PGDATABASE must be set; down and status are unsupported.
+// Run returns a migrate command for [cli.Dispatch] that runs [Up] on "up".
+// It opens and closes a pool from PG* env via [pg.Open] and rejects other args.
+func Run(schemas ...Schema) cli.Command {
+	return func(ctx context.Context, args []string) (err error) {
+		if len(args) > 0 && (args[0] == "down" || args[0] == "status") {
+			return cli.Usage("migrate %s is unsupported: models and init files define the schema, and up applies them", args[0])
+		}
+		if len(args) != 1 || args[0] != "up" {
+			return cli.Usage("usage: migrate up")
+		}
+		db, err := pg.Open(slog.Default())
+		if err != nil {
+			return err
+		}
+		defer func() { err = errors.Join(err, pg.Close(context.WithoutCancel(ctx), db)) }()
+		return Up(ctx, db, schemas, os.Stdout)
+	}
+}
+
+// Up applies schemas to db in slice order; PGDATABASE must be set.
 // One connection holds the migration lock across two transactions.
 // The first commits all enums, which survive failure of the second.
 // The second runs pre SQL, AutoMigrate and post SQL, then rewrites hgmx_init.
 // Init files run on every up and must be idempotent and transactional.
-func Run(ctx context.Context, db *gorm.DB, schemas []Schema, args []string, out io.Writer) (err error) {
-	if len(args) > 0 && (args[0] == "down" || args[0] == "status") {
-		return fmt.Errorf("migrate %s is unsupported: models and init files define the schema, and up applies them", args[0])
-	}
-	if len(args) != 1 || args[0] != "up" {
-		return errors.New("usage: migrate up")
-	}
+func Up(ctx context.Context, db *gorm.DB, schemas []Schema, out io.Writer) (err error) {
 	files := make([]phases, len(schemas))
 	names := make(map[string]bool, len(schemas))
 	for i, s := range schemas {

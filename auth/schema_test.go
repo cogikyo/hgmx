@@ -60,7 +60,7 @@ func TestSchema(t *testing.T) {
 	run := func(db *gorm.DB) []string {
 		t.Helper()
 		r := &recorder{Interface: logger.Discard}
-		if err := migrate.Run(t.Context(), db.Session(&gorm.Session{Logger: r}), []migrate.Schema{Schema}, []string{"up"}, io.Discard); err != nil {
+		if err := migrate.Up(t.Context(), db.Session(&gorm.Session{Logger: r}), []migrate.Schema{Schema}, io.Discard); err != nil {
 			t.Fatal(err)
 		}
 		return r.ddl

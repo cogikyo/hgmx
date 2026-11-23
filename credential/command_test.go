@@ -5,8 +5,11 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/cogikyo/hgmx/cli"
 )
 
 func TestCheckNeverPrintsValue(t *testing.T) {
@@ -29,12 +32,12 @@ func TestCheckNeverPrintsValue(t *testing.T) {
 			smtp.Name():   func(_ context.Context, v string) error { return fail },
 			google.Name(): func(_ context.Context, v string) error { return fail },
 		}
-		code := Command(context.Background(), &r, flag.NewFlagSet("site", flag.ContinueOnError), []string{"check"}, checks, &out)
-		if strings.Contains(out.String(), secret) {
+		err := r.command(context.Background(), flag.NewFlagSet("site", flag.ContinueOnError), []string{"check"}, checks, &out)
+		if strings.Contains(out.String()+fmt.Sprint(err), secret) {
 			t.Errorf("%s: output contains the credential value:\n%s", name, out.String())
 		}
-		if want := map[bool]int{true: 0, false: 1}[fail == nil]; code != want {
-			t.Errorf("%s: exit %d, want %d:\n%s", name, code, want, out.String())
+		if want := map[bool]int{true: 0, false: 1}[fail == nil]; cli.Exit(err) != want {
+			t.Errorf("%s: exit %d, want %d: %v\n%s", name, cli.Exit(err), want, err, out.String())
 		}
 	}
 }
@@ -59,9 +62,37 @@ func TestCheckSkipsOffFeatures(t *testing.T) {
 		fs := flag.NewFlagSet("site", flag.ContinueOnError)
 		fs.String("google-client-id", "", "")
 		var out bytes.Buffer
-		code := Command(context.Background(), &r, fs, append([]string{"check", "--"}, tc.flags...), checks, &out)
-		if code != tc.code || out.String() != tc.out {
-			t.Errorf("flags %q: exit %d, output %q; want %d, %q", tc.flags, code, out.String(), tc.code, tc.out)
+		err := r.command(context.Background(), fs, append([]string{"check", "--"}, tc.flags...), checks, &out)
+		if cli.Exit(err) != tc.code || out.String() != tc.out {
+			t.Errorf("flags %q: exit %d, output %q; want %d, %q", tc.flags, cli.Exit(err), out.String(), tc.code, tc.out)
+		}
+	}
+}
+
+func TestCommandExit(t *testing.T) {
+	t.Setenv("CREDENTIALS_DIRECTORY", "")
+	t.Setenv("TEST_SMTP_PASSWORD", "x")
+
+	var r Registry
+	smtp := r.Declare(Definition{Name: "smtp-password", Env: "TEST_SMTP_PASSWORD", Purpose: "p", Source: Issued{}, Check: "smtp"}, Always, "site")
+	for _, tc := range []struct {
+		args  []string
+		check error
+		code  int
+	}{
+		{nil, nil, 2},
+		{[]string{"rotate"}, nil, 2},
+		{[]string{"manifest", "extra"}, nil, 2},
+		{[]string{"check", "unknown"}, nil, 2},
+		{[]string{"check", "--", "-nope"}, nil, 2},
+		{[]string{"check"}, errors.New("rejected"), 1},
+		{[]string{"check"}, nil, 0},
+		{[]string{"manifest"}, nil, 0},
+	} {
+		checks := Checks{smtp.Name(): func(context.Context, string) error { return tc.check }}
+		err := Run(&r, flag.NewFlagSet("site", flag.ContinueOnError), checks)(context.Background(), tc.args)
+		if got := cli.Exit(err); got != tc.code {
+			t.Errorf("%q, check error %v: exit %d (%v), want %d", tc.args, tc.check, got, err, tc.code)
 		}
 	}
 }

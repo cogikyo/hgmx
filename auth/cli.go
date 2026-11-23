@@ -12,6 +12,7 @@ import (
 
 	"gorm.io/gorm"
 
+	"github.com/cogikyo/hgmx/cli"
 	"github.com/cogikyo/hgmx/internal/webhost"
 	"github.com/cogikyo/hgmx/pg"
 )
@@ -27,13 +28,13 @@ const usage = "usage: auth link [--origin URL] <email|username> | auth reset [--
 // Host.Layout is not required.
 func Command(ctx context.Context, db *gorm.DB, c Config, args []string, out io.Writer) error {
 	if len(args) == 0 || args[0] != "link" && args[0] != "reset" {
-		return errors.New(usage)
+		return cli.Usage(usage)
 	}
 	flags := flag.NewFlagSet("auth "+args[0], flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	raw := flags.String("origin", "", "host origin the link signs in to")
 	if err := flags.Parse(args[1:]); err != nil || flags.NArg() != 1 {
-		return errors.New(usage)
+		return cli.Usage(usage)
 	}
 	hosts, _, err := c.check()
 	if err != nil {
@@ -76,14 +77,14 @@ func target(hosts map[string]*host, raw string) (*host, error) {
 				return h, nil
 			}
 		}
-		return nil, fmt.Errorf("auth: --origin is required; one of %s", strings.Join(slices.Sorted(maps.Keys(hosts)), ", "))
+		return nil, cli.Usage("auth: --origin is required; one of %s", strings.Join(slices.Sorted(maps.Keys(hosts)), ", "))
 	}
 	origin, _, err := webhost.Parse(raw)
 	if err != nil {
-		return nil, err
+		return nil, cli.Usage("auth: --origin: %w", err)
 	}
 	if h, ok := hosts[origin]; ok {
 		return h, nil
 	}
-	return nil, fmt.Errorf("auth: %s is not a configured host; one of %s", raw, strings.Join(slices.Sorted(maps.Keys(hosts)), ", "))
+	return nil, cli.Usage("auth: %s is not a configured host; one of %s", raw, strings.Join(slices.Sorted(maps.Keys(hosts)), ", "))
 }

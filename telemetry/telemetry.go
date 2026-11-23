@@ -159,6 +159,17 @@ func FromEnv(local slog.Handler) (*Pipeline, error) {
 	return p, nil
 }
 
+// Setup calls [FromEnv] and sets slog's default to the pipeline's logger.
+// Invalid config is logged and export stays disabled.
+func Setup(local slog.Handler) *Pipeline {
+	p, err := FromEnv(local)
+	slog.SetDefault(p.Logger())
+	if err != nil {
+		p.Logger().Error("telemetry disabled", "err", err)
+	}
+	return p
+}
+
 func config() (*url.URL, []slog.Attr, error) {
 	if strings.EqualFold(strings.TrimSpace(os.Getenv("OTEL_SDK_DISABLED")), "true") {
 		return nil, nil, nil

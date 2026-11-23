@@ -9,10 +9,14 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"os"
 	"slices"
 	"strings"
+
+	"github.com/cogikyo/hgmx/cli"
 )
 
+// Checks maps declared credential names to their live verification probes.
 type Checks map[string]func(ctx context.Context, value string) error
 
 // Failure is printed verbatim; Reason must not contain secrets or raw errors.
@@ -28,35 +32,48 @@ func (f *Failure) Error() string {
 	return f.Reason
 }
 
-// Command handles the site's early credentials dispatch and returns an exit code.
-// Pass the server's FlagSet before starting databases, queues or telemetry.
+// Run returns the site's credentials command for [cli.Dispatch].
+// It handles "manifest" and live "check" for credentials with an hgmx check.
+// Register server flags on fs first, before databases, queues or telemetry.
+func Run(r *Registry, fs *flag.FlagSet, checks Checks) cli.Command {
+	return func(ctx context.Context, args []string) error {
+		return r.command(ctx, fs, args, checks, os.Stdout)
+	}
+}
+
+// Command runs credentials, prints errors to out and returns [cli.Exit].
+//
+// Deprecated: Use [Run] with [cli.Dispatch].
 func Command(ctx context.Context, r *Registry, fs *flag.FlagSet, args []string, checks Checks, out io.Writer) int {
+	err := r.command(ctx, fs, args, checks, out)
+	if err != nil {
+		fmt.Fprintln(out, err)
+	}
+	return cli.Exit(err)
+}
+
+func (r *Registry) command(ctx context.Context, fs *flag.FlagSet, args []string, checks Checks, out io.Writer) error {
 	if len(args) == 0 {
-		fmt.Fprintln(out, "usage: credentials manifest | credentials check [name...] [-- site flags...]")
-		return 2
+		return cli.Usage("usage: credentials manifest | credentials check [name...] [-- site flags...]")
 	}
 	if err := r.wired(checks); err != nil {
-		fmt.Fprintf(out, "credentials: %v\n", err)
-		return 2
+		return cli.Usage("credentials: %w", err)
 	}
 	switch args[0] {
 	case "manifest":
 		if len(args) > 1 {
-			fmt.Fprintln(out, "usage: credentials manifest")
-			return 2
+			return cli.Usage("usage: credentials manifest")
 		}
 		data, err := r.manifest(fs)
 		if err != nil {
-			fmt.Fprintf(out, "credentials: %v\n", err)
-			return 1
+			return fmt.Errorf("credentials: %w", err)
 		}
-		out.Write(data)
-		return 0
+		_, err = out.Write(data)
+		return err
 	case "check":
 		return r.check(ctx, fs, args[1:], checks, out)
 	}
-	fmt.Fprintf(out, "credentials: unknown command %q; want manifest or check\n", args[0])
-	return 2
+	return cli.Usage("credentials: unknown command %q; want manifest or check", args[0])
 }
 
 func (r *Registry) wired(checks Checks) error {
@@ -181,27 +198,24 @@ func leafKind(c Condition, kinds map[string]string) error {
 	return nil
 }
 
-func (r *Registry) check(ctx context.Context, fs *flag.FlagSet, args []string, checks Checks, out io.Writer) int {
+func (r *Registry) check(ctx context.Context, fs *flag.FlagSet, args []string, checks Checks, out io.Writer) error {
 	names, flags := args, []string(nil)
 	if i := slices.Index(args, "--"); i >= 0 {
 		names, flags = args[:i], args[i+1:]
 	}
 	fs.SetOutput(io.Discard)
 	if err := fs.Parse(flags); err != nil {
-		fmt.Fprintf(out, "credentials: site flags: %v\n", err)
-		return 2
+		return cli.Usage("credentials: site flags: %w", err)
 	}
 	if fs.NArg() > 0 {
-		fmt.Fprintf(out, "credentials: site flags: unexpected argument %q\n", fs.Arg(0))
-		return 2
+		return cli.Usage("credentials: site flags: unexpected argument %q", fs.Arg(0))
 	}
 
 	var on map[string]bool
 	if len(names) == 0 {
 		var err error
 		if on, err = r.on(fs); err != nil {
-			fmt.Fprintf(out, "credentials: %v\n", err)
-			return 2
+			return cli.Usage("credentials: %w", err)
 		}
 	}
 	var selected, skipped []Handle
@@ -218,38 +232,38 @@ func (r *Registry) check(ctx context.Context, fs *flag.FlagSet, args []string, c
 			skipped = append(skipped, h)
 		}
 	}
-	code := 0
+	var misuse []error
 	for _, name := range names {
 		i := slices.IndexFunc(selected, func(h Handle) bool { return h.def.Name == name })
 		switch {
 		case i < 0:
-			fmt.Fprintf(out, "%s: not declared\n", name)
-			code = 2
+			misuse = append(misuse, fmt.Errorf("%s: not declared", name))
 		case selected[i].def.Check == "":
-			fmt.Fprintf(out, "%s: declares no check\n", name)
-			code = 2
+			misuse = append(misuse, fmt.Errorf("%s: declares no check", name))
 		case checkIDs[selected[i].def.Check] == "":
-			fmt.Fprintf(out, "%s: %s check owned by cogictl\n", name, selected[i].def.Check)
-			code = 2
+			misuse = append(misuse, fmt.Errorf("%s: %s check owned by cogictl", name, selected[i].def.Check))
 		}
 	}
 	if len(selected)+len(skipped) == 0 {
-		fmt.Fprintln(out, "credentials: no credential declares an hgmx check")
-		code = 2
+		misuse = append(misuse, errors.New("credentials: no credential declares an hgmx check"))
 	}
-	if code != 0 {
-		return code
+	if len(misuse) > 0 {
+		return cli.Usage("%w", errors.Join(misuse...))
 	}
 
 	for _, h := range skipped {
 		fmt.Fprintf(out, "%s: skipped; feature %s is off\n", h.def.Name, h.required)
 	}
+	failed := 0
 	for _, h := range selected {
 		if !h.probe(ctx, checks[h.def.Name], out) {
-			code = 1
+			failed++
 		}
 	}
-	return code
+	if failed > 0 {
+		return fmt.Errorf("credentials: %d of %d checks failed", failed, len(selected))
+	}
+	return nil
 }
 
 func (h Handle) probe(ctx context.Context, fn func(context.Context, string) error, out io.Writer) bool {

@@ -5,9 +5,8 @@ import (
 	"flag"
 	"log/slog"
 	"os"
-	"os/signal"
-	"syscall"
 
+	"github.com/cogikyo/hgmx/cli"
 	"github.com/cogikyo/hgmx/credential"
 	"github.com/cogikyo/hgmx/migrate"
 	"github.com/cogikyo/hgmx/pg"
@@ -26,25 +25,17 @@ var secrets credential.Registry
 func main() {
 	addr := flag.String("addr", "127.0.0.1:8080", "listen address")
 	dir := flag.String("static", "", "serve /static/ from this directory instead of the embedded files")
-	if len(os.Args) > 1 {
-		switch os.Args[1] {
-		case "migrate":
-			os.Exit(migrateMain(os.Args[2:]))
-		case "credentials":
-			os.Exit(credential.Command(context.Background(), &secrets, flag.CommandLine, os.Args[2:], nil, os.Stdout))
-		}
+	if code, ok := cli.Dispatch(cli.Commands{
+		"credentials": credential.Run(&secrets, flag.CommandLine, nil),
+		"migrate":     migrate.Run(store.Schema),
+	}); ok {
+		os.Exit(code)
 	}
 	flag.Parse()
 
-	p, err := telemetry.FromEnv(slog.NewTextHandler(os.Stderr, nil))
-	log := p.Logger()
-	slog.SetDefault(log)
-	if err != nil {
-		// Invalid exporter configuration leaves the site and local logs usable.
-		log.Error("telemetry disabled", "err", err)
-	}
+	p := telemetry.Setup(slog.NewTextHandler(os.Stderr, nil))
 	if err := run(p, *addr, *dir); err != nil {
-		log.Error("exit", "err", err)
+		p.Logger().Error("exit", "err", err)
 		os.Exit(1)
 	}
 }
@@ -66,27 +57,10 @@ func run(p *telemetry.Pipeline, addr, dir string) error {
 		Telemetry: p,
 	}.Handler(mux)
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := cli.NotifyContext()
 	defer stop()
-	context.AfterFunc(ctx, stop)
 	log.InfoContext(ctx, "listening", "addr", addr, "version", version)
 	return server.Run(ctx, server.New(addr, h, log), p.Shutdown, func(ctx context.Context) error {
 		return pg.Close(ctx, db)
 	})
-}
-
-func migrateMain(args []string) int {
-	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	db, err := pg.Open(log)
-	if err == nil {
-		err = migrate.Run(ctx, db, []migrate.Schema{store.Schema}, args, os.Stdout)
-	}
-	if err != nil {
-		log.ErrorContext(ctx, "migrate", "err", err)
-		return 1
-	}
-	return 0
 }

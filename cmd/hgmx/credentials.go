@@ -135,7 +135,7 @@ func (s site) manifest(ctx context.Context, bin string) ([]byte, error) {
 	err := cmd.Run()
 	switch {
 	case errors.Is(ctx.Err(), context.DeadlineExceeded):
-		return nil, errors.New("site did not exit from `credentials manifest`; dispatch it to credential.Command in main")
+		return nil, errors.New("site did not exit from `credentials manifest`; register credential.Run with cli.Dispatch in main")
 	case err != nil:
 		os.Stderr.Write(out.Bytes())
 		return nil, fmt.Errorf("site `credentials manifest`: %w", err)

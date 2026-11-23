@@ -8,12 +8,11 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/a-h/templ"
 
 	"github.com/cogikyo/hgmx/auth"
+	"github.com/cogikyo/hgmx/cli"
 	"github.com/cogikyo/hgmx/credential"
 	"github.com/cogikyo/hgmx/mail"
 	"github.com/cogikyo/hgmx/migrate"
@@ -33,22 +32,17 @@ func main() {
 	addr := flag.String("addr", "127.0.0.1:18550", "listen address")
 	origin := flag.String("origin", "http://localhost:18550", "public origin")
 	signer := flag.String("android-signer", "", "base64 SHA-256 of the Android signing certificate")
-	if len(os.Args) > 1 {
-		switch os.Args[1] {
-		case "credentials":
-			os.Exit(credential.Command(context.Background(), &secrets, flag.CommandLine, os.Args[2:], nil, os.Stdout))
-		case "migrate":
-			os.Exit(migrateMain(os.Args[2:]))
-		}
+	if code, ok := cli.Dispatch(cli.Commands{
+		"credentials": credential.Run(&secrets, flag.CommandLine, nil),
+		"migrate":     migrate.Run(auth.Schema),
+	}); ok {
+		os.Exit(code)
 	}
 	flag.Parse()
-	p, err := telemetry.FromEnv(slog.NewTextHandler(os.Stderr, nil))
-	log := p.Logger()
-	if err != nil {
-		log.Error("telemetry disabled", "err", err)
-	}
+
+	p := telemetry.Setup(slog.NewTextHandler(os.Stderr, nil))
 	if err := run(p, *addr, *origin, *signer); err != nil {
-		log.Error("exit", "err", err)
+		p.Logger().Error("exit", "err", err)
 		os.Exit(1)
 	}
 }
@@ -100,20 +94,9 @@ func run(p *telemetry.Pipeline, addr, origin, signer string) error {
 		return err
 	}
 	h := server.Site{Telemetry: p, RPC: rpc.Server()}.Handler(mux)
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	ctx, stop := cli.NotifyContext()
 	defer stop()
-	return server.Run(ctx, server.New(addr, h, log), q.Close, p.Shutdown)
-}
-
-func migrateMain(args []string) int {
-	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	db, err := pg.Open(log)
-	if err == nil {
-		err = migrate.Run(context.Background(), db, []migrate.Schema{auth.Schema}, args, os.Stdout)
-	}
-	if err != nil {
-		log.Error("migrate", "err", err)
-		return 1
-	}
-	return 0
+	return server.Run(ctx, server.New(addr, h, log), q.Close, p.Shutdown, func(ctx context.Context) error {
+		return pg.Close(ctx, db)
+	})
 }
